@@ -1,0 +1,148 @@
+name: fleetconfig-controller
+version: v2beta1
+
+vars:
+  GOARCH:
+    command: go
+    args: ["env", "GOARCH"]
+  FLEETCONFIG_CONTROLLER_CONTEXT:
+    value: "."
+  FLEETCONFIG_CONTROLLER_IMAGE: quay.io/open-cluster-management/fleetconfig-controller
+  PORT:
+    value: "2344"
+  PROVIDER:
+    value: "production" # production (generic), eks, gke
+  DEVSPACE_ENV_FILE: '../hack/.versions.env'
+
+pipelines:
+  dev: |-
+    run_dependencies --all
+    build_images fleetconfig-controller-dev
+    create_deployments cert-manager
+    kubectl apply -f ../hack/dev/cluster-issuer.yaml
+    create_deployments fleetconfig-controller-dev
+    start_dev --all
+  deploy: |-
+    run_dependencies --all
+    create_deployments cert-manager
+    create_deployments fleetconfig-controller
+  load-fleetconfig-controller-local: |-
+    run_dependencies --all
+    build_images fleetconfig-controller-local
+  deploy-fleetconfig-controller-local: |-
+    run_pipelines load-fleetconfig-controller-local
+    create_deployments cert-manager
+    kubectl apply -f ../hack/dev/cluster-issuer.yaml
+    create_deployments fleetconfig-controller-local
+  debug: |-
+    run_dependencies --all
+    build_images fleetconfig-controller-dev
+    kubectl -n fleetconfig-system delete deployment fleetconfig-controller-manager
+    create_deployments debug
+    start_dev --all
+
+images:
+  fleetconfig-controller-dev:
+    image: ${FLEETCONFIG_CONTROLLER_IMAGE}
+    tags:
+    - dev
+    createPullSecret: false
+    context: ${FLEETCONFIG_CONTROLLER_CONTEXT}
+    dockerfile: ${FLEETCONFIG_CONTROLLER_CONTEXT}/Dockerfile.devspace
+    rebuildStrategy: ignoreContextChanges
+    docker:
+      args:
+      - --platform=linux/${GOARCH}
+      - --build-arg=PROVIDER=${PROVIDER} # by default, build for "production" aka generic (no provider-specific binaries)
+
+  fleetconfig-controller-local:
+    image: ${FLEETCONFIG_CONTROLLER_IMAGE}-local
+    tags:
+    - local
+    createPullSecret: false
+    context: ${FLEETCONFIG_CONTROLLER_CONTEXT}
+    dockerfile: ${FLEETCONFIG_CONTROLLER_CONTEXT}/Dockerfile
+    rebuildStrategy: ignoreContextChanges
+    docker:
+      args:
+      - --platform=linux/${GOARCH}
+      - --target=${PROVIDER} # by default, build for "production" aka generic (no provider-specific binaries)
+ 
+deployments:
+  fleetconfig-controller:
+    namespace: fleetconfig-system
+    helm:
+      chart:
+        name: ${FLEETCONFIG_CONTROLLER_CONTEXT}/charts/fleetconfig-controller
+      valuesFiles:
+      - ${FLEETCONFIG_CONTROLLER_CONTEXT}/charts/fleetconfig-controller/values.yaml
+    updateImageTags: false
+
+  fleetconfig-controller-dev:
+    namespace: fleetconfig-system
+    helm:
+      chart:
+        name: ${FLEETCONFIG_CONTROLLER_CONTEXT}/charts/fleetconfig-controller
+      values:
+        devspaceEnabled: true
+      valuesFiles:
+      - ${FLEETCONFIG_CONTROLLER_CONTEXT}/charts/fleetconfig-controller/values.yaml
+
+  fleetconfig-controller-local:
+    namespace: fleetconfig-system
+    helm:
+      chart:
+        name: ${FLEETCONFIG_CONTROLLER_CONTEXT}/charts/fleetconfig-controller
+      values:
+        image:
+          repository: ${FLEETCONFIG_CONTROLLER_IMAGE}-local
+          tag: local
+      valuesFiles:
+      - ${FLEETCONFIG_CONTROLLER_CONTEXT}/charts/fleetconfig-controller/values.yaml
+      - ${FLEETCONFIG_CONTROLLER_CONTEXT}/test/data/fleetconfig-values.yaml
+    updateImageTags: false
+
+  debug:
+    kubectl:
+      manifests:
+      - ${FLEETCONFIG_CONTROLLER_CONTEXT}/config/devspace/
+    updateImageTags: false
+
+  cert-manager:
+    helm:
+      chart:
+        name: cert-manager
+        repo: https://charts.jetstack.io
+        version: ${CERT_MANAGER_VERSION}
+      values:
+        namespace: cert-manager
+
+hooks:
+- name: cert-manager-ns
+  command: "kubectl create namespace cert-manager --dry-run=client -o yaml | kubectl apply -f -"
+  events: ["before:deploy"]
+
+dev:
+  fleetconfig-controller-dev:
+    imageSelector: ${FLEETCONFIG_CONTROLLER_IMAGE}
+    terminal:
+      enabled: true
+      disableReplace: true
+      workDir: /workspace
+      command: ./devspace-start.sh
+    ports:
+    - port: ${PORT}
+    sync:
+    - path: .:/workspace
+      excludePaths:
+        - '**'
+        - '!/api'
+        - '!/charts'
+        - '!/cmd'
+        - '!/config'
+        - '!/internal'
+        - '!/devspace-start.sh'
+        - '!/hack'
+        - '!/go.mod'
+        - '!/go.sum'
+        - 'Makefile'

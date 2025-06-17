@@ -1,0 +1,9 @@
+resources:
+- bases/fleetconfig.open-cluster-management.io_fleetconfigs.yaml
+
+patches:
+- path: patches/webhook_in_fleetconfigs.yaml
+- path: patches/cainjection_in_fleetconfigs.yaml
+
+configurations:
+- kustomizeconfig.yaml

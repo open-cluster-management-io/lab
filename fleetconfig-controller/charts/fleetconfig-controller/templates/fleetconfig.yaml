@@ -1,0 +1,64 @@
+{{- if index .Values "fleetConfig" "enabled" }}
+apiVersion: fleetconfig.open-cluster-management.io/v1alpha1
+kind: FleetConfig
+metadata:
+  annotations:
+    helm.sh/resource-policy: keep
+  name: fleetconfig
+  namespace: {{ .Release.Namespace }}
+spec:
+  {{- with .Values.fleetConfig.registrationAuth }}
+  registrationAuth:
+    driver: {{ .driver | quote }}
+    {{- if .hubClusterARN }}
+    hubClusterARN: {{ .hubClusterARN | quote }}
+    {{- end }}
+    {{- if .autoApprovedARNPatterns }}
+    autoApprovedARNPatterns:
+      {{- range .autoApprovedARNPatterns }}
+      - {{ . | quote }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  hub:
+    clusterManager:
+      featureGates: {{ include "featureGates" (dict "dict" .Values.fleetConfig.hub.clusterManager.featureGates) | quote }}
+      purgeOperator: {{ .Values.fleetConfig.hub.clusterManager.purgeOperator }}
+      resources: {{- toYaml .Values.fleetConfig.hub.clusterManager.resources | nindent 8 }}
+      source:
+        bundleVersion: {{ .Values.fleetConfig.source.bundleVersion }}
+        registry: {{ .Values.fleetConfig.source.registry }}
+    createNamespace: {{ .Values.fleetConfig.hub.createNamespace }}
+    force: {{ .Values.fleetConfig.hub.force }}
+    kubeconfig: {{- toYaml .Values.fleetConfig.hub.kubeconfig | nindent 6 }}
+    singleton: {{- toYaml .Values.fleetConfig.hub.singletonControlPlane | nindent 6 }}
+    {{- with .Values.fleetConfig.hub.apiServer }}
+    apiServer: {{ . | quote }}
+    {{- end }}
+  spokes:
+    {{- $spokeFeatureGates := .Values.fleetConfig.spokeFeatureGates }}
+    {{- range .Values.fleetConfig.spokes }}
+    - name: {{ .name }}
+      createNamespace: {{ .createNamespace }}
+      syncLabels: {{ .syncLabels }}
+      kubeconfig: {{- toYaml .kubeconfig | nindent 8 }}
+      ca: {{ .ca | quote }}
+      proxyCa: {{ .proxyCa | quote }}
+      proxyUrl: {{ .proxyUrl | quote }}
+      {{- if .clusterARN }}
+      clusterARN: {{ .clusterARN | quote }}
+      {{- end }}
+      klusterlet:
+        mode: {{ .klusterlet.mode | quote }}
+        purgeOperator: {{ .klusterlet.purgeOperator }}
+        featureGates: {{ include "featureGates" (dict "dict" $spokeFeatureGates) | quote }}
+        forceInternalEndpointLookup: {{ .klusterlet.forceInternalEndpointLookup }}
+        forceInternalEndpointLookupManaged: {{ .klusterlet.forceInternalEndpointLookupManaged }}
+        singleton: {{ .klusterlet.singleton }}
+        managedClusterKubeconfig: {{- toYaml .klusterlet.managedClusterKubeconfig | nindent 10 }}
+        resources: {{- toYaml .klusterlet.resources | nindent 10 }}
+        source:
+          bundleVersion: {{ $.Values.fleetConfig.source.bundleVersion }}
+          registry: {{ $.Values.fleetConfig.source.registry }}
+    {{- end }}
+{{- end }}

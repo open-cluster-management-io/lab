@@ -1,0 +1,59 @@
+{{ if .Values.devspaceEnabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chart.fullname" . }}-manager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    control-plane: controller-manager
+  {{- include "chart.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+    {{- include "chart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+      {{- include "chart.selectorLabels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+    spec:
+      containers:
+      - name: {{ .Release.Name }}
+        command:
+        - /bin/bash
+        - -c
+        - --
+        args:
+          - while true; do sleep 30; done;
+        image: quay.io/open-cluster-management/fleetconfig-controller:dev
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: KUBERNETES_CLUSTER_DOMAIN
+          value: {{ quote .Values.kubernetesClusterDomain }}
+        ports:
+        - containerPort: {{ .Values.webhookService.port }}
+          name: webhook-server
+          protocol: TCP
+        - containerPort: {{ .Values.healthCheck.port }}
+          name: healthz
+          protocol: TCP
+        volumeMounts:
+        - mountPath: {{ .Values.admissionWebhooks.certificate.mountPath }}
+          name: tls-cert-vol
+          readOnly: true
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "chart.fullname" . }}-manager
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - name: tls-cert-vol
+        secret:
+          defaultMode: 420
+          secretName: {{ template "chart.fullname" . }}-admission
+{{ end }}

@@ -1,0 +1,231 @@
+# ClusterRole defining the minimum required permissions for fleetconfig-controller
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "chart.fullname" . }}-manager-role
+  labels:
+    # Aggregate fleetconfig.open-cluster-management.io API permissions to default admin & edit ClusterRoles.
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+    {{- include "chart.labels" . | nindent 4 }}
+rules:
+# Required by 'clusteradm init' and 'clusteradm join' for bootstrapping the hub and joining spoke clusters.
+# Also required by fleetconfig-controller for deleting namespaces during spoke deregistration and cleanup operations;
+# referenced in hub.go:cleanNamespaces() and spoke.go:deregisterSpoke().
+- apiGroups: [""]
+  resources:
+  - "configmaps"
+  - "namespaces"
+  - "secrets"
+  - "serviceaccounts"
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"]
+
+# Required for handling certificate signing requests during spoke join/unjoin operations
+# Used in spoke.go:deregisterSpoke() and fleetconfig_controller.go:cleanup()
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["certificatesigningrequests"]
+  verbs: ["get", "list", "delete", "create", "watch", "deletecollection"]
+- apiGroups: ["certificates.k8s.io"]
+  resources:
+  - "certificatesigningrequests/approval"
+  - "certificatesigningrequests/status"
+  verbs: ["update"]
+- apiGroups: ["certificates.k8s.io"]
+  resources: ["signers"]
+  verbs: ["approve", "sign"]
+
+# Required for managing fleetconfig resources
+- apiGroups: ["fleetconfig.open-cluster-management.io"]
+  resources: ["fleetconfigs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["fleetconfig.open-cluster-management.io"]
+  resources: ["fleetconfigs/status"]
+  verbs: ["update", "patch"]
+
+# Required for handling OCM cluster API resources (ManagedClusters)
+# Used in hub.go:cleanManagedClusters() and spoke.go:deregisterSpoke()
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclusters"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"]
+
+# Required for handling OCM work API resources (ManifestWorks)
+# Referenced in fleetconfig_controller.go:cleanupPreflight() and spoke.go:deregisterSpoke()
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["manifestworks"]
+  verbs: ["get", "list", "watch"]
+
+# Required for handling OCM operator API resources (ClusterManager)
+# Used in hub.go:getClusterManager() and hub.go:cleanHub()
+- apiGroups: ["operator.open-cluster-management.io"]
+  resources: ["clustermanagers"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Required by 'clusteradm init' and 'clusteradm join' for bootstrapping the hub and joining spoke clusters.
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get", "list", "watch", "create", "patch", "update", "delete", "deletecollection"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"]
+- apiGroups: [""]
+  resources: ["serviceaccounts/token"]
+  resourceNames: ["agent-registration-bootstrap"]
+  verbs: ["get", "create"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["replicasets"]
+  verbs: ["get"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources:
+  - "addondeploymentconfigs"
+  - "addontemplates"
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources:
+  - "clustermanagementaddons"
+  - "managedclusteraddons"
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources:
+  - "clustermanagementaddons/finalizers"
+  - "managedclusteraddons/finalizers"
+  verbs: ["update"]
+- apiGroups: ["addon.open-cluster-management.io"]
+  resources:
+  - "clustermanagementaddons/status"
+  - "managedclusteraddons/status"
+  verbs: ["update", "patch"]
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources:
+  - "mutatingwebhookconfigurations"
+  - "validatingwebhookconfigurations"
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions/status"]
+  verbs: ["update", "patch"]
+- apiGroups: ["apiregistration.k8s.io"]
+  resources: ["apiservices"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["authentication.k8s.io"]
+  resources: ["tokenreviews"]
+  verbs: ["create"]
+- apiGroups: ["authorization.k8s.io"]
+  resources: ["subjectaccessreviews"]
+  verbs: ["create", "get"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources:
+  - "managedclustersets"
+  - "placementdecisions"
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["managedclustersets/join"]
+  verbs: ["create"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources:
+  - "addonplacementscores"
+  - "managedclustersetbindings"
+  - "placements"
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources:
+  - "managedclusters/status"
+  - "managedclustersetbindings/status"
+  - "managedclustersets/status"
+  - "placementdecisions/status"
+  - "placements/status"
+  verbs: ["update", "patch"]
+- apiGroups: ["cluster.open-cluster-management.io"]
+  resources: ["placements/finalizers"]
+  verbs: ["update"]
+- apiGroups: ["cluster.x-k8s.io"]
+  resources: ["clusters"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["config.openshift.io"]
+  resources: ["infrastructures"]
+  verbs: ["get"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["events.k8s.io"]
+  resources: ["events"]
+  verbs: ["get", "list", "watch", "create", "patch", "update", "delete", "deletecollection"]
+- apiGroups: ["flowcontrol.apiserver.k8s.io"]
+  resources:
+  - "flowschemas"
+  - "prioritylevelconfigurations"
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["migration.k8s.io"]
+  resources: ["storageversionmigrations"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["multicluster.x-k8s.io"]
+  resources: ["clusterprofiles"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["multicluster.x-k8s.io"]
+  resources: ["clusterprofiles/status"]
+  verbs: ["update", "patch"]
+- apiGroups: ["operator.open-cluster-management.io"]
+  resources: ["klusterlets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["operator.open-cluster-management.io"]
+  resources:
+  - clustermanagers/status
+  - klusterlets
+  verbs: ["update", "patch"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources:
+  - "clusterroles"
+  - "clusterrolebindings"
+  - "roles"
+  - "rolebindings"
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "escalate", "bind"]
+- apiGroups: ["register.open-cluster-management.io"]
+  resources: ["managedclusters/accept"]
+  verbs: ["update"]
+- apiGroups: ["register.open-cluster-management.io"]
+  resources: ["managedclusters/clientcertificates"]
+  verbs: ["renew"]
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["appliedmanifestworks"]
+  verbs: ["list", "update", "patch"]
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["manifestworks"]
+  verbs: ["execute-as"]
+- apiGroups: ["work.open-cluster-management.io"]
+  resources:
+  - "manifestworks"
+  - "manifestworkreplicasets"
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"]
+- apiGroups: ["work.open-cluster-management.io"]
+  resources:
+  - "manifestworks/status"
+  - "manifestworkreplicasets/status"
+  verbs: ["update", "patch"]
+- apiGroups: ["work.open-cluster-management.io"]
+  resources: ["manifestworkreplicasets/finalizers"]
+  verbs: ["update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "chart.fullname" . }}-manager-rolebinding
+  labels:
+  {{- include "chart.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: '{{ include "chart.fullname" . }}-manager-role'
+subjects:
+- kind: ServiceAccount
+  name: '{{ include "chart.fullname" . }}-manager'
+  namespace: '{{ .Release.Namespace }}'

@@ -1,0 +1,6 @@
+{
+    "envTestK8sVersion": "1.33.0",
+    "fullTrace": true,
+    "labelFilter": "",
+    "verbose": true
+}

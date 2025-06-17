@@ -1,0 +1,28 @@
+fleetConfig:
+  spokes:
+  - name: hub-as-spoke
+    createNamespace: true
+    syncLabels: false
+    kubeconfig:
+      inCluster: true
+    klusterlet:
+      mode: "Default"
+      purgeOperator: true
+      forceInternalEndpointLookup: true
+      forceInternalEndpointLookupManaged: false
+      singleton: false
+  - name: spoke
+    createNamespace: true
+    syncLabels: false
+    kubeconfig:
+      # secret is provisioned during E2E test setup
+      secretReference:
+        name: "test-fleetconfig-kubeconfig"
+        namespace: "default"
+        kubeconfigKey: "value"
+    klusterlet:
+      mode: "Default"
+      purgeOperator: true
+      forceInternalEndpointLookup: true
+      forceInternalEndpointLookupManaged: false
+      singleton: false
