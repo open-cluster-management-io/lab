@@ -3,7 +3,9 @@
 ## TL;DR
 
 ```bash
-helm install fleetconfig-controller open-cluster-management.io/helm-charts/fleetconfig-controller -n fleetconfig-system --create-namespace
+helm repo add ocm https://open-cluster-management.io/helm-charts
+helm repo update ocm
+helm install fleetconfig-controller ocm/fleetconfig-controller -n fleetconfig-system --create-namespace
 ```
 
 ## Prerequisites
@@ -34,18 +36,23 @@ helm install fleetconfig-controller open-cluster-management.io/helm-charts/fleet
 | `healthCheck.port`                                  | port the liveness & readiness probes are bound to                                                                              | `9440`                                                   |
 | `kubernetesClusterDomain`                           | kubernetes cluster domain                                                                                                      | `cluster.local`                                          |
 
+### cert-manager
+
+| Name                            | Description                               | Value  |
+| ------------------------------- | ----------------------------------------- | ------ |
+| `cert-manager.enabled`          | Whether to install cert-manager.          | `true` |
+| `clusterIssuer.spec.selfSigned` | Default self-signed issuer configuration. | `{}`   |
+
 ### webhook parameters
 
-| Name                                                 | Description                               | Value                    |
-| ---------------------------------------------------- | ----------------------------------------- | ------------------------ |
-| `certManager.enabled`                                | Whether to install cert-manager.          | `true`                   |
-| `clusterIssuer.spec.selfSigned`                      | Default self-signed issuer configuration. | `{}`                     |
-| `admissionWebhooks.enabled`                          | enable admission webhooks                 | `true`                   |
-| `admissionWebhooks.failurePolicy`                    | admission webhook failure policy          | `Fail`                   |
-| `admissionWebhooks.certificate.mountPath`            | admission webhook certificate mount path  | `/etc/k8s-webhook-certs` |
-| `admissionWebhooks.certManager.revisionHistoryLimit` | cert-manager revision history limit       | `3`                      |
-| `webhookService.type`                                | webhook service type                      | `ClusterIP`              |
-| `webhookService.port`                                | webhook service port                      | `9443`                   |
+| Name                                                 | Description                              | Value                    |
+| ---------------------------------------------------- | ---------------------------------------- | ------------------------ |
+| `admissionWebhooks.enabled`                          | enable admission webhooks                | `true`                   |
+| `admissionWebhooks.failurePolicy`                    | admission webhook failure policy         | `Fail`                   |
+| `admissionWebhooks.certificate.mountPath`            | admission webhook certificate mount path | `/etc/k8s-webhook-certs` |
+| `admissionWebhooks.certManager.revisionHistoryLimit` | cert-manager revision history limit      | `3`                      |
+| `webhookService.type`                                | webhook service type                     | `ClusterIP`              |
+| `webhookService.port`                                | webhook service port                     | `9443`                   |
 
 ### dev parameters
 

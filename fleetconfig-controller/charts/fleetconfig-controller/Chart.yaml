@@ -8,6 +8,6 @@ maintainers:
   - name: TylerGillson
 dependencies:
   - name: cert-manager
-    condition: certManager.enabled
+    condition: cert-manager.enabled
     version: v1.18.1
     repository: https://charts.jetstack.io

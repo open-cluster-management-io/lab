@@ -269,17 +269,22 @@ livenessProbe:
 ## @param kubernetesClusterDomain kubernetes cluster domain
 kubernetesClusterDomain: cluster.local
 
-## @section webhook parameters
+## @section cert-manager
 
-## @param certManager.enabled Whether to install cert-manager.
-certManager:
+## @param cert-manager.enabled Whether to install cert-manager.
+cert-manager:
   enabled: true
+
+  # Add any additional values to pass to the cert-manager Helm chart.
+  # See: https://artifacthub.io/packages/helm/cert-manager/cert-manager
 
 # Configure the spec for the ClusterIssuer used by cert-manager to issue all fleetconfig-controller certificates.
 ## @param clusterIssuer.spec.selfSigned Default self-signed issuer configuration.
 clusterIssuer:
   spec:
     selfSigned: {}
+
+## @section webhook parameters
 
 ## @param admissionWebhooks.enabled enable admission webhooks
 ## @param admissionWebhooks.failurePolicy admission webhook failure policy
