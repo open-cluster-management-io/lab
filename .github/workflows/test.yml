@@ -165,6 +165,7 @@ jobs:
         if: steps.list-changed.outputs.changed == 'true'
         run: |
           ct install \
-          --namespace ocm-labs \
-          --chart-dirs ${{ inputs.repo }}/charts \
-          --helm-extra-set-args '--set=image=${{ env.IMAGE }} --set=image.tag=${{ env.IMAGE_TAG }}'
+            --namespace ocm-labs \
+            --chart-dirs ${{ inputs.repo }}/charts \
+            --helm-extra-set-args \
+              '--set=image.repository=${{ env.IMAGE }} --set=image.tag=${{ env.IMAGE_TAG }}'
