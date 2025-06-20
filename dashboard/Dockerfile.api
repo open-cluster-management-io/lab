@@ -1,0 +1,48 @@
+# APISERVER Dockerfile for OCM Dashboard API
+FROM golang:1.24-alpine AS builder
+
+# Install git and ca-certificates (needed for go modules and HTTPS)
+RUN apk add --no-cache git ca-certificates
+
+# Set working directory
+WORKDIR /app
+
+# Copy go mod files
+COPY apiserver/go.mod apiserver/go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy apiserver source
+COPY apiserver/ ./
+
+# Build the binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags='-w -s -extldflags "-static"' \
+    -a -installsuffix cgo \
+    -o apiserver \
+    main.go
+
+# Final runtime image
+FROM gcr.io/distroless/static:nonroot
+
+# Copy ca-certificates from builder
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+# Copy apiserver binary
+COPY --from=builder /app/apiserver   /app/apiserver
+
+# Set working directory
+WORKDIR /app
+
+# Use non-root user
+USER nonroot:nonroot
+
+# Expose port
+EXPOSE 8080
+
+# Set environment variables
+ENV GIN_MODE=release
+
+# Run the application
+ENTRYPOINT ["/app/apiserver"]
