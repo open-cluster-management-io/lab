@@ -15,7 +15,7 @@ jobs:
       group: test-${{ github.ref }}-${{ inputs.repo }}-reviewable
       cancel-in-progress: true
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
@@ -159,12 +159,12 @@ jobs:
         run: |
           kind load docker-image ${{ env.IMAGE }}:${{ env.IMAGE_TAG }} --name ${{ steps.format-cluster-name.outputs.cluster_name }}
           kubectl config use-context kind-${{ steps.format-cluster-name.outputs.cluster_name }}
-          kubectl create namespace fleetconfig-system
+          kubectl create namespace ocm-labs
 
       - name: Run chart-testing (install)
         if: steps.list-changed.outputs.changed == 'true'
         run: |
           ct install \
-          --namespace fleetconfig-system \
+          --namespace ocm-labs \
           --chart-dirs ${{ inputs.repo }}/charts \
-          --helm-extra-set-args '--set=image.tag=${{ env.IMAGE_TAG }}'
+          --helm-extra-set-args '--set=image=${{ env.IMAGE }} --set=image.tag=${{ env.IMAGE_TAG }}'
