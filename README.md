@@ -45,6 +45,8 @@ To onboard a new lab project:
 
 All projects must follow certain conventions to ensure compatibility with the lab repository's Github Actions workflows.
 
+Refer to the [Test](./.github/workflows/test.yml) and [E2E](./.github/workflows/e2e.yml) workflows for exact details.
+
 #### `make` targets
 
 All projects must define the following `make` targets:
@@ -53,7 +55,9 @@ All projects must define the following `make` targets:
 - `test-e2e`: Invoke end-to-end tests and return an exit code accordingly.
 - `test-unit`: Invoke unit tests and return an exit code accordingly.
 
-Refer to the [Test](./.github/workflows/test.yml) and [E2E](./.github/workflows/e2e.yml) workflows for further details.
+#### Dockerfiles
+
+All Dockerfiles for the project must reside under `<project_name>/build/` and the default Dockerfile must be named `Dockerfile.base`.
 
 #### Helm Charts
 
@@ -78,7 +82,7 @@ image:
 
 This is required so that a locally built image can be used consistently for Helm chart testing.
 
-Refer to the `test-chart` job in the [Test](./.github/workflows/test.yml) workflow for further details.
+See the `test-chart` job in the [Test](./.github/workflows/test.yml) workflow for further details.
 
 ## Governance
 
