@@ -7,6 +7,10 @@ on:
           required: true
           type: string
 
+
+env:
+  GO_REQUIRED_MIN_VERSION: ''
+
 permissions:
   contents: read
 

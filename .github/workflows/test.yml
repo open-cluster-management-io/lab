@@ -7,6 +7,9 @@ on:
         required: true
         type: string
 
+env:
+  GO_REQUIRED_MIN_VERSION: ''
+
 jobs:
   reviewable:
     name: Ensure PR is reviewable & run tests
@@ -143,7 +146,7 @@ jobs:
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
           context: ./${{ inputs.repo }}
-          file: ./${{ inputs.repo }}/build/Dockerfile
+          file: ./${{ inputs.repo }}/build/Dockerfile.base
           platforms: linux/amd64
           target: production
           tags: |
