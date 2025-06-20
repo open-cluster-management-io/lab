@@ -12,12 +12,12 @@ New projects are onboarded via PR and added as subfolders, each governed by its 
 Since our community is still small compared to the [arogoproj](https://github.com/argoproj),
 keeping everything together avoids unnecessary fragmentation.
 
-
 For new add-on projects, please use the
 [addon-contrib](https://github.com/open-cluster-management-io/addon-contrib) repo.
 
 
 ## Table of Contents
+
 - [Current Projects](#current-projects)
 - [Onboarding a New Project](#onboarding-a-new-project)
 - [Governance](#governance)
@@ -27,10 +27,7 @@ For new add-on projects, please use the
 
 ## Current Projects
 
-- **TBD**
-  TBD
-- **TBD**
-  TBD
+- [fleetconfig-controller](./fleetconfig-controller/README.md): Declarative orchestrator for OCM multi-clusters.
 
 
 ## Onboarding a New Project
@@ -44,6 +41,44 @@ To onboard a new lab project:
 1. Create a PR with a brief project overview and confirm the `OWNERS` file is present.  
 1. An OCM maintainer will review and merge the PR.  
 
+### GitHub Actions
+
+All projects must follow certain conventions to ensure compatibility with the lab repository's Github Actions workflows.
+
+#### `make` targets
+
+All projects must define the following `make` targets:
+
+- `check-diff`: Perform any automated formatting, Helm chart README updates, manifest generation, etc. Return a non-zero exit code if a git diff is produced.
+- `test-e2e`: Invoke end-to-end tests and return an exit code accordingly.
+- `test-unit`: Invoke unit tests and return an exit code accordingly.
+
+Refer to the [Test](./.github/workflows/test.yml) and [E2E](./.github/workflows/e2e.yml) workflows for further details.
+
+#### Helm Charts
+
+Any projects that require a Helm chart must be structured as follows:
+
+```bash
+<project_name>
+└── charts
+    └── <project_name> # chart name must match project directory name
+        ├── Chart.yaml
+        ├── templates
+        └── values.yaml
+```
+
+Furthermore, `values.yaml` must contain the following top-level values:
+
+```yaml
+image:
+  repository: <project_image_repository>
+  tag: <project_image_tag>
+```
+
+This is required so that a locally built image can be used consistently for Helm chart testing.
+
+Refer to the `test-chart` job in the [Test](./.github/workflows/test.yml) workflow for further details.
 
 ## Governance
 
