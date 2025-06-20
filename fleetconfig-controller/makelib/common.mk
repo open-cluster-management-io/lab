@@ -43,19 +43,12 @@ check-diff: reviewable ## Execute auto-gen code commands and ensure branch is cl
 
 reviewable-default: fmt vet lint generate manifests helm-doc-gen ## Ensure code is ready for review
 	go mod tidy
+	go mod vendor
 	@$(INFO) PR is ready for review
-
-.PHONY: reviewable-ext-default
-reviewable-ext-default: ## Optional reviewability extension (to be overridden)
-	@$(OK) reviewability extension no-op
 
 fmt-default: ## Run go fmt against code
 	@$(INFO) go fmt
 	@go fmt ./...
-
-.PHONY: fmt-ext-default
-fmt-ext-default: ## Optional fmt extension (to be overridden)
-	@$(OK) fmt extension no-op
 
 vet: ## Run go vet against code
 	@$(INFO) go vet
@@ -64,38 +57,6 @@ vet: ## Run go vet against code
 lint: golangci-lint ## Run golangci-lint against code
 	@$(INFO) lint
 	@$(GOLANGCI_LINT) run --fix --verbose
-
-##@ Testing Targets
-
-COVER_DIR=_build/cov
-COVER_PKGS=$(shell go list ./... | grep -v /e2e) # omit e2e tests
-
-coverage: ## Show global test coverage
-	go tool cover -func $(COVER_DIR)/coverage.out
-
-coverage-html: ## Open global test coverage report in your browser
-	go tool cover -html $(COVER_DIR)/coverage.out
-
-##@ Generation Targets
-
-.PHONY: generate
-generate: controller-gen ## Generate controller API code with controller-gen
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
-##@ Image Targets
-
-CONTAINER_TOOL ?= docker
-TAG ?= latest
-TARGET ?= production
-
-.PHONY: docker-build
-docker-build: ## Build all container images(s)
-	@$(INFO) Building $(IMAGE)...
-	$(CONTAINER_TOOL) build -t $(IMAGE) . $(BUILD_ARGS) --platform linux/$(GOARCH) --target $(TARGET)
-
-.PHONY: docker-push
-docker-push: ## Push docker image with the container tool
-	$(CONTAINER_TOOL) push $(IMAGE)
 
 ##@ Tool Targets
 

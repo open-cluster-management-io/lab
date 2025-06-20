@@ -1,0 +1,55 @@
+ARG OS
+ARG ARCH
+ARG PROVIDER
+
+# Build the manager binary
+FROM golang:1.24.4-alpine3.22 AS builder
+ARG OS
+ARG ARCH
+ARG PROVIDER
+
+RUN apk add --no-cache bash curl python3 py3-pip
+
+# Install Delve for debugging
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
+
+# Install clusteradm
+RUN curl -L https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/install.sh | bash
+
+# Install aws-iam-authenticator if building for EKS
+ARG AWSIAMAUTH_VERSION=0.7.2
+RUN if [ "${PROVIDER}" = "eks" ]; then \
+        curl -Lo aws-iam-authenticator https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/download/v${AWSIAMAUTH_VERSION}/aws-iam-authenticator_${AWSIAMAUTH_VERSION}_${OS}_${ARCH} \
+            && chmod +x aws-iam-authenticator \
+            && mv aws-iam-authenticator /usr/local/bin/; \
+    fi
+
+# Install gcloud and gke-gcloud-auth-plugin if building for GKE
+RUN if [ "${PROVIDER}" = "gke" ]; then \
+        case ${ARCH} in \
+        "amd64") GCLOUD_ARCH=x86_64 ;; \
+        "arm64") GCLOUD_ARCH=arm ;; \
+        *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
+    esac \
+    && curl -Lo google-cloud-sdk.tar.gz https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-${OS}-${GCLOUD_ARCH}.tar.gz \
+    && tar -xzf google-cloud-sdk.tar.gz \
+    && rm google-cloud-sdk.tar.gz \
+    && ./google-cloud-sdk/install.sh --quiet \
+    && ./google-cloud-sdk/bin/gcloud components remove --quiet gsutil bq gcloud-crc32c \
+    && ./google-cloud-sdk/bin/gcloud components install gke-gcloud-auth-plugin \
+    && rm -rf ./google-cloud-sdk/platform/bundledpythonunix \
+    && mv ./google-cloud-sdk /opt/google-cloud-sdk; fi
+
+ENV PATH="/opt/google-cloud-sdk/bin:$PATH"
+
+WORKDIR /workspace
+
+COPY go.mod go.mod
+COPY go.sum go.sum
+RUN go mod download
+
+# Copy the go source
+COPY cmd/main.go cmd/main.go
+COPY api/ api/
+COPY internal/ internal/
+COPY pkg/ pkg/
