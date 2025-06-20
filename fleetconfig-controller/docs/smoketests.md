@@ -1,118 +1,79 @@
 # Smoke Tests
 
-## Single kind cluster
-
-1. Deploy the kind cluster
+Before beginning either scenario, export your target directory. You will store kubeconfigs there in subsequent steps.
 
 ```bash
-kind create cluster --name ocm-demo --kubeconfig ~/Downloads/ocm-demo.kubeconfig
+export TARGET_DIR=""
+mkdir -p $TARGET_DIR
 ```
 
-2. Build & load the latest fleetconfig-controller image
+## Single kind cluster (hub-as-spoke)
 
-```bash
-make docker-build && kind load docker-image quay.io/open-cluster-management/fleetconfig-controller:latest --name ocm-demo
-```
+1. Create a kind cluster
 
-3. Install the fleetconfig-controller
+   ```bash
+   kind create cluster --name ocm-hub-as-spoke --kubeconfig $TARGET_DIR/ocm-hub-as-spoke.kubeconfig
+   export KUBECONFIG=$TARGET_DIR/ocm-hub-as-spoke.kubeconfig
+   ```
 
-```bash
-devspace run-pipeline deploy -n fleetconfig-system -b --kube-context kind-ocm-demo --silent
-```
+1. Build & load the `fleetconfig-controller:latest` image
 
-4. Apply the FleetConfig
+   ```bash
+   IMAGE_FLAVOURS="fleetconfig-controller:./build/Dockerfile.base" make images && \
+     kind load docker-image quay.io/open-cluster-management/fleetconfig-controller:latest \
+       --name ocm-hub-as-spoke
+   ```
 
-```bash
-kubectl apply -f - <<EOF
-apiVersion: fleetconfig.open-cluster-management.io/v1alpha1
-kind: FleetConfig
-metadata:
-  name: fleetconfig-kind-single
-spec:
-  hub:
-    clusterManager:
-      featureGates: "DefaultClusterSet=true,ManifestWorkReplicaSet=true,ResourceCleanup=true"
-      source:
-        bundleVersion: v0.16.0
-        registry: quay.io/open-cluster-management
-  spokes:
-  - name: hub-as-spoke
-    klusterlet:
-      featureGates: "ClusterClaim=true,RawFeedbackJsonString=true"
-      forceInternalEndpointLookup: true
-      source:
-        bundleVersion: v0.16.0
-        registry: quay.io/open-cluster-management
-    kubeconfig:
-      inCluster: true
-EOF
-```
-5. Verify that the FleetConfig is reconciled successfully
-```bash
-kubectl wait --for=jsonpath='{.status.phase}'=Running fleetconfigs.open-cluster-management.io/fleetconfig-kind-single
-```
+1. Install the `fleetconfig-controller`
 
-## Two kind clusters
+   ```bash
+   devspace deploy -n fleetconfig-system
+   ```
 
-1. Deploy the kind clusters
+1. Verify that the `FleetConfig` is reconciled successfully
 
-```bash
-kind create cluster --name ocm-hub --kubeconfig ~/Downloads/ocm-hub.kubeconfig
-kind create cluster --name ocm-spoke --kubeconfig ~/Downloads/ocm-spoke.kubeconfig
-export KUBECONFIG=~/Downloads/ocm-hub.kubeconfig
-```
+   ```bash
+   kubectl wait --for=jsonpath='{.status.phase}'=Running fleetconfig/fleetconfig \
+     -n fleetconfig-system \
+     --timeout=10m
+   ```
 
-2. Obtain an internal kubeconfig for the ocm-spoke cluster
+## Two kind clusters (hub and spoke)
 
-```bash
-kind get kubeconfig --name ocm-spoke --internal > ~/Downloads/ocm-spoke-internal.kubeconfig
-kubectl create secret generic spoke-kubeconfig --from-file=kubeconfig=/Users/tylergillson/Downloads/spoke-internal.kubeconfig
-```
+1. Create two kind clusters
 
-3. Build & load the latest fleetconfig-controller image
+   ```bash
+   kind create cluster --name ocm-hub --kubeconfig $TARGET_DIR/ocm-hub.kubeconfig
+   kind create cluster --name ocm-spoke --kubeconfig $TARGET_DIR/ocm-spoke.kubeconfig
+   export KUBECONFIG=$TARGET_DIR/ocm-hub.kubeconfig
+   ```
 
-```bash
-make docker-build && kind load docker-image quay.io/open-cluster-management/fleetconfig-controller:latest --name ocm-hub
-```
+1. Generate an internal kubeconfig for the `ocm-spoke` cluster and upload it to the `ocm-hub` cluster
 
-4. Install the fleetconfig-controller on the hub
+   ```bash
+   kind get kubeconfig --name ocm-spoke --internal > $TARGET_DIR/ocm-spoke-internal.kubeconfig
+   kubectl create secret generic test-fleetconfig-kubeconfig \
+     --from-file=value=$TARGET_DIR/ocm-spoke-internal.kubeconfig
+   ```
 
-```bash
-devspace run-pipeline deploy -n fleet-config-system -b --kube-context kind-ocm-hub --silent
-```
+1. Build & load the `fleetconfig-controller:local` image
 
-5. Apply the FleetConfig
+   ```bash
+   IMAGE_FLAVOURS="fleetconfig-controller:./build/Dockerfile.base" IMAGE_TAG=local make images && \
+     kind load docker-image quay.io/open-cluster-management/fleetconfig-controller:local \
+       --name ocm-hub
+   ```
 
-```bash
-kubectl apply -f - <<EOF
-apiVersion: fleetconfig.open-cluster-management.io/v1alpha1
-kind: FleetConfig
-metadata:
-  name: fleetconfig-kind-multiple
-spec:
-  hub:
-    clusterManager:
-      featureGates: "DefaultClusterSet=true,ManifestWorkReplicaSet=true,ResourceCleanup=true"
-      source:
-        bundleVersion: v0.16.0
-        registry: quay.io/open-cluster-management
-  spokes:
-  - name: ocm-spoke
-    klusterlet:
-      featureGates: "ClusterClaim=true,RawFeedbackJsonString=true"
-      forceInternalEndpointLookup: true
-      source:
-        bundleVersion: v0.16.0
-        registry: quay.io/open-cluster-management
-    kubeconfig:
-      secretReference:
-        name: spoke-kubeconfig
-        namespace: default
-EOF
-```
+1. Install the `fleetconfig-controller` on the hub using the `deploy-local` pipeline
 
-5. Verify that the FleetConfig is reconciled successfully
+   ```bash
+   devspace run-pipeline deploy-local -n fleet-config-system --skip-build
+   ```
 
-```bash
-kubectl wait --for=jsonpath='{.status.phase}'=Running fleetconfigs.open-cluster-management.io/fleetconfig-kind-multiple --timeout=5m
-```
+1. Verify that the `FleetConfig` is reconciled successfully
+
+   ```bash
+   kubectl wait --for=jsonpath='{.status.phase}'=Running fleetconfig/fleetconfig \
+     -n fleetconfig-system \
+     --timeout=10m
+   ```

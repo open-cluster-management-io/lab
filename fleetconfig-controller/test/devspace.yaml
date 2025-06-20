@@ -5,7 +5,7 @@ imports:
 - path: ../devspace.yaml
 
 vars:
-  FLEETCONFIG_CONTROLLER_CONTEXT:
+  CONTEXT:
     value: ".."
 
 pipelines:

@@ -5,34 +5,35 @@ vars:
   GOARCH:
     command: go
     args: ["env", "GOARCH"]
-  FLEETCONFIG_CONTROLLER_CONTEXT:
+  CONTEXT:
     value: "."
-  FLEETCONFIG_CONTROLLER_IMAGE: quay.io/open-cluster-management/fleetconfig-controller
+  IMAGE_REPOSITORY: quay.io/open-cluster-management/fleetconfig-controller
+  IMAGE_TAG: latest
   PORT:
     value: "2344"
   PROVIDER:
     value: "production" # production (generic), eks, gke
-  DEVSPACE_ENV_FILE: '../hack/.versions.env'
+  DEVSPACE_ENV_FILE: './hack/.versions.env'
 
 pipelines:
   dev: |-
     run_dependencies --all
     build_images fleetconfig-controller-dev
     create_deployments cert-manager
-    kubectl apply -f ../hack/dev/cluster-issuer.yaml
+    kubectl apply -f ./hack/dev/cluster-issuer.yaml
     create_deployments fleetconfig-controller-dev
     start_dev --all
   deploy: |-
     run_dependencies --all
     create_deployments cert-manager
     create_deployments fleetconfig-controller
-  load-fleetconfig-controller-local: |-
+  load-local: |-
     run_dependencies --all
     build_images fleetconfig-controller-local
-  deploy-fleetconfig-controller-local: |-
-    run_pipelines load-fleetconfig-controller-local
+  deploy-local: |-
+    run_pipelines load-local
     create_deployments cert-manager
-    kubectl apply -f ../hack/dev/cluster-issuer.yaml
+    kubectl apply -f ./hack/dev/cluster-issuer.yaml
     create_deployments fleetconfig-controller-local
   debug: |-
     run_dependencies --all
@@ -43,12 +44,12 @@ pipelines:
 
 images:
   fleetconfig-controller-dev:
-    image: ${FLEETCONFIG_CONTROLLER_IMAGE}
+    image: ${IMAGE_REPOSITORY}
     tags:
     - dev
     createPullSecret: false
-    context: ${FLEETCONFIG_CONTROLLER_CONTEXT}
-    dockerfile: ${FLEETCONFIG_CONTROLLER_CONTEXT}/Dockerfile.devspace
+    context: ${CONTEXT}
+    dockerfile: ${CONTEXT}/build/Dockerfile.devspace
     rebuildStrategy: ignoreContextChanges
     docker:
       args:
@@ -56,12 +57,12 @@ images:
       - --build-arg=PROVIDER=${PROVIDER} # by default, build for "production" aka generic (no provider-specific binaries)
 
   fleetconfig-controller-local:
-    image: ${FLEETCONFIG_CONTROLLER_IMAGE}-local
+    image: ${IMAGE_REPOSITORY}-local
     tags:
     - local
     createPullSecret: false
-    context: ${FLEETCONFIG_CONTROLLER_CONTEXT}
-    dockerfile: ${FLEETCONFIG_CONTROLLER_CONTEXT}/Dockerfile
+    context: ${CONTEXT}
+    dockerfile: ${CONTEXT}/build/Dockerfile.base
     rebuildStrategy: ignoreContextChanges
     docker:
       args:
@@ -73,39 +74,43 @@ deployments:
     namespace: fleetconfig-system
     helm:
       chart:
-        name: ${FLEETCONFIG_CONTROLLER_CONTEXT}/charts/fleetconfig-controller
+        name: ${CONTEXT}/charts/fleetconfig-controller
+      values:
+        image:
+          repository: ${IMAGE_REPOSITORY}
+          tag: ${IMAGE_TAG}
       valuesFiles:
-      - ${FLEETCONFIG_CONTROLLER_CONTEXT}/charts/fleetconfig-controller/values.yaml
+      - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
     updateImageTags: false
 
   fleetconfig-controller-dev:
     namespace: fleetconfig-system
     helm:
       chart:
-        name: ${FLEETCONFIG_CONTROLLER_CONTEXT}/charts/fleetconfig-controller
+        name: ${CONTEXT}/charts/fleetconfig-controller
       values:
         devspaceEnabled: true
       valuesFiles:
-      - ${FLEETCONFIG_CONTROLLER_CONTEXT}/charts/fleetconfig-controller/values.yaml
+      - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
 
   fleetconfig-controller-local:
     namespace: fleetconfig-system
     helm:
       chart:
-        name: ${FLEETCONFIG_CONTROLLER_CONTEXT}/charts/fleetconfig-controller
+        name: ${CONTEXT}/charts/fleetconfig-controller
       values:
         image:
-          repository: ${FLEETCONFIG_CONTROLLER_IMAGE}-local
+          repository: ${IMAGE_REPOSITORY}
           tag: local
       valuesFiles:
-      - ${FLEETCONFIG_CONTROLLER_CONTEXT}/charts/fleetconfig-controller/values.yaml
-      - ${FLEETCONFIG_CONTROLLER_CONTEXT}/test/data/fleetconfig-values.yaml
+      - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
+      - ${CONTEXT}/test/data/fleetconfig-values.yaml
     updateImageTags: false
 
   debug:
     kubectl:
       manifests:
-      - ${FLEETCONFIG_CONTROLLER_CONTEXT}/config/devspace/
+      - ${CONTEXT}/config/devspace/
     updateImageTags: false
 
   cert-manager:
@@ -115,6 +120,8 @@ deployments:
         repo: https://charts.jetstack.io
         version: ${CERT_MANAGER_VERSION}
       values:
+        crds:
+          enabled: true
         namespace: cert-manager
 
 hooks:
@@ -124,7 +131,7 @@ hooks:
 
 dev:
   fleetconfig-controller-dev:
-    imageSelector: ${FLEETCONFIG_CONTROLLER_IMAGE}
+    imageSelector: ${IMAGE_REPOSITORY}
     terminal:
       enabled: true
       disableReplace: true

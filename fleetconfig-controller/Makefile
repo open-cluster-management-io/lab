@@ -12,14 +12,10 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 
 IMAGE_REGISTRY ?= quay.io/open-cluster-management
 IMAGE_TAG ?= latest
-
-IMAGE_FLAVOURS := \
-	fleetconfig-controller:./build/Dockerfile.base
-
-#IMAGE_FLAVOURS := \
-#	fleetconfig-controller:./build/Dockerfile.base \
-#	fleetconfig-controller-eks:./build/Dockerfile.eks \
-#	fleetconfig-controller-gke:./build/Dockerfile.gke
+IMAGE_FLAVOURS ?= \
+	fleetconfig-controller:./build/Dockerfile.base \
+	fleetconfig-controller-eks:./build/Dockerfile.eks \
+	fleetconfig-controller-gke:./build/Dockerfile.gke
 
 # Generate build targets for each variant
 $(foreach flavour,$(IMAGE_FLAVOURS),\
