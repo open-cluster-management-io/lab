@@ -1,0 +1,70 @@
+# Support bundle definition for the fleetconfig E2E tests.
+#
+# Documentation: https://troubleshoot.sh/docs/support-bundle/introduction/.
+#
+# Notes:
+# - Logs collection is best-effort by default. If a logs collector fails to find a pod,
+#   it will be ignored.
+# - If a bundle definition fails to load due to a malformed spec,
+#   the support-bundle command will fail with:
+#
+#   Error: no collectors specified to run. Use --debug and/or -v=2 to see more information
+#
+#   Therefore you must be very careful when editing the bundle definition to ensure it is valid!
+#   Ref: https://github.com/replicatedhq/troubleshoot/issues/1312
+#
+apiVersion: troubleshoot.sh/v1beta2
+kind: SupportBundle
+metadata:
+  name: fleetconfig-bundle
+spec:
+  collectors:
+  - clusterInfo: {}
+  - clusterResources:
+      namespaces:
+      - fleetconfig-system
+      - open-cluster-management
+      - open-cluster-management-agent
+      - open-cluster-management-hub
+      ignoreRBAC: true
+  - secret:
+      namespace: fleetconfig-system
+      selector:
+      - app.kubernetes.io/managed-by=Helm
+  - secret:
+      namespace: open-cluster-management-agent
+      name: bootstrap-hub-kubeconfig
+  - secret:
+      namespace: open-cluster-management-agent
+      name: hub-kubeconfig-secret
+  - logs:
+      selector:
+      - app.kubernetes.io/name=fleetconfig
+      namespace: fleetconfig-system
+      name: fleetconfig/fleetconfig
+  - logs:
+      selector:
+      - app=klusterlet-registration-agent
+      namespace: open-cluster-management-agent
+      name: ocm/klusterlet-registration-agent
+  - logs:
+      selector:
+      - app=klusterlet-manifestwork-agent
+      namespace: open-cluster-management-agent
+      name: ocm/klusterlet-work-agent
+  - logs:
+      selector:
+      - app=clustermanager-placement-controller
+      namespace: open-cluster-management-hub
+      name: ocm/cluster-manager-placement-controller
+  - logs:
+      selector:
+      - app=clustermanager-registration-controller
+      namespace: open-cluster-management-hub
+      name: ocm/cluster-manager-registration-controller
+  - logs:
+      selector:
+      - app=cluster-manager-work-controller
+      namespace: open-cluster-management-hub
+      name: ocm/cluster-manager-work-controller
+  analyzers: []

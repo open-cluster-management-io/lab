@@ -1,0 +1,22 @@
+{{- if .Values.admissionWebhooks.enabled -}}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "chart.fullname" . }}-admission
+  namespace: {{ .Release.Namespace }}
+  annotations:
+  {{- include "chart.annotations" . | nindent 4 }}
+    "helm.sh/hook": pre-install,pre-upgrade
+  labels:
+  {{- include "chart.labels" . | nindent 4 }}
+spec:
+  dnsNames:
+  - '{{ include "chart.fullname" . }}-webhook.{{ .Release.Namespace }}.svc'
+  - '{{ include "chart.fullname" . }}-webhook.{{ .Release.Namespace }}.svc.{{
+    .Values.kubernetesClusterDomain }}'
+  issuerRef:
+    kind: ClusterIssuer
+    name: fleetconfig-controller
+  revisionHistoryLimit: {{ .Values.admissionWebhooks.certManager.revisionHistoryLimit }}
+  secretName: {{ template "chart.fullname" . }}-admission
+{{- end }}

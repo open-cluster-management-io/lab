@@ -1,0 +1,21 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fleetconfig-viewer
+  labels:
+  {{- include "chart.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - fleetconfig.open-cluster-management.io
+  resources:
+  - fleetconfigs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - fleetconfig.open-cluster-management.io
+  resources:
+  - fleetconfigs/status
+  verbs:
+  - get

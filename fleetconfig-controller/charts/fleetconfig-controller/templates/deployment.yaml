@@ -1,0 +1,88 @@
+{{ if not .Values.devspaceEnabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chart.fullname" . }}-manager
+  labels:
+    control-plane: controller-manager
+  {{- include "chart.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+    {{- include "chart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+      {{- include "chart.selectorLabels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+      {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      serviceAccountName: {{ include "chart.fullname" . }}-manager
+      terminationGracePeriodSeconds: 10
+      containers:
+      - args:
+        - "--leader-elect"
+        - "--health-probe-bind-address=:{{ .Values.healthCheck.port }}"
+        {{ if .Values.admissionWebhooks.enabled }}
+        - "--use-webhook=true"
+        - "--webhook-port={{ .Values.webhookService.port }}"
+        - "--webhook-cert-dir={{ .Values.admissionWebhooks.certificate.mountPath }}"
+        {{ end }}
+        command:
+        - /manager
+        env:
+        - name: KUBERNETES_CLUSTER_DOMAIN
+          value: {{ quote .Values.kubernetesClusterDomain }}
+        image: {{ include "controller.image" . }}
+        imagePullPolicy: {{ quote .Values.image.pullPolicy }}
+        name: manager
+        resources:
+        {{- toYaml .Values.resources | nindent 12 }}
+        securityContext:
+        {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+      {{ if .Values.admissionWebhooks.enabled }}
+        ports:
+        - containerPort: {{ .Values.webhookService.port }}
+          name: webhook-server
+          protocol: TCP
+        - containerPort: {{ .Values.healthCheck.port }}
+          name: healthz
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: healthz
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          successThreshold: {{ .Values.livenessProbe.successThreshold }}
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: healthz
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          successThreshold: {{ .Values.readinessProbe.successThreshold }}
+        volumeMounts:
+        - mountPath: {{ .Values.admissionWebhooks.certificate.mountPath }}
+          name: tls-cert-vol
+          readOnly: true
+      volumes:
+      - name: tls-cert-vol
+        secret:
+          defaultMode: 420
+          secretName: {{ template "chart.fullname" . }}-admission
+      {{ end }}
+{{ end }}

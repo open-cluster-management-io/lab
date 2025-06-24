@@ -1,0 +1,620 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: CERTIFICATE_NAMESPACE/CERTIFICATE_NAME
+    controller-gen.kubebuilder.io/version: v0.17.0
+  name: fleetconfigs.fleetconfig.open-cluster-management.io
+spec:
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        service:
+          name: webhook-service
+          namespace: system
+          path: /convert
+      conversionReviewVersions:
+      - v1
+  group: fleetconfig.open-cluster-management.io
+  names:
+    kind: FleetConfig
+    listKind: FleetConfigList
+    plural: fleetconfigs
+    singular: fleetconfig
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: FleetConfig is the Schema for the fleetconfigs API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: FleetConfigSpec defines the desired state of FleetConfig.
+            properties:
+              hub:
+                description: Hub provides specifications for an OCM hub cluster.
+                properties:
+                  apiServer:
+                    description: |-
+                      APIServer is the API server URL for the Hub cluster. If provided, the hub will be joined
+                      using this API server instead of the one in the obtained kubeconfig. This is useful when
+                      using in-cluster kubeconfig when that kubeconfig would return an incorrect API server URL.
+                    type: string
+                  clusterManager:
+                    default: {}
+                    description: ClusterManager configuration.
+                    properties:
+                      featureGates:
+                        default: AddonManagement=true
+                        description: |-
+                          A set of comma-separated pairs of the form 'key1=value1,key2=value2' that describe feature gates for alpha/experimental features.
+                          Options are:
+                           - AddonManagement (ALPHA - default=true)
+                           - AllAlpha (ALPHA - default=false)
+                           - AllBeta (BETA - default=false)
+                           - CloudEventsDrivers (ALPHA - default=false)
+                           - DefaultClusterSet (ALPHA - default=false)
+                           - ManagedClusterAutoApproval (ALPHA - default=false)
+                           - ManifestWorkReplicaSet (ALPHA - default=false)
+                           - NilExecutorValidating (ALPHA - default=false)
+                           - ResourceCleanup (BETA - default=true)
+                           - V1beta1CSRAPICompatibility (ALPHA - default=false)
+                        type: string
+                      purgeOperator:
+                        default: true
+                        description: |-
+                          If set, the cluster manager operator will be purged and the open-cluster-management namespace deleted
+                          when the FleetConfig CR is deleted.
+                        type: boolean
+                      resources:
+                        description: Resource specifications for all clustermanager-managed
+                          containers.
+                        properties:
+                          limits:
+                            description: The resource limits of all the containers
+                              managed by the Cluster Manager or Klusterlet operators.
+                            properties:
+                              cpu:
+                                description: The number of CPU units to request, e.g.,
+                                  '800m'.
+                                type: string
+                              memory:
+                                description: The amount of memory to request, e.g.,
+                                  '8Gi'.
+                                type: string
+                            type: object
+                          qosClass:
+                            default: Default
+                            description: |-
+                              The resource QoS class of all the containers managed by the Cluster Manager or Klusterlet operators.
+                              One of Default, BestEffort or ResourceRequirement.
+                            enum:
+                            - Default
+                            - BestEffort
+                            - ResourceRequirement
+                            type: string
+                          requests:
+                            description: The resource requests of all the containers
+                              managed by the Cluster Manager or Klusterlet operators.
+                            properties:
+                              cpu:
+                                description: The number of CPU units to request, e.g.,
+                                  '800m'.
+                                type: string
+                              memory:
+                                description: The amount of memory to request, e.g.,
+                                  '8Gi'.
+                                type: string
+                            type: object
+                        required:
+                        - qosClass
+                        type: object
+                      source:
+                        default: {}
+                        description: Version and image registry details for the cluster
+                          manager.
+                        properties:
+                          bundleVersion:
+                            default: default
+                            description: |-
+                              The version of predefined compatible image versions (e.g. v0.6.0). Defaults to the latest released version.
+                              You can also set "latest" to install the latest development version.
+                            type: string
+                          registry:
+                            default: quay.io/open-cluster-management
+                            description: The name of the image registry serving OCM
+                              images, which will be used for all OCM components."
+                            type: string
+                        type: object
+                      useBootstrapToken:
+                        description: If set, the bootstrap token will used instead
+                          of a service account token.
+                        type: boolean
+                    type: object
+                  createNamespace:
+                    default: true
+                    description: If true, create open-cluster-management namespace,
+                      otherwise use existing one.
+                    type: boolean
+                  force:
+                    description: If set, the hub will be reinitialized.
+                    type: boolean
+                  kubeconfig:
+                    description: Kubeconfig details for the Hub cluster.
+                    properties:
+                      context:
+                        description: The context to use in the kubeconfig file.
+                        type: string
+                      inCluster:
+                        description: |-
+                          If set, the kubeconfig will be read from the cluster.
+                          Only applicable for same-cluster operations.
+                          Defaults to false.
+                        type: boolean
+                      secretReference:
+                        description: |-
+                          A reference to an existing secret containing a kubeconfig.
+                          Must be provided for remote clusters.
+                          For same-cluster, must be provided unless InCluster is set to true.
+                        properties:
+                          kubeconfigKey:
+                            description: |-
+                              The map key to access the kubeconfig.
+                              Leave empty to use 'kubeconfig'.
+                            type: string
+                          name:
+                            description: The name of the secret.
+                            type: string
+                          namespace:
+                            description: The namespace the secret is in.
+                            type: string
+                        required:
+                        - name
+                        - namespace
+                        type: object
+                    type: object
+                  singleton:
+                    description: |-
+                      Singleton control plane configuration. If provided, deploy a singleton control plane instead of clustermanager.
+                      This is an alpha stage flag.
+                    properties:
+                      helm:
+                        description: |-
+                          Helm configuration for the multicluster-controlplane Helm chart.
+                          For now https://open-cluster-management.io/helm-charts/ocm/multicluster-controlplane is always used - no private registry support.
+                          See: https://github.com/open-cluster-management-io/multicluster-controlplane/blob/main/charts/multicluster-controlplane/values.yaml
+                        properties:
+                          set:
+                            description: Comma-separated Helm values, e.g., key1=val1,key2=val2.
+                            items:
+                              type: string
+                            type: array
+                          setJson:
+                            description: Comma-separated Helm JSON values, e.g., key1=jsonval1,key2=jsonval2.
+                            items:
+                              type: string
+                            type: array
+                          setLiteral:
+                            description: Comma-separated Helm literal STRING values.
+                            items:
+                              type: string
+                            type: array
+                          setString:
+                            description: Comma-separated Helm STRING values, e.g.,
+                              key1=val1,key2=val2.
+                            items:
+                              type: string
+                            type: array
+                          values:
+                            description: Raw, YAML-formatted Helm values.
+                            type: string
+                        type: object
+                      name:
+                        default: singleton-controlplane
+                        description: The name of the singleton control plane.
+                        type: string
+                    required:
+                    - helm
+                    - name
+                    type: object
+                required:
+                - createNamespace
+                - kubeconfig
+                type: object
+              registrationAuth:
+                description: RegistrationAuth provides specifications for registration
+                  authentication.
+                properties:
+                  autoApprovedARNPatterns:
+                    description: |-
+                      List of AWS EKS ARN patterns so any EKS clusters with these patterns will be auto accepted to join with hub cluster.
+                      Example pattern: "arn:aws:eks:us-west-2:123456789013:cluster/.*"
+                    items:
+                      type: string
+                    type: array
+                  driver:
+                    default: csr
+                    description: |-
+                      The registration authentication driver to use.
+                      Options are:
+                       - csr: Use the default CSR-based registration authentication.
+                       - awsirsa: Use AWS IAM Role for Service Accounts (IRSA) registration authentication.
+                      The set of valid options is open for extension.
+                    enum:
+                    - csr
+                    - awsirsa
+                    type: string
+                  hubClusterARN:
+                    description: The Hub cluster ARN for awsirsa registration authentication.
+                      Required when Type is awsirsa, otherwise ignored.
+                    type: string
+                required:
+                - driver
+                type: object
+              spokes:
+                items:
+                  description: Spoke provides specifications for joining and potentially
+                    upgrading spokes.
+                  properties:
+                    ca:
+                      description: Hub cluster CA certificate, optional
+                      type: string
+                    clusterARN:
+                      description: |-
+                        ClusterARN is the ARN of the spoke cluster.
+                        This field is optionally used for AWS IRSA registration authentication.
+                      type: string
+                    createNamespace:
+                      default: true
+                      description: |-
+                        If true, create open-cluster-management namespace and agent namespace (open-cluster-management-agent for Default mode,
+                        <klusterlet-name> for Hosted mode), otherwise use existing one.
+                      type: boolean
+                    klusterlet:
+                      default: {}
+                      description: Klusterlet configuration.
+                      properties:
+                        featureGates:
+                          default: AddonManagement=true,ClusterClaim=true
+                          description: |-
+                            A set of comma-separated pairs of the form 'key1=value1,key2=value2' that describe feature gates for alpha/experimental features.
+                            Options are:
+                             - AddonManagement (ALPHA - default=true)
+                             - AllAlpha (ALPHA - default=false)
+                             - AllBeta (BETA - default=false)
+                             - ClusterClaim (ALPHA - default=true)
+                             - ExecutorValidatingCaches (ALPHA - default=false)
+                             - RawFeedbackJsonString (ALPHA - default=false)
+                             - V1beta1CSRAPICompatibility (ALPHA - default=false)
+                          type: string
+                        forceInternalEndpointLookup:
+                          description: |-
+                            If true, the installed klusterlet agent will start the cluster registration process by looking for the
+                            internal endpoint from the public cluster-info in the Hub cluster instead of using hubApiServer.
+                          type: boolean
+                        forceInternalEndpointLookupManaged:
+                          description: |-
+                            If true, the klusterlet accesses the managed cluster using the internal endpoint from the public
+                            cluster-info in the managed cluster instead of using managedClusterKubeconfig.
+                          type: boolean
+                        managedClusterKubeconfig:
+                          description: External managed cluster kubeconfig, required
+                            if using hosted mode.
+                          properties:
+                            context:
+                              description: The context to use in the kubeconfig file.
+                              type: string
+                            inCluster:
+                              description: |-
+                                If set, the kubeconfig will be read from the cluster.
+                                Only applicable for same-cluster operations.
+                                Defaults to false.
+                              type: boolean
+                            secretReference:
+                              description: |-
+                                A reference to an existing secret containing a kubeconfig.
+                                Must be provided for remote clusters.
+                                For same-cluster, must be provided unless InCluster is set to true.
+                              properties:
+                                kubeconfigKey:
+                                  description: |-
+                                    The map key to access the kubeconfig.
+                                    Leave empty to use 'kubeconfig'.
+                                  type: string
+                                name:
+                                  description: The name of the secret.
+                                  type: string
+                                namespace:
+                                  description: The namespace the secret is in.
+                                  type: string
+                              required:
+                              - name
+                              - namespace
+                              type: object
+                          type: object
+                        mode:
+                          default: Default
+                          description: Deployent mode for klusterlet
+                          enum:
+                          - Default
+                          - Hosted
+                          type: string
+                        purgeOperator:
+                          default: true
+                          description: |-
+                            If set, the klusterlet operator will be purged and all open-cluster-management namespaces deleted
+                            when the klusterlet is unjoined from its Hub cluster.
+                          type: boolean
+                        resources:
+                          description: Resource specifications for all klusterlet-managed
+                            containers.
+                          properties:
+                            limits:
+                              description: The resource limits of all the containers
+                                managed by the Cluster Manager or Klusterlet operators.
+                              properties:
+                                cpu:
+                                  description: The number of CPU units to request,
+                                    e.g., '800m'.
+                                  type: string
+                                memory:
+                                  description: The amount of memory to request, e.g.,
+                                    '8Gi'.
+                                  type: string
+                              type: object
+                            qosClass:
+                              default: Default
+                              description: |-
+                                The resource QoS class of all the containers managed by the Cluster Manager or Klusterlet operators.
+                                One of Default, BestEffort or ResourceRequirement.
+                              enum:
+                              - Default
+                              - BestEffort
+                              - ResourceRequirement
+                              type: string
+                            requests:
+                              description: The resource requests of all the containers
+                                managed by the Cluster Manager or Klusterlet operators.
+                              properties:
+                                cpu:
+                                  description: The number of CPU units to request,
+                                    e.g., '800m'.
+                                  type: string
+                                memory:
+                                  description: The amount of memory to request, e.g.,
+                                    '8Gi'.
+                                  type: string
+                              type: object
+                          required:
+                          - qosClass
+                          type: object
+                        singleton:
+                          description: |-
+                            If true, deploy klusterlet in singleton mode, with registration and work agents running in a single pod.
+                            This is an alpha stage flag.
+                          type: boolean
+                        source:
+                          default: {}
+                          description: Version and image registry details for the
+                            klusterlet.
+                          properties:
+                            bundleVersion:
+                              default: default
+                              description: |-
+                                The version of predefined compatible image versions (e.g. v0.6.0). Defaults to the latest released version.
+                                You can also set "latest" to install the latest development version.
+                              type: string
+                            registry:
+                              default: quay.io/open-cluster-management
+                              description: The name of the image registry serving
+                                OCM images, which will be used for all OCM components."
+                              type: string
+                          type: object
+                      type: object
+                    kubeconfig:
+                      description: Kubeconfig details for the Spoke cluster.
+                      properties:
+                        context:
+                          description: The context to use in the kubeconfig file.
+                          type: string
+                        inCluster:
+                          description: |-
+                            If set, the kubeconfig will be read from the cluster.
+                            Only applicable for same-cluster operations.
+                            Defaults to false.
+                          type: boolean
+                        secretReference:
+                          description: |-
+                            A reference to an existing secret containing a kubeconfig.
+                            Must be provided for remote clusters.
+                            For same-cluster, must be provided unless InCluster is set to true.
+                          properties:
+                            kubeconfigKey:
+                              description: |-
+                                The map key to access the kubeconfig.
+                                Leave empty to use 'kubeconfig'.
+                              type: string
+                            name:
+                              description: The name of the secret.
+                              type: string
+                            namespace:
+                              description: The namespace the secret is in.
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          type: object
+                      type: object
+                    name:
+                      description: The name of the spoke cluster.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                      type: string
+                    proxyCa:
+                      description: Proxy CA certificate, optional
+                      type: string
+                    proxyUrl:
+                      description: URL of a forward proxy server used by agents to
+                        connect to the Hub cluster.
+                      type: string
+                    syncLabels:
+                      description: If true, sync the labels from klusterlet to all
+                        agent resources.
+                      type: boolean
+                  required:
+                  - createNamespace
+                  - kubeconfig
+                  - name
+                  type: object
+                type: array
+            required:
+            - hub
+            - spokes
+            type: object
+          status:
+            description: FleetConfigStatus defines the observed state of FleetConfig.
+            properties:
+              conditions:
+                items:
+                  description: Condition describes the state of a FleetConfig.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                    wantStatus:
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  - wantStatus
+                  type: object
+                type: array
+              joinedSpokes:
+                items:
+                  description: JoinedSpoke represents a spoke that has been joined
+                    to a hub.
+                  properties:
+                    kubeconfig:
+                      description: Kubeconfig details for the Spoke cluster.
+                      properties:
+                        context:
+                          description: The context to use in the kubeconfig file.
+                          type: string
+                        inCluster:
+                          description: |-
+                            If set, the kubeconfig will be read from the cluster.
+                            Only applicable for same-cluster operations.
+                            Defaults to false.
+                          type: boolean
+                        secretReference:
+                          description: |-
+                            A reference to an existing secret containing a kubeconfig.
+                            Must be provided for remote clusters.
+                            For same-cluster, must be provided unless InCluster is set to true.
+                          properties:
+                            kubeconfigKey:
+                              description: |-
+                                The map key to access the kubeconfig.
+                                Leave empty to use 'kubeconfig'.
+                              type: string
+                            name:
+                              description: The name of the secret.
+                              type: string
+                            namespace:
+                              description: The namespace the secret is in.
+                              type: string
+                          required:
+                          - name
+                          - namespace
+                          type: object
+                      type: object
+                    name:
+                      description: The name of the spoke cluster.
+                      type: string
+                    purgeKlusterletOperator:
+                      default: true
+                      description: |-
+                        If set, the klusterlet operator will be purged and all open-cluster-management namespaces deleted
+                        when the klusterlet is unjoined from its Hub cluster.
+                      type: boolean
+                  required:
+                  - kubeconfig
+                  - name
+                  type: object
+                type: array
+              phase:
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

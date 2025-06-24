@@ -1,0 +1,15 @@
+name: fleetconfig-controller
+version: v2beta1
+
+imports:
+- path: ../devspace.yaml
+
+vars:
+  CONTEXT:
+    value: ".."
+
+pipelines:
+  deploy: |-
+    run_dependencies --all
+    build_images fleetconfig-controller-local
+    create_deployments fleetconfig-controller-local

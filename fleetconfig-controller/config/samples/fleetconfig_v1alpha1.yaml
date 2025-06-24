@@ -1,0 +1,11 @@
+apiVersion: fleetconfig.open-cluster-management.io/v1alpha1
+kind: FleetConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: fleetconfig-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: fleetconfig-sample
+spec:
+  hub: {}
+  spokes:
+  - name: hub-as-spoke

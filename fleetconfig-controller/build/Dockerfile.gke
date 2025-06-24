@@ -1,0 +1,98 @@
+# This Dockerfile is used to build the GKE fleetconfig-controller manager image for all platforms.
+
+ARG OS
+ARG ARCH
+
+## Stage 1: Build the manager binary
+FROM golang:1.24.4-alpine3.22 AS builder
+ARG OS
+ARG ARCH
+
+# Add prerequisites for installing bundled binaries
+RUN apk update && apk add --no-cache bash curl
+
+WORKDIR /workspace
+
+COPY go.mod go.mod
+COPY go.sum go.sum
+RUN go mod download
+
+# Copy the go source
+COPY cmd/main.go cmd/main.go
+COPY api/ api/
+COPY internal/ internal/
+COPY pkg/ pkg/
+
+# Build
+RUN CGO_ENABLED=0 GOOS=${OS:-linux} GOARCH=${ARCH} go build -a -o manager cmd/main.go
+
+## Stage 2: Install dependencies
+FROM golang:1.24.4-alpine3.22 AS dependencies
+ARG OS
+ARG ARCH
+
+RUN apk update && apk add --no-cache bash curl
+
+# Install clusteradm
+ARG CLUSTERADM_VERSION=0.11.1
+RUN curl -L https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/install.sh | bash -s -- ${CLUSTERADM_VERSION}
+
+## Stage 3: Compress binaries with upx to reduce image size
+FROM python:3.13-alpine AS upx
+RUN apk update && apk add --no-cache upx
+
+WORKDIR /output
+COPY --from=dependencies /usr/local/bin/clusteradm /input/clusteradm
+COPY --from=builder /workspace/manager /input/manager
+
+RUN mkdir -p /output && \
+    upx -1 /input/clusteradm -o /output/clusteradm || cp /input/clusteradm /output/clusteradm && \
+    upx -1 /input/manager -o /output/manager || cp /input/manager /output/manager
+
+## Stage 4: Finalize
+
+# Use Python image instead of distroless to support gcloud
+FROM python:3.13-alpine AS production
+ARG OS
+ARG ARCH
+
+WORKDIR /
+
+RUN apk update && apk add --no-cache bash curl
+
+# Install gke-gcloud-auth-plugin (and gcloud which it depends on)
+ARG GCLOUD_VERSION=525.0.0
+RUN case ${ARCH} in \
+        "amd64") GCLOUD_ARCH=x86_64 ;; \
+        "arm64") GCLOUD_ARCH=arm ;; \
+        *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
+    esac \
+    && curl -Lo google-cloud-sdk.tar.gz https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-${OS}-${GCLOUD_ARCH}.tar.gz \
+    && tar -xzf google-cloud-sdk.tar.gz \
+    && rm google-cloud-sdk.tar.gz \
+    && ./google-cloud-sdk/install.sh --quiet \
+    && ./google-cloud-sdk/bin/gcloud components remove --quiet gsutil bq gcloud-crc32c \
+    && ./google-cloud-sdk/bin/gcloud components install gke-gcloud-auth-plugin
+
+# The amd64 version of gcloud includes >300MB bundledpythonunix, we can remove and use the lighter python:3.12-alpine image
+RUN if [ "${ARCH}" = "amd64" ]; then rm -rf ./google-cloud-sdk/platform/bundledpythonunix; fi
+
+# Create directories for gcloud with proper permissions before switching users
+RUN mkdir -p /home/nonroot/.config/gcloud /tmp/gcloud-logs \
+    && chown -R 65532:65532 /home/nonroot /tmp/gcloud-logs
+
+# Delete bash and curl from the final image to reduce image size
+RUN apk update && apk del --no-cache bash curl
+
+COPY --from=upx /output/manager .
+COPY --from=upx /output/clusteradm /bin/clusteradm
+
+USER 65532:65532
+
+# Add gcloud to PATH, enable logging as nonroot user which is required by gcloud
+ENV PATH="/google-cloud-sdk/bin:$PATH"
+ENV HOME="/home/nonroot"
+ENV CLOUDSDK_CONFIG="/home/nonroot/.config/gcloud"
+ENV CLOUDSDK_LOGS_DIR="/tmp/gcloud-logs"
+
+ENTRYPOINT ["/manager"]

@@ -1,0 +1,34 @@
+name: E2E
+
+on:
+  workflow_call:
+    inputs:
+        repo:
+          required: true
+          type: string
+
+
+env:
+  GO_REQUIRED_MIN_VERSION: ''
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install DevSpace
+        uses: loft-sh/setup-devspace@main
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.24.4
+
+      - name: Test E2E
+        run: |
+          cd ${{ inputs.repo }} && make test-e2e

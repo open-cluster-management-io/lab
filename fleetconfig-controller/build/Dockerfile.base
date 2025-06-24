@@ -1,0 +1,62 @@
+# This Dockerfile is used to build the base fleetconfig-controller manager image for all platforms.
+
+ARG OS
+ARG ARCH
+
+## Stage 1: Build the manager binary
+FROM golang:1.24.4-alpine3.22 AS builder
+ARG OS
+ARG ARCH
+
+# Add prerequisites for installing bundled binaries
+RUN apk update && apk add --no-cache bash curl
+
+WORKDIR /workspace
+
+COPY go.mod go.mod
+COPY go.sum go.sum
+RUN go mod download
+
+# Copy the go source
+COPY cmd/main.go cmd/main.go
+COPY api/ api/
+COPY internal/ internal/
+COPY pkg/ pkg/
+
+# Build
+RUN CGO_ENABLED=0 GOOS=${OS:-linux} GOARCH=${ARCH} go build -a -o manager cmd/main.go
+
+## Stage 2: Install dependencies
+FROM golang:1.24.4-alpine3.22 AS dependencies
+ARG OS
+ARG ARCH
+
+RUN apk update && apk add --no-cache bash curl
+
+# Install clusteradm
+ARG CLUSTERADM_VERSION=0.11.1
+RUN curl -L https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/install.sh | bash -s -- ${CLUSTERADM_VERSION}
+
+## Stage 3: Compress binaries with upx to reduce image size
+FROM python:3.13-alpine AS upx
+RUN apk update && apk add --no-cache upx
+
+WORKDIR /output
+COPY --from=dependencies /usr/local/bin/clusteradm /input/clusteradm
+COPY --from=builder /workspace/manager /input/manager
+
+RUN mkdir -p /output && \
+    upx -1 /input/clusteradm -o /output/clusteradm || cp /input/clusteradm /output/clusteradm && \
+    upx -1 /input/manager -o /output/manager || cp /input/manager /output/manager
+
+## Stage 4: Finalize
+
+FROM gcr.io/distroless/static:nonroot AS production
+WORKDIR /
+
+COPY --from=upx /output/manager .
+COPY --from=upx /output/clusteradm /bin/clusteradm
+
+USER 65532:65532
+
+ENTRYPOINT ["/manager"]

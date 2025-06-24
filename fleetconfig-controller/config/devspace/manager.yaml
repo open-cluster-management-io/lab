@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleetconfig-controller-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: fleetconfig-controller-local
+      app.kubernetes.io/name: fleetconfig-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: fleetconfig-controller-local
+        app.kubernetes.io/name: fleetconfig-controller
+    spec:
+      serviceAccountName: fleetconfig-controller-manager
+      containers:
+        - name: fleetconfig-controller-manager
+          command:
+            - /bin/bash
+            - -c
+            - --
+          args:
+            - while true; do sleep 30; done;
+          image: quay.io/open-cluster-management/fleetconfig-controller:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9443
+              name: webhook-server
+              protocol: TCP
+            - containerPort: 9440
+              name: healthz
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /etc/k8s-webhook-certs
+              name: tls-cert-vol
+              readOnly: true
+      volumes:
+        - name: tls-cert-vol
+          secret:
+            defaultMode: 420
+            secretName: fleetconfig-controller-admission
