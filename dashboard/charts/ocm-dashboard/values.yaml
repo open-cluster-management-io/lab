@@ -1,0 +1,193 @@
+# Default values for ocm-dashboard.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# API Service Configuration
+api:
+  replicaCount: 2
+  image:
+    registry: quay.io
+    repository: open-cluster-management/dashboard-api
+    pullPolicy: IfNotPresent
+    tag: ""
+
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+
+  # Environment variables for the API
+  env:
+    GIN_MODE: "release"
+    DASHBOARD_DEBUG: "false"
+    DASHBOARD_USE_MOCK: "false"
+    DASHBOARD_BYPASS_AUTH: "false"
+    PORT: "8080"
+
+  # Additional environment variables
+  extraEnv: []
+
+  # Health checks
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: api
+      scheme: HTTP
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+
+
+# UI Service Configuration
+ui:
+  replicaCount: 2
+  image:
+    registry: quay.io
+    repository: open-cluster-management/dashboard-ui
+    pullPolicy: IfNotPresent
+    tag: ""
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 3000
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+
+  # Health checks
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: http
+      scheme: HTTP
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Service configuration (used by ingress template)
+service:
+  port: 80  # Default to UI port
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  capabilities:
+    drop:
+    - ALL
+
+ingress:
+  enabled: true
+  className: ""
+  annotations:
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+  hosts:
+    - host: ocm-dashboard.local
+      paths:
+        - path: /()(.*)
+          pathType: Prefix
+          backend:
+            service:
+              name: ocm-dashboard
+              port:
+                number: 80
+        - path: /(api)(.*)
+          pathType: Prefix
+          backend:
+            service:
+              name: ocm-dashboard
+              port:
+                number: 8080
+  tls: []
+  #  - secretName: ocm-dashboard-tls
+  #    hosts:
+  #      - ocm-dashboard.local
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - ocm-dashboard
+        topologyKey: kubernetes.io/hostname
+
+# RBAC configuration (only API needs cluster access)
+rbac:
+  # Specifies whether RBAC resources should be created
+  create: true
+  # Additional rules to add to the ClusterRole
+  additionalRules: []
+
+# Volume configuration for API and UI containers
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 100Mi
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
