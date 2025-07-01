@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
+	"strings"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +29,8 @@ import (
 )
 
 var csrSuffixPattern = regexp.MustCompile(`-[a-zA-Z0-9]{5}$`)
+
+const amwExistsError = "you should manually clean them, uninstall kluster will cause those works out of control."
 
 // handleSpokes manages Spoke cluster join and upgrade operations
 func handleSpokes(ctx context.Context, kClient client.Client, mc *v1alpha1.FleetConfig) error {
@@ -480,7 +483,7 @@ func unjoinSpoke(ctx context.Context, kClient client.Client, kubeconfig *v1alpha
 
 	cmd := exec.Command(clusteradm, unjoinArgs...)
 	out, err := exec_utils.CmdWithLogs(ctx, cmd, fmt.Sprintf("waiting for 'clusteradm unjoin' to complete for spoke %s...", spokeName))
-	if err != nil {
+	if err != nil || strings.Contains(string(out), amwExistsError) {
 		return fmt.Errorf("failed to unjoin spoke cluster %s: %v, output: %s", spokeName, err, string(out))
 	}
 	logger.V(1).Info("spoke cluster unjoined", "output", string(out))

@@ -28,8 +28,6 @@ import (
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/component-base/featuregate"
-	ocmfeature "open-cluster-management.io/api/feature"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -191,9 +189,7 @@ func (r *FleetConfigReconciler) cleanup(ctx context.Context, mc *v1alpha1.FleetC
 		return err
 	}
 
-	enabledFeatureGates := common.ExtractFeatureGates(mc)
-
-	doCleanup, err := cleanupPreflight(ctx, hubKubeconfig, enabledFeatureGates)
+	doCleanup, err := cleanupPreflight(ctx, hubKubeconfig)
 	if err != nil {
 		return err
 	}
@@ -217,7 +213,7 @@ func (r *FleetConfigReconciler) cleanup(ctx context.Context, mc *v1alpha1.FleetC
 }
 
 // cleanupPreflight performs preflight checks before attempting FleetConfig cleanup.
-func cleanupPreflight(ctx context.Context, hubKubeconfig []byte, enabledFeatureGates map[featuregate.Feature]bool) (bool, error) {
+func cleanupPreflight(ctx context.Context, hubKubeconfig []byte) (bool, error) {
 	logger := log.FromContext(ctx)
 
 	clusterC, err := common.ClusterClient(hubKubeconfig)
@@ -228,8 +224,6 @@ func cleanupPreflight(ctx context.Context, hubKubeconfig []byte, enabledFeatureG
 	if err != nil {
 		return false, err
 	}
-
-	resourceCleanupEnabled := enabledFeatureGates[ocmfeature.ResourceCleanup]
 
 	// skip clean up if the ManagedCluster resource is not found or if any manifestWorks exist
 	managedClusters, err := clusterC.ClusterV1().ManagedClusters().List(ctx, metav1.ListOptions{})
@@ -245,7 +239,7 @@ func cleanupPreflight(ctx context.Context, hubKubeconfig []byte, enabledFeatureG
 			return false, fmt.Errorf("failed to list manifestWorks for managedCluster %s: %w", managedCluster.Name, err)
 		}
 		// If resourceCleanup is not enabled and there are manifestWorks, return false with an error message
-		if len(manifestWorks.Items) > 0 && !resourceCleanupEnabled {
+		if len(manifestWorks.Items) > 0 {
 			msg := fmt.Sprintf("Found manifestWorks for ManagedCluster %s; cannot clean hub while any ManagedClusters have active ManifestWorks", managedCluster.Name)
 			logger.Info(msg)
 			return false, errors.New(msg)

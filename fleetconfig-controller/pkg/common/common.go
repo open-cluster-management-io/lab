@@ -4,12 +4,9 @@ package common
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/component-base/featuregate"
 	clusterapi "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	operatorapi "open-cluster-management.io/api/client/operator/clientset/versioned"
 	workapi "open-cluster-management.io/api/client/work/clientset/versioned"
@@ -117,35 +114,4 @@ func PrepareResources(resources v1alpha1.ResourceSpec) []string {
 		flags = append(flags, "--resource-limits", limits)
 	}
 	return flags
-}
-
-// ExtractFeatureGates extracts the feature gates from a feature gates string and returns a map of feature gates.
-func ExtractFeatureGates(mc *v1alpha1.FleetConfig) map[featuregate.Feature]bool {
-	featureGates := make(map[featuregate.Feature]bool)
-
-	if mc == nil || mc.Spec.Hub.ClusterManager == nil {
-		return featureGates
-	}
-
-	featureGatesStr := mc.Spec.Hub.ClusterManager.FeatureGates
-	if featureGatesStr == "" {
-		return featureGates
-	}
-
-	// Parse comma-separated feature gates string
-	for gate := range strings.SplitSeq(featureGatesStr, ",") {
-		parts := strings.Split(strings.TrimSpace(gate), "=")
-		if len(parts) != 2 {
-			continue
-		}
-		feature := featuregate.Feature(strings.TrimSpace(parts[0]))
-
-		enabled, err := strconv.ParseBool(strings.TrimSpace(parts[1]))
-		if err != nil {
-			continue
-		}
-		featureGates[feature] = enabled
-	}
-
-	return featureGates
 }
