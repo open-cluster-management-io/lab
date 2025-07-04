@@ -1,24 +1,24 @@
-name: 'Prepare Release Environment'
-description: 'Prepare release environment variables and matrix'
+name: Prepare Release Environment
+description: Prepare release environment variables and repository matrix
 
 inputs:
   github_ref:
-    description: 'GitHub reference'
+    description: GitHub reference
     required: true
     default: ${{ github.ref }}
 
 outputs:
   MAJOR_RELEASE_VERSION:
-    description: 'Major release version'
+    description: Major release version
     value: ${{ steps.env-vars.outputs.MAJOR_RELEASE_VERSION }}
   RELEASE_VERSION:
-    description: 'Release version'
+    description: Release version
     value: ${{ steps.env-vars.outputs.RELEASE_VERSION }}
   TRIMMED_RELEASE_VERSION:
-    description: 'Trimmed release version'
+    description: Trimmed release version
     value: ${{ steps.env-vars.outputs.TRIMMED_RELEASE_VERSION }}
   MATRIX:
-    description: 'Generated matrix'
+    description: Repository matrix
     value: ${{ steps.generate-matrix.outputs.matrix }}
 
 runs:
@@ -55,4 +55,4 @@ runs:
       id: generate-matrix
       uses: ./go/src/open-cluster-management.io/lab/.github/actions/generate-repo-matrix
       with:
-        repoRoot: go/src/open-cluster-management.io/lab 
+        repoRoot: go/src/open-cluster-management.io/lab
