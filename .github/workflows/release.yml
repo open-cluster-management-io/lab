@@ -80,6 +80,15 @@ jobs:
           set -e
           mkdir -p release
           pushd release
+          yq eval '.dependencies[] | .name + " " + .repository' ../${{ matrix.repository }}/charts/${{ matrix.repository }}/Chart.yaml | while read -r repo_name repo_url; do
+            if [[ ! "$repo_url" =~ ^(oci://|file://) ]]; then
+              helm repo add "$repo_name" "$repo_url"
+            else
+              echo "Skipping OCI repository $repo_url for $repo_name"
+            fi
+          done
+          helm repo update
+          helm dependency build ../${{ matrix.repository }}/charts/${{ matrix.repository }}
           helm package ../${{ matrix.repository }}/charts/${{ matrix.repository }} \
             --app-version ${{ needs.env.outputs.RELEASE_VERSION }} \
             --version ${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}
