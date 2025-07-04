@@ -21,7 +21,9 @@ IMAGE_FLAVOURS ?= \
 # Generate build targets for each variant
 $(foreach flavour,$(IMAGE_FLAVOURS),\
 	$(eval VARIANT := $(word 1,$(subst :, ,$(flavour)))) \
-	$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG),$(IMAGE_TAG)-$(VARIANT))) \
+	$(eval ARCH_SUFFIX := $(if $(filter %-amd64,$(IMAGE_TAG)),-amd64,$(if $(filter %-arm64,$(IMAGE_TAG)),-arm64,))) \
+	$(eval BASE_TAG := $(patsubst %$(ARCH_SUFFIX),%,$(IMAGE_TAG))) \
+	$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG),$(BASE_TAG)-$(VARIANT)$(ARCH_SUFFIX))) \
 	$(eval DOCKERFILE := $(word 2,$(subst :, ,$(flavour)))) \
 	$(eval $(call build-image,$(IMAGE_REPO)-$(VARIANT),$(IMAGE_REGISTRY)/$(IMAGE_REPO):$(VARIANT_TAG),$(DOCKERFILE),.)) \
 )
@@ -34,15 +36,18 @@ images: $(foreach flavour,$(IMAGE_FLAVOURS),image-$(IMAGE_REPO)-$(word 1,$(subst
 image-push:
 	$(foreach flavour,$(IMAGE_FLAVOURS),\
 		$(eval VARIANT := $(word 1,$(subst :, ,$(flavour)))) \
-		$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG),$(IMAGE_TAG)-$(VARIANT))) \
+		$(eval ARCH_SUFFIX := $(if $(filter %-amd64,$(IMAGE_TAG)),-amd64,$(if $(filter %-arm64,$(IMAGE_TAG)),-arm64,))) \
+		$(eval BASE_TAG := $(patsubst %$(ARCH_SUFFIX),%,$(IMAGE_TAG))) \
+		$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG),$(BASE_TAG)-$(VARIANT)$(ARCH_SUFFIX))) \
 		docker push $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(VARIANT_TAG); \
 	)
 
 .PHONY: image-manifest
 image-manifest:
 	$(foreach flavour,$(IMAGE_FLAVOURS),\
+		$(eval IMAGE_TAG_NO_ARCH := $(patsubst %-amd64,%,$(patsubst %-arm64,%,$(IMAGE_TAG)))) \
 		$(eval VARIANT := $(word 1,$(subst :, ,$(flavour)))) \
-		$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG),$(IMAGE_TAG)-$(VARIANT))) \
+		$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG_NO_ARCH),$(IMAGE_TAG_NO_ARCH)-$(VARIANT))) \
 		$(eval IMAGE := $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(VARIANT_TAG)) \
 		docker manifest create $(IMAGE) $(IMAGE)-amd64 $(IMAGE)-arm64; \
 	)
@@ -50,8 +55,9 @@ image-manifest:
 .PHONY: image-manifest-annotate
 image-manifest-annotate:
 	$(foreach flavour,$(IMAGE_FLAVOURS),\
+		$(eval IMAGE_TAG_NO_ARCH := $(patsubst %-amd64,%,$(patsubst %-arm64,%,$(IMAGE_TAG)))) \
 		$(eval VARIANT := $(word 1,$(subst :, ,$(flavour)))) \
-		$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG),$(IMAGE_TAG)-$(VARIANT))) \
+		$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG_NO_ARCH),$(IMAGE_TAG_NO_ARCH)-$(VARIANT))) \
 		$(eval IMAGE := $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(VARIANT_TAG)) \
 		docker manifest annotate $(IMAGE) $(IMAGE)-amd64 --arch amd64; \
 		docker manifest annotate $(IMAGE) $(IMAGE)-arm64 --arch arm64; \
@@ -60,8 +66,9 @@ image-manifest-annotate:
 .PHONY: image-manifest-push
 image-manifest-push:
 	$(foreach flavour,$(IMAGE_FLAVOURS),\
+		$(eval IMAGE_TAG_NO_ARCH := $(patsubst %-amd64,%,$(patsubst %-arm64,%,$(IMAGE_TAG)))) \
 		$(eval VARIANT := $(word 1,$(subst :, ,$(flavour)))) \
-		$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG),$(IMAGE_TAG)-$(VARIANT))) \
+		$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG_NO_ARCH),$(IMAGE_TAG_NO_ARCH)-$(VARIANT))) \
 		$(eval IMAGE := $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(VARIANT_TAG)) \
 		docker manifest push $(IMAGE); \
 	)
