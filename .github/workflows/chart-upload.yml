@@ -38,7 +38,7 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.env.outputs.MATRIX) }}
     steps:
-      - name: submit fleetconfig-controller chart to OCM chart repo
+      - name: submit lab project chart to OCM chart repo
         if: github.event_name != 'pull_request'
         uses: actions/github-script@v7
         with:
@@ -53,6 +53,7 @@ jobs:
                 inputs: {
                   repo:         "${{ github.repository }}",
                   version:      "${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}",
+                  component:    "${{ matrix.repository }}",
                   "chart-name": "${{ matrix.repository }}",
                 },
               })
