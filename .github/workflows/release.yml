@@ -104,4 +104,4 @@ jobs:
           draft: true
           generate_release_notes: true
           files: |
-            /home/runner/work/ocm/ocm/go/src/open-cluster-management.io/lab/release/*.tgz
+            /home/runner/work/lab/lab/go/src/open-cluster-management.io/lab/release/*.tgz
