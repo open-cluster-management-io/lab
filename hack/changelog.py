@@ -77,11 +77,15 @@ if __name__ == '__main__':
 
     # get related PR from the last release tag
     last_release_pr = 0
-    for tag in tags:
-        if tag.name == last_release_tag:
-            tag_pulls = tag.commit.get_pulls()
-            last_release_pr = tag_pulls[0].number
-            break
+    release_word = "in"
+
+    if tags.totalCount > 1:
+        release_word = "since"
+        for tag in tags:
+            if tag.name == last_release_tag:
+                tag_pulls = tag.commit.get_pulls()
+                last_release_pr = tag_pulls[0].number
+                break
 
     # collect all PRs from the last release tag
     features = []
@@ -112,8 +116,8 @@ if __name__ == '__main__':
 
     # Print
     print("# %s %s" % (repo_name, release_tag))
-    print("\n**changes since [%s](https://github.com/open-cluster-management-io/releases/%s)**\n"
-          % (last_release_tag, last_release_tag))
+    print("\n**changes %s [%s](https://github.com/open-cluster-management-io/releases/%s)**\n"
+          % (release_word, last_release_tag, last_release_tag))
     section_if_present(breakings, ":warning: Breaking Changes")
     section_if_present(features, ":sparkles: New Features")
     section_if_present(bugs, ":bug: Bug Fixes")
