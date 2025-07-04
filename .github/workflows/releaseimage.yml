@@ -47,7 +47,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/lab
+          path: go/src/open-cluster-management.io/lab/${{ matrix.repository }}
 
       - name: install Go
         uses: actions/setup-go@v5
@@ -86,7 +86,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          path: go/src/open-cluster-management.io/lab
+          path: go/src/open-cluster-management.io/lab/${{ matrix.repository }}
 
       - name: create
         run: |

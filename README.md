@@ -53,6 +53,10 @@ All projects must define the following `make` targets:
 - `check-diff`: Perform any automated formatting, Helm chart README updates, manifest generation, etc. Return a non-zero exit code if a git diff is produced.
 - `test-e2e`: Invoke end-to-end tests and return an exit code accordingly.
 - `test-unit`: Invoke unit tests and return an exit code accordingly.
+- `images`: Build all container images.
+- `image-push`: Push all container images.
+- `image-manifest`: Create multi-architecture manifests for all images.
+- `image-manifest-annotate`: Annotate multi-architecture manifests for all images.
 
 #### Dockerfiles
 
