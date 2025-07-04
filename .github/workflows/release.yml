@@ -23,6 +23,12 @@ jobs:
     name: prepare release env
     runs-on: ubuntu-latest
     steps:
+      - name: checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          path: go/src/open-cluster-management.io/lab
+
       - name: prepare release environment
         id: prepare-env
         uses: ./go/src/open-cluster-management.io/lab/.github/actions/prepare-release-env

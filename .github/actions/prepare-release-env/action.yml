@@ -24,12 +24,6 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - name: checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 1
-        path: go/src/open-cluster-management.io/lab
-
     - name: get release version
       shell: bash
       run: |
