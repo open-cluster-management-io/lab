@@ -11,39 +11,44 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 )
 
 IMAGE_REGISTRY ?= quay.io/open-cluster-management
+IMAGE_REPO ?= fleetconfig-controller
 IMAGE_TAG ?= latest
 IMAGE_FLAVOURS ?= \
-	fleetconfig-controller:./build/Dockerfile.base \
-	fleetconfig-controller-eks:./build/Dockerfile.eks \
-	fleetconfig-controller-gke:./build/Dockerfile.gke
+	base:./build/Dockerfile.base \
+	eks:./build/Dockerfile.eks \
+	gke:./build/Dockerfile.gke
 
 # Generate build targets for each variant
 $(foreach flavour,$(IMAGE_FLAVOURS),\
-	$(eval IMAGE_REPO := $(word 1,$(subst :, ,$(flavour)))) \
+	$(eval VARIANT := $(word 1,$(subst :, ,$(flavour)))) \
+	$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG),$(IMAGE_TAG)-$(VARIANT))) \
 	$(eval DOCKERFILE := $(word 2,$(subst :, ,$(flavour)))) \
-	$(eval $(call build-image,$(IMAGE_REPO),$(IMAGE_REGISTRY)/$(IMAGE_REPO):$(IMAGE_TAG),$(DOCKERFILE),.)) \
+	$(eval $(call build-image,$(IMAGE_REPO),$(IMAGE_REGISTRY)/$(IMAGE_REPO):$(VARIANT_TAG),$(DOCKERFILE),.)) \
 )
 
 .PHONY: image-push
 image-push:
 	$(foreach flavour,$(IMAGE_FLAVOURS),\
-		$(eval IMAGE_REPO := $(word 1,$(subst :, ,$(flavour)))) \
-		docker push $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(IMAGE_TAG); \
+		$(eval VARIANT := $(word 1,$(subst :, ,$(flavour)))) \
+		$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG),$(IMAGE_TAG)-$(VARIANT))) \
+		docker push $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(VARIANT_TAG); \
 	)
 
 .PHONY: image-manifest
 image-manifest:
 	$(foreach flavour,$(IMAGE_FLAVOURS),\
-		$(eval IMAGE_REPO := $(word 1,$(subst :, ,$(flavour)))) \
-		$(eval IMAGE := $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(IMAGE_TAG)) \
+		$(eval VARIANT := $(word 1,$(subst :, ,$(flavour)))) \
+		$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG),$(IMAGE_TAG)-$(VARIANT))) \
+		$(eval IMAGE := $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(VARIANT_TAG)) \
 		docker manifest create $(IMAGE) $(IMAGE)-amd64 --amd64 $(IMAGE)-arm64 --arm64; \
 	)
 
 .PHONY: image-manifest-annotate
 image-manifest-annotate:
 	$(foreach flavour,$(IMAGE_FLAVOURS),\
-		$(eval IMAGE_REPO := $(word 1,$(subst :, ,$(flavour)))) \
-		$(eval IMAGE := $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(IMAGE_TAG)) \
+		$(eval VARIANT := $(word 1,$(subst :, ,$(flavour)))) \
+		$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG),$(IMAGE_TAG)-$(VARIANT))) \
+		$(eval IMAGE := $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(VARIANT_TAG)) \
 		docker manifest annotate $(IMAGE) --arch amd64 $(IMAGE)-amd64; \
 		docker manifest annotate $(IMAGE) --arch arm64 $(IMAGE)-arm64; \
 	)
