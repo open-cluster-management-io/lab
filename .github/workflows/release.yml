@@ -84,7 +84,7 @@ jobs:
             if [[ ! "$repo_url" =~ ^(oci://|file://) ]]; then
               helm repo add "$repo_name" "$repo_url"
             else
-              echo "Skipping OCI repository $repo_url for $repo_name"
+              echo "Skipping repository $repo_url for $repo_name"
             fi
           done
           helm repo update
