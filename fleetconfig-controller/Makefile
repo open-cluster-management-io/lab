@@ -28,7 +28,7 @@ $(foreach flavour,$(IMAGE_FLAVOURS),\
 image-push:
 	$(foreach flavour,$(IMAGE_FLAVOURS),\
 		$(eval IMAGE_REPO := $(word 1,$(subst :, ,$(flavour)))) \
-		docker push $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(IMAGE_TAG) \
+		docker push $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(IMAGE_TAG); \
 	)
 
 .PHONY: image-manifest
@@ -36,7 +36,7 @@ image-manifest:
 	$(foreach flavour,$(IMAGE_FLAVOURS),\
 		$(eval IMAGE_REPO := $(word 1,$(subst :, ,$(flavour)))) \
 		$(eval IMAGE := $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(IMAGE_TAG)) \
-		docker manifest create $(IMAGE) $(IMAGE)-amd64 --amd64 $(IMAGE)-arm64 --arm64 \
+		docker manifest create $(IMAGE) $(IMAGE)-amd64 --amd64 $(IMAGE)-arm64 --arm64; \
 	)
 
 .PHONY: image-manifest-annotate
@@ -44,8 +44,8 @@ image-manifest-annotate:
 	$(foreach flavour,$(IMAGE_FLAVOURS),\
 		$(eval IMAGE_REPO := $(word 1,$(subst :, ,$(flavour)))) \
 		$(eval IMAGE := $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(IMAGE_TAG)) \
-		docker manifest annotate $(IMAGE) --arch amd64 $(IMAGE)-amd64 \
-		docker manifest annotate $(IMAGE) --arch arm64 $(IMAGE)-arm64 \
+		docker manifest annotate $(IMAGE) --arch amd64 $(IMAGE)-amd64; \
+		docker manifest annotate $(IMAGE) --arch arm64 $(IMAGE)-arm64; \
 	)
 
 ##@ Generation Targets
