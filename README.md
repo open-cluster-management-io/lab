@@ -57,6 +57,7 @@ All projects must define the following `make` targets:
 - `image-push`: Push all container images.
 - `image-manifest`: Create multi-architecture manifests for all images.
 - `image-manifest-annotate`: Annotate multi-architecture manifests for all images.
+- `image-manifest-push`: Push finalized image manifests for all images.
 
 #### Dockerfiles
 

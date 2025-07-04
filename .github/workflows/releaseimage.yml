@@ -111,4 +111,6 @@ jobs:
 
       - name: push
         run: |
-          docker manifest push quay.io/open-cluster-management/${{ matrix.repository }}:${{ needs.env.outputs.RELEASE_VERSION }}
+          set -e
+          cd ${{ matrix.repository }}
+          IMAGE_TAG=${{ needs.env.outputs.RELEASE_VERSION }} make image-manifest-push

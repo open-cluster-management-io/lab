@@ -44,7 +44,7 @@ image-manifest:
 		$(eval VARIANT := $(word 1,$(subst :, ,$(flavour)))) \
 		$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG),$(IMAGE_TAG)-$(VARIANT))) \
 		$(eval IMAGE := $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(VARIANT_TAG)) \
-		docker manifest create $(IMAGE) $(IMAGE)-amd64 --amd64 $(IMAGE)-arm64 --arm64; \
+		docker manifest create $(IMAGE) $(IMAGE)-amd64 $(IMAGE)-arm64; \
 	)
 
 .PHONY: image-manifest-annotate
@@ -53,8 +53,17 @@ image-manifest-annotate:
 		$(eval VARIANT := $(word 1,$(subst :, ,$(flavour)))) \
 		$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG),$(IMAGE_TAG)-$(VARIANT))) \
 		$(eval IMAGE := $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(VARIANT_TAG)) \
-		docker manifest annotate $(IMAGE) --arch amd64 $(IMAGE)-amd64; \
-		docker manifest annotate $(IMAGE) --arch arm64 $(IMAGE)-arm64; \
+		docker manifest annotate $(IMAGE) $(IMAGE)-amd64 --arch amd64; \
+		docker manifest annotate $(IMAGE) $(IMAGE)-arm64 --arch arm64; \
+	)
+
+.PHONY: image-manifest-push
+image-manifest-push:
+	$(foreach flavour,$(IMAGE_FLAVOURS),\
+		$(eval VARIANT := $(word 1,$(subst :, ,$(flavour)))) \
+		$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG),$(IMAGE_TAG)-$(VARIANT))) \
+		$(eval IMAGE := $(IMAGE_REGISTRY)/$(IMAGE_REPO):$(VARIANT_TAG)) \
+		docker manifest push $(IMAGE); \
 	)
 
 ##@ Generation Targets
