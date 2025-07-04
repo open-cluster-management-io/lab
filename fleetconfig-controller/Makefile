@@ -23,8 +23,12 @@ $(foreach flavour,$(IMAGE_FLAVOURS),\
 	$(eval VARIANT := $(word 1,$(subst :, ,$(flavour)))) \
 	$(eval VARIANT_TAG := $(if $(filter base,$(VARIANT)),$(IMAGE_TAG),$(IMAGE_TAG)-$(VARIANT))) \
 	$(eval DOCKERFILE := $(word 2,$(subst :, ,$(flavour)))) \
-	$(eval $(call build-image,$(IMAGE_REPO),$(IMAGE_REGISTRY)/$(IMAGE_REPO):$(VARIANT_TAG),$(DOCKERFILE),.)) \
+	$(eval $(call build-image,$(IMAGE_REPO)-$(VARIANT),$(IMAGE_REGISTRY)/$(IMAGE_REPO):$(VARIANT_TAG),$(DOCKERFILE),.)) \
 )
+
+# Create a single images target that builds all variants
+.PHONY: images
+images: $(foreach flavour,$(IMAGE_FLAVOURS),image-$(IMAGE_REPO)-$(word 1,$(subst :, ,$(flavour))))
 
 .PHONY: image-push
 image-push:
