@@ -1,4 +1,5 @@
 import sys
+import os
 
 from enum import Enum
 from github import Github
@@ -54,7 +55,10 @@ def section_if_present(changes: [], pr_title):
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    auth = Auth.Token(args[0])
+    token = args[0]
+    if len(token) == 0:
+        token = os.getenv("GITHUB_TOKEN")
+    auth = Auth.Token(token)
     repo_name = args[1]
     release_tag = args[2]
     g = Github(auth=auth)
@@ -90,7 +94,7 @@ if __name__ == '__main__':
         if pr.number == last_release_pr:
             break
         if pr.is_merged():
-            if repo_name not in pr.labels:
+            if repo_name not in [l.name for l in pr.labels]:
                 continue
             prtype, title = pr_type_from_title(pr.title)
             if prtype == PRType.FeaturePR:
@@ -115,5 +119,6 @@ if __name__ == '__main__':
     section_if_present(bugs, ":bug: Bug Fixes")
     section_if_present(docs, ":book: Documentation")
     section_if_present(infras, ":seedling: Infra & Such")
+    section_if_present(uncategorized, ":hammer_and_wrench: Uncategorized")
     print("")
     print("Thanks to all our contributors!*")

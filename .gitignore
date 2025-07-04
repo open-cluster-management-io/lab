@@ -37,3 +37,6 @@ go.work.sum
 .devspace/
 .idea/
 .vscode/
+venv/
+*__pycache__/
+requirements.txt
