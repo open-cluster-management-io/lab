@@ -15,8 +15,8 @@ spec:
   - '{{ include "chart.fullname" . }}-webhook.{{ .Release.Namespace }}.svc.{{
     .Values.kubernetesClusterDomain }}'
   issuerRef:
-    kind: ClusterIssuer
-    name: fleetconfig-controller
+    kind: {{ .Values.certificates.issuerRef.kind }}
+    name: {{ .Values.certificates.issuerRef.name }}
   revisionHistoryLimit: {{ .Values.admissionWebhooks.certManager.revisionHistoryLimit }}
   secretName: {{ template "chart.fullname" . }}-admission
 {{- end }}

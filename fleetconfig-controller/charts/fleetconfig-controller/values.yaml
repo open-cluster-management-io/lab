@@ -37,19 +37,19 @@ fleetConfig:
     registry: quay.io/open-cluster-management
   ## @descriptionStart
   ## ### Registration Authentication Configuration
-  ## Registration authentication configuration for multicluster setup. authentication can be configured by uncommenting `multicluster.registrationAuth`
+  ## Registration authentication configuration for FleetConfig setup. authentication can be configured by uncommenting `fleetConfig.registrationAuth`
   ## Optional Configuration for the Registration Authentication. If not provided, will default to using certificate signing requests (CSR).
-  ## For EKS multicluster configurations, set the driver to "awsirsa" to use AWS IAM Roles for Service Accounts.
+  ## For EKS FleetConfigs, set the driver to "awsirsa" to use AWS IAM Roles for Service Accounts.
   ## Available fields:
-  ## - **driver**: The authentication driver to use (default: "csr"). Set to "awsirsa" for EKS multicluster.
-  ## - **hubClusterARN**: The ARN of the hub cluster (required for EKS multicluster).
+  ## - **driver**: The authentication driver to use (default: "csr"). Set to "awsirsa" for EKS FleetConfigs.
+  ## - **hubClusterARN**: The ARN of the hub cluster (required for EKS FleetConfigs).
   ## - **autoApprovedARNPatterns**: Optional list of spoke cluster ARN patterns that the hub will auto approve.
   ## @descriptionEnd
   # registrationAuth:
   #   # The driver used for authentication. Default is "csr".
-  #   # If configuring an EKS multicluster, ensure this is set to "awsirsa".
+  #   # If configuring an EKS FleetConfig, ensure this is set to "awsirsa".
   #   driver: "csr"
-  #   # The ARN of the hub cluster. This is only required if configuring an EKS multicluster.
+  #   # The ARN of the hub cluster. This is only required if configuring an EKS FleetConfig.
   #   hubClusterARN: "arn:aws:eks:us-west-2:<HUB_AWS_ACCOUNT_ID>:cluster/<HUB_CLUSTER_NAME>"
   #   # Optional list of spoke cluster name ARN patterns that the hub will auto approve
   #   autoApprovedARNPatterns: []
@@ -103,7 +103,7 @@ fleetConfig:
     createNamespace: true
     ## @param fleetConfig.hub.force If set, the hub will be reinitialized.
     force: false
-    ## The Hub clusters API Server. Required when configuring an EKS, or GKE multicluster
+    ## The Hub clusters API Server. Required when configuring an EKS, or GKE FleetConfig.
     # apiServer: "https://<API_SERVER_HOST_AND_PORT>"
     ## Kubeconfig details for the Hub cluster.
     kubeconfig:
@@ -149,83 +149,81 @@ fleetConfig:
         # setLiteral: []
         ## List of comma-separated Helm STRING values, e.g., key1=val1,key2=val2.
         # setString: []
-  ## @param fleetConfig.spokes[0].name Name of the spoke cluster.
   ## Configuration for Spoke clusters.
+  ## @param fleetConfig.spokes[0].name Name of the spoke cluster.
+  ## @param fleetConfig.spokes[0].createNamespace If true, create open-cluster-management namespace and agent namespace (open-cluster-management-agent for Default mode, <klusterlet-name> for Hosted mode), otherwise use existing one. Do not edit this name if you are using the default hub-as-spoke mode.
+  ## @param fleetConfig.spokes[0].syncLabels If true, sync the labels from klusterlet to all agent resources.
+  ## @param fleetConfig.spokes[0].kubeconfig.context The context to use in the kubeconfig file. Leave empty to use the current context.
+  ## @param fleetConfig.spokes[0].kubeconfig.inCluster If set, the kubeconfig will be read from the cluster. Only applicable for same-cluster operations.
+  ## @param fleetConfig.spokes[0].ca Hub cluster CA certificate, optional.
+  ## @param fleetConfig.spokes[0].proxyCa Proxy CA certificate, optional.
+  ## @param fleetConfig.spokes[0].proxyUrl URL of a forward proxy server used by agents to connect to the Hub cluster, optional.
+  ## @param fleetConfig.spokes[0].klusterlet.mode Deployment mode for klusterlet. Options: Default (agents run on spoke cluster) | Hosted (agents run on hub cluster).
+  ## @param fleetConfig.spokes[0].klusterlet.purgeOperator If set, the klusterlet operator will be purged and all open-cluster-management namespaces deleted when the klusterlet is unjoined from its Hub cluster.
+  ## @param fleetConfig.spokes[0].klusterlet.forceInternalEndpointLookup If true, the klusterlet agent will start the cluster registration process by looking for the
+  ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig External managed cluster kubeconfig, required if using hosted mode.
+  ## @param fleetConfig.spokes[0].klusterlet.forceInternalEndpointLookupManaged If true, the klusterlet accesses the managed cluster using the internal endpoint from the public cluster-info in the managed cluster instead of using managedClusterKubeconfig.
+  ## @param fleetConfig.spokes[0].klusterlet.resources Resource specifications for all klusterlet-managed containers.
+  ## @param fleetConfig.spokes[0].klusterlet.singleton If true, deploy klusterlet in singleton mode, with registration and work agents running in a single pod. This is an alpha stage flag.
   spokes:
-      ## @param fleetConfig.spokes[0].createNamespace If true, create open-cluster-management namespace and agent namespace (open-cluster-management-agent for Default mode, <klusterlet-name> for Hosted mode), otherwise use existing one. Do not edit this name if you are using the default hub-as-spoke mode.
-    - name: hub-as-spoke
-      ## @param fleetConfig.spokes[0].createNamespace If true, create open-cluster-management namespace and agent namespace (open-cluster-management-agent for Default mode,
-      # <klusterlet-name> for Hosted mode), otherwise use existing one.
-      createNamespace: true
-      ## @param fleetConfig.spokes[0].syncLabels If true, sync the labels from klusterlet to all agent resources.
-      syncLabels: false
-              ## The ARN of the spoke cluster. This is only required if configuring an EKS multicluster.
-      # clusterARN: "arn:aws:eks:us-west-2:<SPOKE_AWS_ACCOUNT_ID>:cluster/<SPOKE_CLUSTER_NAME>"
-      ## Kubeconfig details for the Spoke cluster.
-      kubeconfig:
-        ## @param fleetConfig.spokes[0].kubeconfig.context The context to use in the kubeconfig file. Leave empty to use the current context.
-        context: ""
-        ## @param fleetConfig.spokes[0].kubeconfig.inCluster If set, the kubeconfig will be read from the cluster. Only applicable for same-cluster operations.
-        inCluster: true
+  - name: hub-as-spoke
+    createNamespace: true
+    syncLabels: false
+    ## The ARN of the spoke cluster. This is only required if configuring an EKS FleetConfig.
+    # clusterARN: "arn:aws:eks:us-west-2:<SPOKE_AWS_ACCOUNT_ID>:cluster/<SPOKE_CLUSTER_NAME>"
+    ## Kubeconfig details for the Spoke cluster.
+    kubeconfig:
+      context: ""
+      inCluster: true
+      ## A reference to an existing secret containing a kubeconfig. Must be provided for remote clusters. For same-cluster, must be provided unless InCluster is set to true.
+      # secretReference:
+      #   ## @param fleetConfig.spokes[0].kubeconfig.secretReference.name The name of the secret.
+      #   name: ""
+      #   ## @param fleetConfig.spokes[0].kubeconfig.secretReference.namespace The namespace the secret is in.
+      #   namespace: ""
+      #   ## @param fleetConfig.spokes[0].kubeconfig.secretReference.kubeconfigKey The map key to access the kubeconfig.
+      #   kubeconfigKey: "kubeconfig"
+    ca: ""
+    proxyCa: ""
+    proxyUrl: ""
+    ## Configuration for the Klusterlet on the Spoke cluster.
+    klusterlet:
+      mode: "Default"
+      purgeOperator: true
+      # Reference the internal endpoint from the cluster-info ConfigMap in the Hub cluster instead of using the Hub's
+      # public API server endpoint. Set to true when registering the hub cluster as a spoke.
+      forceInternalEndpointLookup: true
+      managedClusterKubeconfig: {}
+        ## The context to use in the kubeconfig file.
+        # context: ""
+        ## If set, the kubeconfig will be read from the cluster. Only applicable for same-cluster operations.
+        # inCluster: false
         ## A reference to an existing secret containing a kubeconfig. Must be provided for remote clusters. For same-cluster, must be provided unless InCluster is set to true.
         # secretReference:
-        #   ## @param fleetConfig.spokes[0].kubeconfig.secretReference.name The name of the secret.
+        #   ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig.secretReference.name The name of the secret.
         #   name: ""
-        #   ## @param fleetConfig.spokes[0].kubeconfig.secretReference.namespace The namespace the secret is in.
+        #   ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig.secretReference.namespace The namespace the secret is in.
         #   namespace: ""
-        #   ## @param fleetConfig.spokes[0].kubeconfig.secretReference.kubeconfigKey The map key to access the kubeconfig.
+        #   ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig.secretReference.kubeconfigKey The map key to access the kubeconfig.
         #   kubeconfigKey: "kubeconfig"
-      ## @param fleetConfig.spokes[0].ca Hub cluster CA certificate, optional.
-      ca: ""
-      ## @param fleetConfig.spokes[0].proxyCa Proxy CA certificate, optional.
-      proxyCa: ""
-      ## @param fleetConfig.spokes[0].proxyUrl URL of a forward proxy server used by agents to connect to the Hub cluster, optional.
-      proxyUrl: ""
-      ## Configuration for the Klusterlet on the Spoke cluster.
-      klusterlet:
-        ## @param fleetConfig.spokes[0].klusterlet.mode Deployment mode for klusterlet. Options: Default (agents run on spoke cluster) | Hosted (agents run on hub cluster).
-        mode: "Default"
-        ## @param fleetConfig.spokes[0].klusterlet.purgeOperator If set, the klusterlet operator will be purged and all open-cluster-management namespaces deleted when the klusterlet is unjoined from its Hub cluster.
-        purgeOperator: true
-        ## @param fleetConfig.spokes[0].klusterlet.forceInternalEndpointLookup If true, the klusterlet agent will start the cluster registration process by looking for the
-        # internal endpoint from the cluster-info ConfigMap in the Hub cluster instead of using the Hub's
-        # public API server endpoint. Set to true when registering the hub cluster as a spoke.
-        forceInternalEndpointLookup: true
-        ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig External managed cluster kubeconfig, required if using hosted mode.
-        managedClusterKubeconfig: {}
-          ## The context to use in the kubeconfig file.
-          # context: ""
-          ## If set, the kubeconfig will be read from the cluster. Only applicable for same-cluster operations.
-          # inCluster: false
-          ## A reference to an existing secret containing a kubeconfig. Must be provided for remote clusters. For same-cluster, must be provided unless InCluster is set to true.
-          # secretReference:
-          #   ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig.secretReference.name The name of the secret.
-          #   name: ""
-          #   ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig.secretReference.namespace The namespace the secret is in.
-          #   namespace: ""
-          #   ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig.secretReference.kubeconfigKey The map key to access the kubeconfig.
-          #   kubeconfigKey: "kubeconfig"
-        ## @param fleetConfig.spokes[0].klusterlet.forceInternalEndpointLookupManaged If true, the klusterlet accesses the managed cluster using the internal endpoint from the public cluster-info in the managed cluster instead of using managedClusterKubeconfig.
-        forceInternalEndpointLookupManaged: false
-        ## @param fleetConfig.spokes[0].klusterlet.resources Resource specifications for all klusterlet-managed containers.
-        resources: {}
-          # # The resource limits of all the containers managed by the Cluster Manager or Klusterlet operators.
-          # limits:
-          #   # The number of CPU units to request, e.g., '800m'.
-          #   cpu: ""
-          #   # The amount of memory to request, e.g., '8Gi'.
-          #   memory: ""
-          # # The resource requests of all the containers managed by the Cluster Manager or Klusterlet operators.
-          # requests:
-          #   # The number of CPU units to request, e.g., '800m'.
-          #   cpu: ""
-          #   # The amount of memory to request, e.g., '8Gi'.
-          #   memory: ""
-          # # The resource QoS class of all the containers managed by the Cluster Manager or Klusterlet operators.
-          # # Options: [ Default | BestEffort | ResourceRequirement ].
-          # qosClass: "Default"
-        ## @param fleetConfig.spokes[0].klusterlet.singleton If true, deploy klusterlet in singleton mode, with registration and work agents running in a single pod. This is an alpha stage flag.
-        singleton: false
+      forceInternalEndpointLookupManaged: false
+      resources: {}
+        # # The resource limits of all the containers managed by the Cluster Manager or Klusterlet operators.
+        # limits:
+        #   # The number of CPU units to request, e.g., '800m'.
+        #   cpu: ""
+        #   # The amount of memory to request, e.g., '8Gi'.
+        #   memory: ""
+        # # The resource requests of all the containers managed by the Cluster Manager or Klusterlet operators.
+        # requests:
+        #   # The number of CPU units to request, e.g., '800m'.
+        #   cpu: ""
+        #   # The amount of memory to request, e.g., '8Gi'.
+        #   memory: ""
+        # # The resource QoS class of all the containers managed by the Cluster Manager or Klusterlet operators.
+        # # Options: [ Default | BestEffort | ResourceRequirement ].
+        # qosClass: "Default"
+      singleton: false
 
 ## @section fleetconfig-controller parameters
 
@@ -313,11 +311,20 @@ cert-manager:
   # Add any additional values to pass to the cert-manager Helm chart.
   # See: https://artifacthub.io/packages/helm/cert-manager/cert-manager
 
-# Configure the spec for the ClusterIssuer used by cert-manager to issue all fleetconfig-controller certificates.
-## @param clusterIssuer.spec.selfSigned Default self-signed issuer configuration.
-clusterIssuer:
-  spec:
-    selfSigned: {}
+## @section certificates
+
+## @param certificates.clusterIssuer.spec.selfSigned Use a self-signed ClusterIssuer by default.
+## @param certificates.clusterIssuer.enabled Enable the creation of a ClusterIssuer.
+## @param certificates.issuerRef.kind Kind of the certificate issuer to use.
+## @param certificates.issuerRef.name Name of the certificate issuer to use.
+certificates:
+  clusterIssuer:
+    enabled: true
+    spec:
+      selfSigned: {}
+  issuerRef:
+    kind: ClusterIssuer
+    name: fleetconfig-controller
 
 ## @section webhook parameters
 

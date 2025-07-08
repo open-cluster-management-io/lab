@@ -30,12 +30,12 @@ Available Spoke Feature Gates:
 - **RawFeedbackJsonString** (ALPHA - default=false) - Enables raw feedback JSON string support
 - **V1beta1CSRAPICompatibility** (ALPHA - default=false) - Enables v1beta1 CSR API compatibility
 ### Registration Authentication Configuration
-Registration authentication configuration for multicluster setup. authentication can be configured by uncommenting `multicluster.registrationAuth`
+Registration authentication configuration for FleetConfig setup. authentication can be configured by uncommenting `fleetConfig.registrationAuth`
 Optional Configuration for the Registration Authentication. If not provided, will default to using certificate signing requests (CSR).
-For EKS multicluster configurations, set the driver to "awsirsa" to use AWS IAM Roles for Service Accounts.
+For EKS FleetConfigs, set the driver to "awsirsa" to use AWS IAM Roles for Service Accounts.
 Available fields:
-- **driver**: The authentication driver to use (default: "csr"). Set to "awsirsa" for EKS multicluster.
-- **hubClusterARN**: The ARN of the hub cluster (required for EKS multicluster).
+- **driver**: The authentication driver to use (default: "csr"). Set to "awsirsa" for EKS FleetConfigs.
+- **hubClusterARN**: The ARN of the hub cluster (required for EKS FleetConfigs).
 - **autoApprovedARNPatterns**: Optional list of spoke cluster ARN patterns that the hub will auto approve.
 ### Hub Cluster Manager Feature Gates
 Feature gates for the Hub's Cluster Manager. Do not disable the feature gates that are enabled by default.
@@ -83,7 +83,6 @@ Refer to the [Multicluster Controlplane configuration](https://github.com/open-c
 | `fleetConfig.hub.kubeconfig.inCluster`                                | If set, the kubeconfig will be read from the cluster. Only applicable for same-cluster operations.                                                                                                                                                           | `true`                            |
 | `fleetConfig.spokes[0].name`                                          | Name of the spoke cluster.                                                                                                                                                                                                                                   | `hub-as-spoke`                    |
 | `fleetConfig.spokes[0].createNamespace`                               | If true, create open-cluster-management namespace and agent namespace (open-cluster-management-agent for Default mode, <klusterlet-name> for Hosted mode), otherwise use existing one. Do not edit this name if you are using the default hub-as-spoke mode. | `true`                            |
-| `fleetConfig.spokes[0].createNamespace`                               | If true, create open-cluster-management namespace and agent namespace (open-cluster-management-agent for Default mode,                                                                                                                                       | `true`                            |
 | `fleetConfig.spokes[0].syncLabels`                                    | If true, sync the labels from klusterlet to all agent resources.                                                                                                                                                                                             | `false`                           |
 | `fleetConfig.spokes[0].kubeconfig.context`                            | The context to use in the kubeconfig file. Leave empty to use the current context.                                                                                                                                                                           | `""`                              |
 | `fleetConfig.spokes[0].kubeconfig.inCluster`                          | If set, the kubeconfig will be read from the cluster. Only applicable for same-cluster operations.                                                                                                                                                           | `true`                            |
@@ -122,10 +121,18 @@ Refer to the [Multicluster Controlplane configuration](https://github.com/open-c
 
 ### cert-manager
 
-| Name                            | Description                               | Value  |
-| ------------------------------- | ----------------------------------------- | ------ |
-| `cert-manager.enabled`          | Whether to install cert-manager.          | `true` |
-| `clusterIssuer.spec.selfSigned` | Default self-signed issuer configuration. | `{}`   |
+| Name                   | Description                      | Value  |
+| ---------------------- | -------------------------------- | ------ |
+| `cert-manager.enabled` | Whether to install cert-manager. | `true` |
+
+### certificates
+
+| Name                                         | Description                                 | Value                    |
+| -------------------------------------------- | ------------------------------------------- | ------------------------ |
+| `certificates.clusterIssuer.spec.selfSigned` | Use a self-signed ClusterIssuer by default. | `{}`                     |
+| `certificates.clusterIssuer.enabled`         | Enable the creation of a ClusterIssuer.     | `true`                   |
+| `certificates.issuerRef.kind`                | Kind of the certificate issuer to use.      | `ClusterIssuer`          |
+| `certificates.issuerRef.name`                | Name of the certificate issuer to use.      | `fleetconfig-controller` |
 
 ### webhook parameters
 

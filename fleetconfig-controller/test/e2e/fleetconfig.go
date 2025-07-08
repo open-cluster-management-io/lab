@@ -53,14 +53,14 @@ var _ = Describe("fleetconfig", Label("fleetconfig"), Ordered, func() {
 		teardownTestEnvironment(tc)
 	})
 
-	// Tests multicluster operations with ResourceCleanup feature gate enabled, verifying:
+	// Tests FleetConfig operations with ResourceCleanup feature gate enabled, verifying:
 	// 1. Cluster joining (spoke and hub-as-spoke) to the hub
 	// 2. ManifestWork creation in hub-as-spoke namespace and namespace creation validation
 	// 3. Prevention of feature gate modifications during active operation
 	// 4. Spoke removal with proper deregistration from hub
 	// 5. ManagedCluster and namespace deletion validation
 	// 6. Automatic ManifestWork cleanup when FleetConfig resource is deleted
-	Context("deploy and teardown multicluster with ResourceCleanup feature gate enabled", func() {
+	Context("deploy and teardown FleetConfig with ResourceCleanup feature gate enabled", func() {
 
 		It("should join the spoke and hub-as-spoke clusters to the hub", func() {
 			// NOTE: The FleetConfig CR is created by devspace when the fleetconfig-controller chart is installed.
@@ -85,7 +85,7 @@ var _ = Describe("fleetconfig", Label("fleetconfig"), Ordered, func() {
 			}, 2*time.Minute, 10*time.Second).Should(Succeed())
 		})
 
-		It("should not allow changes to the multicluster resource", func() {
+		It("should not allow changes to the FleetConfig resource", func() {
 
 			By("failing to patch the FleetConfig's feature gates")
 			fc, err := utils.GetFleetConfig(tc.ctx, tc.kClient, multiClusterNN)
