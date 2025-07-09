@@ -67,7 +67,7 @@ mkdir -p $TARGET_DIR
 1. Install the `fleetconfig-controller` on the hub using the `deploy-local` pipeline
 
    ```bash
-   devspace run-pipeline deploy-local -n fleet-config-system --skip-build
+   devspace run-pipeline deploy-local -n fleetconfig-system --skip-build
    ```
 
 1. Verify that the `FleetConfig` is reconciled successfully

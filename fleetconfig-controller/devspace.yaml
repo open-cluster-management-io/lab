@@ -71,7 +71,6 @@ images:
  
 deployments:
   fleetconfig-controller:
-    namespace: fleetconfig-system
     helm:
       chart:
         name: ${CONTEXT}/charts/fleetconfig-controller
@@ -84,7 +83,6 @@ deployments:
     updateImageTags: false
 
   fleetconfig-controller-dev:
-    namespace: fleetconfig-system
     helm:
       chart:
         name: ${CONTEXT}/charts/fleetconfig-controller
@@ -94,7 +92,6 @@ deployments:
       - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
 
   fleetconfig-controller-local:
-    namespace: fleetconfig-system
     helm:
       chart:
         name: ${CONTEXT}/charts/fleetconfig-controller
