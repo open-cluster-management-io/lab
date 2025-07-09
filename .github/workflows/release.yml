@@ -80,6 +80,15 @@ jobs:
           set -e
           mkdir -p release
           pushd release
+
+          # assert that the default image tag in values.yaml matches the release version
+          chartImageTag=$(yq eval '.image.tag' ../${{ matrix.repository }}/charts/${{ matrix.repository }}/values.yaml)
+          if [[ $chartImageTag != ${{ needs.env.outputs.RELEASE_VERSION }} && $chartImageTag != ${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }} ]]; then
+            echo "Error: .image.tag in values.yaml ($chartImageTag) does not match the release version (${{ needs.env.outputs.RELEASE_VERSION }}) or the trimmed release version (${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }})"
+            exit 1
+          fi
+
+          # stage helm dependencies and package the chart
           yq eval '.dependencies[] | .name + " " + .repository' ../${{ matrix.repository }}/charts/${{ matrix.repository }}/Chart.yaml | while read -r repo_name repo_url; do
             if [[ ! "$repo_url" =~ ^(oci://|file://) ]]; then
               helm repo add "$repo_name" "$repo_url"
@@ -92,6 +101,7 @@ jobs:
           helm package ../${{ matrix.repository }}/charts/${{ matrix.repository }} \
             --app-version ${{ needs.env.outputs.RELEASE_VERSION }} \
             --version ${{ needs.env.outputs.TRIMMED_RELEASE_VERSION }}
+
           popd
 
       - name: publish release

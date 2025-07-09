@@ -237,11 +237,11 @@ replicas: 1
 imageRegistry: ""
 
 ## @param image.repository Image repository
-## @param image.tag x-release-please-version
+## @param image.tag Image tag
 ## @param image.pullPolicy Image pull policy
 image:
   repository: quay.io/open-cluster-management/fleetconfig-controller
-  tag: v0.0.1  # x-release-please-version
+  tag: v0.0.2
   pullPolicy: IfNotPresent
 
 ## @param imagePullSecrets Image pull secrets
