@@ -8,7 +8,7 @@
 ## Configuration for the FleetConfig resource created on the Hub. By default, bootstraps the Hub cluster in hub-as-spoke mode.
 ## @descriptionEnd
 fleetConfig:
-  ## @param fleetConfig.enabled Whether to install fleetconfig-controller.
+  ## @param fleetConfig.enabled Whether to create a FleetConfig resource.
   enabled: true
   ## @descriptionStart
   ## ### Spoke Feature Gates
@@ -80,7 +80,7 @@ fleetConfig:
         ManifestWorkReplicaSet: true
         ## @param fleetConfig.hub.clusterManager.featureGates.ResourceCleanup ResourceCleanup feature gate.
         ResourceCleanup: true
-      ## @param fleetConfig.hub.clusterManager.purgeOperator If set, the cluster manager operator will be purged and the open-cluster-management namespace deleted when the MultiCluster CR is deleted.
+      ## @param fleetConfig.hub.clusterManager.purgeOperator If set, the cluster manager operator will be purged and the open-cluster-management namespace deleted when the FleetConfig CR is deleted.
       purgeOperator: true
       ## @param fleetConfig.hub.clusterManager.resources Resource specifications for all clustermanager-managed containers.
       resources: {}
@@ -224,6 +224,12 @@ fleetConfig:
         # # Options: [ Default | BestEffort | ResourceRequirement ].
         # qosClass: "Default"
       singleton: false
+
+## @section Topology Resources
+
+## @param topologyResources.enabled Whether to create Namespaces and ManagedClusterSetBindings for the default ManagedClusterSets created when a FleetConfig is created with the DefaultClusterSet feature gate enabled. Additionally, a Namespace, ManagedClusterSet, and Placement are created for targeting all managed clusters that are not the hub running in hub-as-spoke mode.
+topologyResources:
+  enabled: true
 
 ## @section fleetconfig-controller parameters
 

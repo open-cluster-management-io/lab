@@ -1,4 +1,4 @@
-{{- if index .Values "fleetConfig" "enabled" }}
+{{- if index .Values "topologyResources" "enabled" }}
 # managed-cluster-set-global always includes all ManagedClusters.
 apiVersion: v1
 kind: Namespace
