@@ -29,12 +29,12 @@ import (
 )
 
 // handleHub manages Hub cluster init and upgrade operations
-func handleHub(ctx context.Context, kClient client.Client, mc *v1alpha1.FleetConfig) error {
+func handleHub(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetConfig) error {
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("handleHub", "fleetconfig", mc.Name)
+	logger.V(0).Info("handleHub", "fleetconfig", fc.Name)
 
 	// check if the hub is already initialized
-	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, kClient, mc.Spec.Hub.Kubeconfig)
+	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, kClient, fc.Spec.Hub.Kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -67,64 +67,64 @@ func handleHub(ctx context.Context, kClient client.Client, mc *v1alpha1.FleetCon
 		if len(msgs) > 0 {
 			msg := strings.TrimSuffix(strings.Join(msgs, "; "), "; ")
 			msg = fmt.Sprintf("hub pending/degraded: %s", msg)
-			mc.SetConditions(true, v1alpha1.NewCondition(
+			fc.SetConditions(true, v1alpha1.NewCondition(
 				msg, v1alpha1.FleetConfigHubInitialized, metav1.ConditionFalse, metav1.ConditionTrue,
 			))
 			return errors.New(msg)
 		}
 	} else {
-		if err := initializeHub(ctx, kClient, mc); err != nil {
+		if err := initializeHub(ctx, kClient, fc); err != nil {
 			return err
 		}
 	}
 
-	mc.SetConditions(true, v1alpha1.NewCondition(
+	fc.SetConditions(true, v1alpha1.NewCondition(
 		v1alpha1.FleetConfigHubInitialized, v1alpha1.FleetConfigHubInitialized, metav1.ConditionTrue, metav1.ConditionTrue,
 	))
 
 	// attempt an upgrade whenever the clustermanager's bundleVersion changes
-	upgrade, err := hubNeedsUpgrade(ctx, mc, operatorC)
+	upgrade, err := hubNeedsUpgrade(ctx, fc, operatorC)
 	if err != nil {
 		return fmt.Errorf("failed to check if hub needs upgrade: %w", err)
 	}
 	if upgrade {
-		return upgradeHub(ctx, mc)
+		return upgradeHub(ctx, fc)
 	}
 
 	return nil
 }
 
 // initializeHub initializes the Hub cluster via 'clusteradm init'
-func initializeHub(ctx context.Context, kClient client.Client, mc *v1alpha1.FleetConfig) error {
+func initializeHub(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetConfig) error {
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("initHub", "fleetconfig", mc.Name)
+	logger.V(0).Info("initHub", "fleetconfig", fc.Name)
 
 	initArgs := []string{"init",
-		fmt.Sprintf("--create-namespace=%t", mc.Spec.Hub.CreateNamespace),
-		fmt.Sprintf("--force=%t", mc.Spec.Hub.Force),
+		fmt.Sprintf("--create-namespace=%t", fc.Spec.Hub.CreateNamespace),
+		fmt.Sprintf("--force=%t", fc.Spec.Hub.Force),
 		"--wait=true",
 	}
 
-	registrationDriver := mc.Spec.RegistrationAuth.GetDriver()
+	registrationDriver := fc.Spec.RegistrationAuth.GetDriver()
 	if registrationDriver == v1alpha1.AWSIRSARegistrationDriver {
 		raArgs := []string{
 			fmt.Sprintf("--registration-drivers=%s", registrationDriver),
 		}
-		if mc.Spec.RegistrationAuth.HubClusterARN != "" {
-			raArgs = append(raArgs, fmt.Sprintf("--hub-cluster-arn=%s", mc.Spec.RegistrationAuth.HubClusterARN))
+		if fc.Spec.RegistrationAuth.HubClusterARN != "" {
+			raArgs = append(raArgs, fmt.Sprintf("--hub-cluster-arn=%s", fc.Spec.RegistrationAuth.HubClusterARN))
 		}
-		if len(mc.Spec.RegistrationAuth.AutoApprovedARNPatterns) > 0 {
-			raArgs = append(raArgs, fmt.Sprintf("--auto-approved-arn-patterns=%s", strings.Join(mc.Spec.RegistrationAuth.AutoApprovedARNPatterns, ",")))
+		if len(fc.Spec.RegistrationAuth.AutoApprovedARNPatterns) > 0 {
+			raArgs = append(raArgs, fmt.Sprintf("--auto-approved-arn-patterns=%s", strings.Join(fc.Spec.RegistrationAuth.AutoApprovedARNPatterns, ",")))
 		}
 		initArgs = append(initArgs, raArgs...)
 	}
 
 	// hub.clusterManager defaults to an empty object so check singleton control plane first
-	if mc.Spec.Hub.SingletonControlPlane != nil && mc.Spec.Hub.SingletonControlPlane.Name != "" {
+	if fc.Spec.Hub.SingletonControlPlane != nil && fc.Spec.Hub.SingletonControlPlane.Name != "" {
 		initArgs = append(initArgs, "--singleton=true")
-		initArgs = append(initArgs, "--singleton-name", mc.Spec.Hub.SingletonControlPlane.Name)
-		if mc.Spec.Hub.SingletonControlPlane.Helm.Values != "" {
-			values, cleanupValues, err := file.TmpFile([]byte(mc.Spec.Hub.SingletonControlPlane.Helm.Values), "values")
+		initArgs = append(initArgs, "--singleton-name", fc.Spec.Hub.SingletonControlPlane.Name)
+		if fc.Spec.Hub.SingletonControlPlane.Helm.Values != "" {
+			values, cleanupValues, err := file.TmpFile([]byte(fc.Spec.Hub.SingletonControlPlane.Helm.Values), "values")
 			if cleanupValues != nil {
 				defer cleanupValues()
 			}
@@ -133,33 +133,33 @@ func initializeHub(ctx context.Context, kClient client.Client, mc *v1alpha1.Flee
 			}
 			initArgs = append(initArgs, "--values", values)
 		}
-		for _, s := range mc.Spec.Hub.SingletonControlPlane.Helm.Set {
+		for _, s := range fc.Spec.Hub.SingletonControlPlane.Helm.Set {
 			initArgs = append(initArgs, "--set", s)
 		}
-		for _, s := range mc.Spec.Hub.SingletonControlPlane.Helm.SetJSON {
+		for _, s := range fc.Spec.Hub.SingletonControlPlane.Helm.SetJSON {
 			initArgs = append(initArgs, "--set-json", s)
 		}
-		for _, s := range mc.Spec.Hub.SingletonControlPlane.Helm.SetLiteral {
+		for _, s := range fc.Spec.Hub.SingletonControlPlane.Helm.SetLiteral {
 			initArgs = append(initArgs, "--set-literal", s)
 		}
-		for _, s := range mc.Spec.Hub.SingletonControlPlane.Helm.SetString {
+		for _, s := range fc.Spec.Hub.SingletonControlPlane.Helm.SetString {
 			initArgs = append(initArgs, "--set-string", s)
 		}
-	} else if mc.Spec.Hub.ClusterManager != nil {
+	} else if fc.Spec.Hub.ClusterManager != nil {
 		// clustermanager args
-		initArgs = append(initArgs, "--feature-gates", mc.Spec.Hub.ClusterManager.FeatureGates)
-		initArgs = append(initArgs, fmt.Sprintf("--use-bootstrap-token=%t", mc.Spec.Hub.ClusterManager.UseBootstrapToken))
+		initArgs = append(initArgs, "--feature-gates", fc.Spec.Hub.ClusterManager.FeatureGates)
+		initArgs = append(initArgs, fmt.Sprintf("--use-bootstrap-token=%t", fc.Spec.Hub.ClusterManager.UseBootstrapToken))
 		// source args
-		initArgs = append(initArgs, "--bundle-version", mc.Spec.Hub.ClusterManager.Source.BundleVersion)
-		initArgs = append(initArgs, "--image-registry", mc.Spec.Hub.ClusterManager.Source.Registry)
-		if mc.Spec.Hub.ClusterManager.Resources != nil {
-			initArgs = append(initArgs, common.PrepareResources(*mc.Spec.Hub.ClusterManager.Resources)...)
+		initArgs = append(initArgs, "--bundle-version", fc.Spec.Hub.ClusterManager.Source.BundleVersion)
+		initArgs = append(initArgs, "--image-registry", fc.Spec.Hub.ClusterManager.Source.Registry)
+		if fc.Spec.Hub.ClusterManager.Resources != nil {
+			initArgs = append(initArgs, common.PrepareResources(*fc.Spec.Hub.ClusterManager.Resources)...)
 		}
 	} else {
 		return fmt.Errorf("unknown hub type, must specify either hub.clusterManager or hub.singletonControlPlane")
 	}
 
-	initArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, mc.Spec.Hub.Kubeconfig, initArgs)
+	initArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, fc.Spec.Hub.Kubeconfig, initArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -180,15 +180,15 @@ func initializeHub(ctx context.Context, kClient client.Client, mc *v1alpha1.Flee
 }
 
 // hubNeedsUpgrade checks if the clustermanager on the Hub cluster has the desired bundle version
-func hubNeedsUpgrade(ctx context.Context, mc *v1alpha1.FleetConfig, operatorC *operatorapi.Clientset) (bool, error) {
+func hubNeedsUpgrade(ctx context.Context, fc *v1alpha1.FleetConfig, operatorC *operatorapi.Clientset) (bool, error) {
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("hubNeedsUpgrade", "fleetconfig", mc.Name)
+	logger.V(0).Info("hubNeedsUpgrade", "fleetconfig", fc.Name)
 
-	if mc.Spec.Hub.ClusterManager.Source.BundleVersion == "default" {
+	if fc.Spec.Hub.ClusterManager.Source.BundleVersion == "default" {
 		logger.V(0).Info("clustermanager bundleVersion is default, skipping upgrade")
 		return false, nil
 	}
-	if mc.Spec.Hub.ClusterManager.Source.BundleVersion == "latest" {
+	if fc.Spec.Hub.ClusterManager.Source.BundleVersion == "latest" {
 		logger.V(0).Info("clustermanager bundleVersion is latest, attempting upgrade")
 		return true, nil
 	}
@@ -219,9 +219,9 @@ func hubNeedsUpgrade(ctx context.Context, mc *v1alpha1.FleetConfig, operatorC *o
 
 	logger.V(0).Info("found clustermanager bundleVersions",
 		"activeBundleVersion", activeBundleVersion,
-		"desiredBundleVersion", mc.Spec.Hub.ClusterManager.Source.BundleVersion,
+		"desiredBundleVersion", fc.Spec.Hub.ClusterManager.Source.BundleVersion,
 	)
-	return activeBundleVersion == mc.Spec.Hub.ClusterManager.Source.BundleVersion, nil
+	return activeBundleVersion == fc.Spec.Hub.ClusterManager.Source.BundleVersion, nil
 }
 
 // getClusterManager retrieves the ClusterManager resource from the Hub cluster
@@ -237,13 +237,13 @@ func getClusterManager(ctx context.Context, operatorC *operatorapi.Clientset) (*
 }
 
 // upgradeHub upgrades the Hub cluster's clustermanager to the specified version
-func upgradeHub(ctx context.Context, mc *v1alpha1.FleetConfig) error {
+func upgradeHub(ctx context.Context, fc *v1alpha1.FleetConfig) error {
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("upgradeHub", "fleetconfig", mc.Name)
+	logger.V(0).Info("upgradeHub", "fleetconfig", fc.Name)
 
 	upgradeArgs := []string{"upgrade", "clustermanager",
-		"--bundle-version", mc.Spec.Hub.ClusterManager.Source.BundleVersion,
-		"--image-registry", mc.Spec.Hub.ClusterManager.Source.Registry,
+		"--bundle-version", fc.Spec.Hub.ClusterManager.Source.BundleVersion,
+		"--image-registry", fc.Spec.Hub.ClusterManager.Source.Registry,
 		"--wait=true",
 	}
 	logger.V(1).Info("clusteradm upgrade clustermanager", "args", upgradeArgs)
@@ -253,7 +253,7 @@ func upgradeHub(ctx context.Context, mc *v1alpha1.FleetConfig) error {
 	if err != nil {
 		return fmt.Errorf(
 			"failed to upgrade hub clustermanager to %s: %v, output: %s",
-			mc.Spec.Hub.ClusterManager.Source.BundleVersion, err, string(out),
+			fc.Spec.Hub.ClusterManager.Source.BundleVersion, err, string(out),
 		)
 	}
 	logger.V(1).Info("clustermanager upgraded", "output", string(out))
@@ -263,9 +263,9 @@ func upgradeHub(ctx context.Context, mc *v1alpha1.FleetConfig) error {
 
 // cleanHub uninstalls OCM components from the Hub cluster via 'clusteradm clean'
 // TODO: how to clean hub clusters using a singleton control plane?
-func cleanHub(ctx context.Context, kClient client.Client, hubKubeconfig []byte, mc *v1alpha1.FleetConfig) error {
+func cleanHub(ctx context.Context, kClient client.Client, hubKubeconfig []byte, fc *v1alpha1.FleetConfig) error {
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("cleanHub", "fleetconfig", mc.Name)
+	logger.V(0).Info("cleanHub", "fleetconfig", fc.Name)
 
 	clusterC, err := common.ClusterClient(hubKubeconfig)
 	if err != nil {
@@ -273,18 +273,18 @@ func cleanHub(ctx context.Context, kClient client.Client, hubKubeconfig []byte, 
 	}
 
 	// delete all ManagedClusters before cleaning the hub
-	if err := cleanManagedClusters(ctx, mc, clusterC); err != nil {
+	if err := cleanManagedClusters(ctx, fc, clusterC); err != nil {
 		return err
 	}
 
 	// manually clean all managed cluster namespaces
-	if err := cleanNamespaces(ctx, kClient, mc); err != nil {
+	if err := cleanNamespaces(ctx, kClient, fc); err != nil {
 		return err
 	}
 
 	cleanArgs := []string{"clean",
 		// name is omitted, as the default name, 'cluster-manager', is always used
-		fmt.Sprintf("--purge-operator=%t", mc.Spec.Hub.ClusterManager.PurgeOperator),
+		fmt.Sprintf("--purge-operator=%t", fc.Spec.Hub.ClusterManager.PurgeOperator),
 	}
 	logger.V(1).Info("clusteradm clean", "args", cleanArgs)
 
@@ -302,9 +302,9 @@ func cleanHub(ctx context.Context, kClient client.Client, hubKubeconfig []byte, 
 var cleanupInterval = 5 * time.Second
 
 // cleanManagedClusters deletes all ManagedClusters from the Hub cluster.
-func cleanManagedClusters(ctx context.Context, mc *v1alpha1.FleetConfig, client *clusterapi.Clientset) error {
+func cleanManagedClusters(ctx context.Context, fc *v1alpha1.FleetConfig, client *clusterapi.Clientset) error {
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("cleanManagedClusters", "fleetconfig", mc.Name)
+	logger.V(0).Info("cleanManagedClusters", "fleetconfig", fc.Name)
 
 	deleteOpts := metav1.DeleteOptions{
 		PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
@@ -340,16 +340,16 @@ func cleanManagedClusters(ctx context.Context, mc *v1alpha1.FleetConfig, client 
 	return nil
 }
 
-func cleanNamespaces(ctx context.Context, kClient client.Client, mc *v1alpha1.FleetConfig) error {
+func cleanNamespaces(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetConfig) error {
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("cleanNamespaces", "fleetconfig", mc.Name)
+	logger.V(0).Info("cleanNamespaces", "fleetconfig", fc.Name)
 
 	deleteOpts := &client.DeleteOptions{
 		PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
 	}
-	namespaces := make([]string, 0, len(mc.Spec.Spokes))
+	namespaces := make([]string, 0, len(fc.Spec.Spokes))
 
-	for _, spoke := range mc.Spec.Spokes {
+	for _, spoke := range fc.Spec.Spokes {
 		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: spoke.Name}}
 		if err := kClient.Delete(ctx, ns, deleteOpts); err != nil && !kerrs.IsNotFound(err) {
 			return err

@@ -88,7 +88,7 @@ var _ = Describe("fleetconfig", Label("fleetconfig"), Ordered, func() {
 		It("should not allow changes to the FleetConfig resource", func() {
 
 			By("failing to patch the FleetConfig's feature gates")
-			fc, err := utils.GetFleetConfig(tc.ctx, tc.kClient, multiClusterNN)
+			fc, err := utils.GetFleetConfig(tc.ctx, tc.kClient, fleetConfigNN)
 			Expect(err).NotTo(HaveOccurred())
 			patchFeatureGates := "DefaultClusterSet=true,ManifestWorkReplicaSet=true,ResourceCleanup=false"
 			Expect(utils.UpdateFleetConfigFeatureGates(tc.ctx, tc.kClient, fc, patchFeatureGates)).ToNot(Succeed())
@@ -102,7 +102,7 @@ var _ = Describe("fleetconfig", Label("fleetconfig"), Ordered, func() {
 
 			By("ensuring the spoke is deregistered properly")
 			EventuallyWithOffset(1, func() error {
-				if err := tc.kClient.Get(tc.ctx, multiClusterNN, fc); err != nil {
+				if err := tc.kClient.Get(tc.ctx, fleetConfigNN, fc); err != nil {
 					return err
 				}
 				if len(fc.Status.JoinedSpokes) > 1 {
@@ -166,7 +166,7 @@ var _ = Describe("fleetconfig", Label("fleetconfig"), Ordered, func() {
 			By("deleting the FleetConfig and ensuring that it isn't deleted until the ManifestWork is deleted")
 			ExpectWithOffset(1, tc.kClient.Delete(tc.ctx, fcClone)).To(Succeed())
 			EventuallyWithOffset(1, func() error {
-				if err := tc.kClient.Get(tc.ctx, multiClusterNN, fcClone); err != nil {
+				if err := tc.kClient.Get(tc.ctx, fleetConfigNN, fcClone); err != nil {
 					utils.WarnError(err, "failed to get FleetConfig")
 					return err
 				}
@@ -198,7 +198,7 @@ var _ = Describe("fleetconfig", Label("fleetconfig"), Ordered, func() {
 			By("ensuring the FleetConfig is deleted once the ManifestWork is deleted")
 			ensureResourceDeleted(
 				func() error {
-					err := tc.kClient.Get(tc.ctx, multiClusterNN, fcClone)
+					err := tc.kClient.Get(tc.ctx, fleetConfigNN, fcClone)
 					if kerrs.IsNotFound(err) {
 						utils.Info("FleetConfig deleted successfully")
 						return nil

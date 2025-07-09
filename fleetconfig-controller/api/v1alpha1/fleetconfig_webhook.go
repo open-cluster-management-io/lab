@@ -85,46 +85,46 @@ var _ webhook.CustomValidator = &FleetConfigCustomValidator{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (v *FleetConfigCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	mc, ok := obj.(*FleetConfig)
+	fc, ok := obj.(*FleetConfig)
 	if !ok {
 		return nil, fmt.Errorf("expected a FleetConfig object but got %T", obj)
 	}
-	log.Info("Validation for FleetConfig upon creation", "name", mc.GetName())
+	log.Info("Validation for FleetConfig upon creation", "name", fc.GetName())
 
 	var (
 		allErrs  field.ErrorList
 		warnings admission.Warnings
 	)
 
-	if valid, msg := isKubeconfigValid(mc.Spec.Hub.Kubeconfig); !valid {
+	if valid, msg := isKubeconfigValid(fc.Spec.Hub.Kubeconfig); !valid {
 		allErrs = append(allErrs, field.Invalid(
-			field.NewPath("hub"), mc.Spec.Hub.Kubeconfig, msg),
+			field.NewPath("hub"), fc.Spec.Hub.Kubeconfig, msg),
 		)
 	}
 
-	for i, spoke := range mc.Spec.Spokes {
+	for i, spoke := range fc.Spec.Spokes {
 		if spoke.Klusterlet.Mode == string(operatorv1.InstallModeHosted) {
 			if spoke.Klusterlet.ManagedClusterKubeconfig == nil {
 				allErrs = append(allErrs, field.Invalid(
-					field.NewPath("spokes").Index(i), mc.Spec.Spokes, "managedClusterKubeconfig is required in hosted mode"),
+					field.NewPath("spokes").Index(i), fc.Spec.Spokes, "managedClusterKubeconfig is required in hosted mode"),
 				)
 			} else {
 				if valid, msg := isKubeconfigValid(spoke.Klusterlet.ManagedClusterKubeconfig); !valid {
 					allErrs = append(allErrs, field.Invalid(
-						field.NewPath("spokes").Index(i), mc.Spec.Spokes, msg),
+						field.NewPath("spokes").Index(i), fc.Spec.Spokes, msg),
 					)
 				}
 			}
 		}
 		if valid, msg := isKubeconfigValid(spoke.Kubeconfig); !valid {
 			allErrs = append(allErrs, field.Invalid(
-				field.NewPath("spokes").Index(i), mc.Spec.Spokes, msg),
+				field.NewPath("spokes").Index(i), fc.Spec.Spokes, msg),
 			)
 		}
 	}
 
 	if len(allErrs) > 0 {
-		return warnings, errors.NewInvalid(GroupKind, mc.Name, allErrs)
+		return warnings, errors.NewInvalid(GroupKind, fc.Name, allErrs)
 	}
 
 	return warnings, nil
@@ -142,7 +142,7 @@ func isKubeconfigValid(kubeconfig *Kubeconfig) (bool, string) {
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (v *FleetConfigCustomValidator) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	mc, ok := newObj.(*FleetConfig)
+	fc, ok := newObj.(*FleetConfig)
 	if !ok {
 		return nil, fmt.Errorf("expected a FleetConfig object for the newObj but got %T", newObj)
 	}
@@ -150,24 +150,24 @@ func (v *FleetConfigCustomValidator) ValidateUpdate(_ context.Context, oldObj, n
 	if !ok {
 		return nil, fmt.Errorf("expected a FleetConfig object for the oldObj but got %T", oldObj)
 	}
-	log.Info("starting validation for FleetConfig update", "name", mc.GetName())
+	log.Info("starting validation for FleetConfig update", "name", fc.GetName())
 
-	err := allowFleetConfigUpdate(mc, oldMC)
+	err := allowFleetConfigUpdate(fc, oldMC)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Info("validation for FleetConfig update allowed", "name", mc.GetName())
+	log.Info("validation for FleetConfig update allowed", "name", fc.GetName())
 	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (v *FleetConfigCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	mc, ok := obj.(*FleetConfig)
+	fc, ok := obj.(*FleetConfig)
 	if !ok {
 		return nil, fmt.Errorf("expected a FleetConfig object but got %T", obj)
 	}
-	log.Info("Validation for FleetConfig upon deletion", "name", mc.GetName())
+	log.Info("Validation for FleetConfig upon deletion", "name", fc.GetName())
 
 	// TODO(user): fill in your validation logic upon object deletion.
 	return nil, nil

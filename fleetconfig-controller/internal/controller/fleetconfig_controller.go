@@ -50,8 +50,8 @@ const (
 	originalFleetConfigKey contextKey = iota
 )
 
-func withOriginalFleetConfig(ctx context.Context, mc *v1alpha1.FleetConfig) context.Context {
-	return context.WithValue(ctx, originalFleetConfigKey, mc.DeepCopy())
+func withOriginalFleetConfig(ctx context.Context, fc *v1alpha1.FleetConfig) context.Context {
+	return context.WithValue(ctx, originalFleetConfigKey, fc.DeepCopy())
 }
 
 // FleetConfigReconciler reconciles a FleetConfig object
@@ -67,45 +67,45 @@ func (r *FleetConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	ctx = log.IntoContext(ctx, logger)
 
 	// Fetch the FleetConfig instance
-	mc := &v1alpha1.FleetConfig{}
-	err := r.Get(ctx, req.NamespacedName, mc)
+	fc := &v1alpha1.FleetConfig{}
+	err := r.Get(ctx, req.NamespacedName, fc)
 	if err != nil {
 		if !kerrs.IsNotFound(err) {
 			logger.Error(err, "failed to fetch FleetConfig", "key", req)
 		}
 		return ret(ctx, ctrl.Result{}, client.IgnoreNotFound(err))
 	}
-	ctx = withOriginalFleetConfig(ctx, mc)
+	ctx = withOriginalFleetConfig(ctx, fc)
 
 	// Create a patch helper for this reconciliation
-	patchHelper, err := patch.NewHelper(mc, r.Client)
+	patchHelper, err := patch.NewHelper(fc, r.Client)
 	if err != nil {
 		return ret(ctx, ctrl.Result{}, err)
 	}
 
 	// Ensure patch is applied at the end
 	defer func() {
-		if err := patchHelper.Patch(ctx, mc); err != nil && !kerrs.IsNotFound(err) {
+		if err := patchHelper.Patch(ctx, fc); err != nil && !kerrs.IsNotFound(err) {
 			logger.Error(err, "failed to patch FleetConfig")
 		}
 	}()
 
 	// Add a finalizer and requeue if not already present
-	if !slices.Contains(mc.Finalizers, v1alpha1.FleetConfigFinalizer) {
-		mc.Finalizers = append(mc.Finalizers, v1alpha1.FleetConfigFinalizer)
+	if !slices.Contains(fc.Finalizers, v1alpha1.FleetConfigFinalizer) {
+		fc.Finalizers = append(fc.Finalizers, v1alpha1.FleetConfigFinalizer)
 		return ret(ctx, ctrl.Result{Requeue: true}, nil)
 	}
 
 	// Handle deletion logic with finalizer
-	if !mc.DeletionTimestamp.IsZero() {
-		if mc.Status.Phase != v1alpha1.FleetConfigDeleting {
-			mc.Status.Phase = v1alpha1.FleetConfigDeleting
+	if !fc.DeletionTimestamp.IsZero() {
+		if fc.Status.Phase != v1alpha1.FleetConfigDeleting {
+			fc.Status.Phase = v1alpha1.FleetConfigDeleting
 			return ret(ctx, ctrl.Result{Requeue: true}, nil)
 		}
 
-		if slices.Contains(mc.Finalizers, v1alpha1.FleetConfigFinalizer) {
-			if err := r.cleanup(ctx, mc); err != nil {
-				mc.SetConditions(true, v1alpha1.NewCondition(
+		if slices.Contains(fc.Finalizers, v1alpha1.FleetConfigFinalizer) {
+			if err := r.cleanup(ctx, fc); err != nil {
+				fc.SetConditions(true, v1alpha1.NewCondition(
 					err.Error(), v1alpha1.FleetConfigCleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
 				))
 				return ret(ctx, ctrl.Result{}, err)
@@ -116,8 +116,8 @@ func (r *FleetConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// Initialize phase & conditions
-	previousPhase := mc.Status.Phase
-	mc.Status.Phase = v1alpha1.FleetConfigStarting
+	previousPhase := fc.Status.Phase
+	fc.Status.Phase = v1alpha1.FleetConfigStarting
 	initConditions := []v1alpha1.Condition{
 		v1alpha1.NewCondition(
 			v1alpha1.FleetConfigHubInitialized, v1alpha1.FleetConfigHubInitialized, metav1.ConditionFalse, metav1.ConditionTrue,
@@ -126,11 +126,11 @@ func (r *FleetConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			v1alpha1.FleetConfigCleanupFailed, v1alpha1.FleetConfigCleanupFailed, metav1.ConditionFalse, metav1.ConditionFalse,
 		),
 	}
-	for _, s := range mc.Spec.Spokes {
+	for _, s := range fc.Spec.Spokes {
 		initConditions = append(
 			initConditions, v1alpha1.NewCondition("", s.JoinType(), metav1.ConditionFalse, metav1.ConditionTrue))
 	}
-	mc.SetConditions(false, initConditions...)
+	fc.SetConditions(false, initConditions...)
 
 	if previousPhase == "" {
 		// set initial phase/conditions and requeue
@@ -138,31 +138,31 @@ func (r *FleetConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	// Handle Hub cluster: initialization and/or upgrade
-	hubInitializedCond := mc.GetCondition(v1alpha1.FleetConfigHubInitialized)
-	if err := handleHub(ctx, r.Client, mc); err != nil {
+	hubInitializedCond := fc.GetCondition(v1alpha1.FleetConfigHubInitialized)
+	if err := handleHub(ctx, r.Client, fc); err != nil {
 		logger.Error(err, "Failed to handle hub operations")
-		mc.Status.Phase = v1alpha1.FleetConfigUnhealthy
+		fc.Status.Phase = v1alpha1.FleetConfigUnhealthy
 	}
 	if hubInitializedCond.Status == metav1.ConditionFalse {
 		return ret(ctx, ctrl.Result{Requeue: true}, nil)
 	}
 
 	// Handle Spoke clusters: join and/or upgrade
-	if err := handleSpokes(ctx, r.Client, mc); err != nil {
+	if err := handleSpokes(ctx, r.Client, fc); err != nil {
 		logger.Error(err, "Failed to handle spoke operations")
-		mc.Status.Phase = v1alpha1.FleetConfigUnhealthy
+		fc.Status.Phase = v1alpha1.FleetConfigUnhealthy
 	}
 
 	// Finalize phase
-	for _, c := range mc.Status.Conditions {
+	for _, c := range fc.Status.Conditions {
 		if c.Status != c.WantStatus {
 			logger.Info("WARNING: condition does not have the desired status", "type", c.Type, "reason", c.Reason, "message", c.Message, "status", c.Status, "wantStatus", c.WantStatus)
-			mc.Status.Phase = v1alpha1.FleetConfigUnhealthy
+			fc.Status.Phase = v1alpha1.FleetConfigUnhealthy
 			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 		}
 	}
-	if mc.Status.Phase == v1alpha1.FleetConfigStarting {
-		mc.Status.Phase = v1alpha1.FleetConfigRunning
+	if fc.Status.Phase == v1alpha1.FleetConfigStarting {
+		fc.Status.Phase = v1alpha1.FleetConfigRunning
 	}
 
 	return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
@@ -183,8 +183,8 @@ func ret(ctx context.Context, res ctrl.Result, err error) (ctrl.Result, error) {
 }
 
 // cleanup cleans up a FleetConfig and its associated resources.
-func (r *FleetConfigReconciler) cleanup(ctx context.Context, mc *v1alpha1.FleetConfig) error {
-	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, mc.Spec.Hub.Kubeconfig)
+func (r *FleetConfigReconciler) cleanup(ctx context.Context, fc *v1alpha1.FleetConfig) error {
+	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, fc.Spec.Hub.Kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -194,10 +194,10 @@ func (r *FleetConfigReconciler) cleanup(ctx context.Context, mc *v1alpha1.FleetC
 		return err
 	}
 	if doCleanup {
-		if err := cleanupSpokes(ctx, r.Client, mc); err != nil {
+		if err := cleanupSpokes(ctx, r.Client, fc); err != nil {
 			return err
 		}
-		if err := cleanHub(ctx, r.Client, hubKubeconfig, mc); err != nil {
+		if err := cleanHub(ctx, r.Client, hubKubeconfig, fc); err != nil {
 			return err
 		}
 		if err := r.DeleteAllOf(ctx, &certificatesv1.CertificateSigningRequest{},
@@ -206,7 +206,7 @@ func (r *FleetConfigReconciler) cleanup(ctx context.Context, mc *v1alpha1.FleetC
 			return err
 		}
 	}
-	mc.Finalizers = slices.DeleteFunc(mc.Finalizers, func(s string) bool {
+	fc.Finalizers = slices.DeleteFunc(fc.Finalizers, func(s string) bool {
 		return s == v1alpha1.FleetConfigFinalizer
 	})
 	return nil

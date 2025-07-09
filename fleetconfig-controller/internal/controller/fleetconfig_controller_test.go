@@ -33,8 +33,8 @@ import (
 )
 
 var (
-	mc           *v1alpha1.FleetConfig
-	mcReconciler *FleetConfigReconciler
+	fc           *v1alpha1.FleetConfig
+	fcReconciler *FleetConfigReconciler
 	nn           types.NamespacedName
 )
 
@@ -47,12 +47,12 @@ var _ = Describe("FleetConfig Controller", Ordered, func() {
 				Name:      "test-fleetconfig",
 				Namespace: "default",
 			}
-			mcReconciler = &FleetConfigReconciler{
+			fcReconciler = &FleetConfigReconciler{
 				Client: kClient,
 				Log:    logr.Logger{},
 				Scheme: kClient.Scheme(),
 			}
-			mc = &v1alpha1.FleetConfig{
+			fc = &v1alpha1.FleetConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      nn.Name,
 					Namespace: nn.Namespace,
@@ -69,7 +69,7 @@ var _ = Describe("FleetConfig Controller", Ordered, func() {
 		})
 
 		It("Should create a FleetConfig", func() {
-			Expect(kClient.Create(ctx, mc)).To(Succeed())
+			Expect(kClient.Create(ctx, fc)).To(Succeed())
 		})
 
 		It("Should add a finalizer to the FleetConfig", func() {
@@ -77,8 +77,8 @@ var _ = Describe("FleetConfig Controller", Ordered, func() {
 			Expect(reconcileFleetConfig(ctx)).To(Succeed())
 
 			By("Verifying the FleetConfig's finalizer")
-			Expect(kClient.Get(ctx, nn, mc)).To(Succeed())
-			Expect(mc.Finalizers[0]).To(Equal(v1alpha1.FleetConfigFinalizer),
+			Expect(kClient.Get(ctx, nn, fc)).To(Succeed())
+			Expect(fc.Finalizers[0]).To(Equal(v1alpha1.FleetConfigFinalizer),
 				"FleetConfig %s wasn't given a finalizer", nn.Name)
 		})
 
@@ -87,10 +87,10 @@ var _ = Describe("FleetConfig Controller", Ordered, func() {
 			Expect(reconcileFleetConfig(ctx)).To(Succeed())
 
 			By("Verifying the FleetConfig's phase and conditions")
-			Expect(kClient.Get(ctx, nn, mc)).To(Succeed())
-			Expect(mc.Status.Phase).To(Equal(v1alpha1.FleetConfigStarting),
+			Expect(kClient.Get(ctx, nn, fc)).To(Succeed())
+			Expect(fc.Status.Phase).To(Equal(v1alpha1.FleetConfigStarting),
 				"FleetConfig %s is not in the Initializing phase", nn.Name)
-			Expect(assertConditions(mc.Status.Conditions, map[string]metav1.ConditionStatus{
+			Expect(assertConditions(fc.Status.Conditions, map[string]metav1.ConditionStatus{
 				v1alpha1.FleetConfigHubInitialized: metav1.ConditionFalse,
 				v1alpha1.FleetConfigCleanupFailed:  metav1.ConditionFalse,
 			})).To(Succeed())
@@ -100,9 +100,9 @@ var _ = Describe("FleetConfig Controller", Ordered, func() {
 
 		It("Should delete the FleetConfig", func() {
 			By("Deleting the FleetConfig")
-			Expect(kClient.Delete(ctx, mc)).To(Succeed())
+			Expect(kClient.Delete(ctx, fc)).To(Succeed())
 			Eventually(func() error {
-				err := kClient.Get(ctx, nn, mc)
+				err := kClient.Get(ctx, nn, fc)
 				if kerrs.IsNotFound(err) {
 					return nil
 				}
@@ -113,7 +113,7 @@ var _ = Describe("FleetConfig Controller", Ordered, func() {
 })
 
 func reconcileFleetConfig(ctx context.Context) error {
-	_, err := mcReconciler.Reconcile(ctx, reconcile.Request{
+	_, err := fcReconciler.Reconcile(ctx, reconcile.Request{
 		NamespacedName: nn,
 	})
 	return err

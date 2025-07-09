@@ -33,11 +33,11 @@ var csrSuffixPattern = regexp.MustCompile(`-[a-zA-Z0-9]{5}$`)
 const amwExistsError = "you should manually clean them, uninstall kluster will cause those works out of control."
 
 // handleSpokes manages Spoke cluster join and upgrade operations
-func handleSpokes(ctx context.Context, kClient client.Client, mc *v1alpha1.FleetConfig) error {
+func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetConfig) error {
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("handleSpokes", "fleetconfig", mc.Name)
+	logger.V(0).Info("handleSpokes", "fleetconfig", fc.Name)
 
-	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, kClient, mc.Spec.Hub.Kubeconfig)
+	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, kClient, fc.Spec.Hub.Kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -48,23 +48,23 @@ func handleSpokes(ctx context.Context, kClient client.Client, mc *v1alpha1.Fleet
 
 	// clean up deregistered spokes
 	joinedSpokes := make([]v1alpha1.JoinedSpoke, 0)
-	for _, js := range mc.Status.JoinedSpokes {
-		if !slices.ContainsFunc(mc.Spec.Spokes, func(spoke v1alpha1.Spoke) bool {
+	for _, js := range fc.Status.JoinedSpokes {
+		if !slices.ContainsFunc(fc.Spec.Spokes, func(spoke v1alpha1.Spoke) bool {
 			return spoke.Name == js.Name && reflect.DeepEqual(spoke.Kubeconfig, js.Kubeconfig)
 		}) {
 			err = deregisterSpoke(ctx, kClient, hubKubeconfig, &js)
 			if err != nil {
-				mc.SetConditions(true, v1alpha1.NewCondition(
+				fc.SetConditions(true, v1alpha1.NewCondition(
 					err.Error(), js.UnjoinType(), metav1.ConditionFalse, metav1.ConditionTrue,
 				))
 				joinedSpokes = append(joinedSpokes, js)
 				continue
 			}
-			mc.SetConditions(true, v1alpha1.NewCondition("unjoined", js.UnjoinType(), metav1.ConditionTrue, metav1.ConditionTrue))
+			fc.SetConditions(true, v1alpha1.NewCondition("unjoined", js.UnjoinType(), metav1.ConditionTrue, metav1.ConditionTrue))
 		}
 	}
 
-	for _, spoke := range mc.Spec.Spokes {
+	for _, spoke := range fc.Spec.Spokes {
 		logger.V(0).Info("handleSpokes: reconciling spoke cluster", "name", spoke.Name)
 
 		// check if the spoke has already been joined to the hub
@@ -76,19 +76,19 @@ func handleSpokes(ctx context.Context, kClient client.Client, mc *v1alpha1.Fleet
 
 		// attempt to join the spoke cluster if it hasn't already been joined
 		if managedCluster == nil {
-			tokenMeta, err := getToken(ctx, kClient, mc)
+			tokenMeta, err := getToken(ctx, kClient, fc)
 			if err != nil {
 				return fmt.Errorf("failed to get join token: %w", err)
 			}
-			if err := joinSpoke(ctx, kClient, mc.Spec, spoke, tokenMeta); err != nil {
-				mc.SetConditions(true, v1alpha1.NewCondition(
+			if err := joinSpoke(ctx, kClient, fc.Spec, spoke, tokenMeta); err != nil {
+				fc.SetConditions(true, v1alpha1.NewCondition(
 					err.Error(), spoke.JoinType(), metav1.ConditionFalse, metav1.ConditionTrue,
 				))
 				continue
 			}
 			// run `clusteradm accept` even if auto acceptance is enabled, as it's just a no-op if the spoke is already accepted
 			if err := acceptCluster(ctx, spoke.Name); err != nil {
-				mc.SetConditions(true, v1alpha1.NewCondition(
+				fc.SetConditions(true, v1alpha1.NewCondition(
 					err.Error(), spoke.JoinType(), metav1.ConditionFalse, metav1.ConditionTrue,
 				))
 				continue
@@ -107,7 +107,7 @@ func handleSpokes(ctx context.Context, kClient client.Client, mc *v1alpha1.Fleet
 		if jc == nil {
 			logger.V(0).Info("handleSpokes: waiting for spoke cluster to join", "name", spoke.Name)
 			msg := fmt.Sprintf("ManagedClusterJoined condition not found in ManagedCluster for spoke cluster %s", spoke.Name)
-			mc.SetConditions(true, v1alpha1.NewCondition(
+			fc.SetConditions(true, v1alpha1.NewCondition(
 				msg, spoke.JoinType(), metav1.ConditionFalse, metav1.ConditionTrue,
 			))
 			continue
@@ -116,7 +116,7 @@ func handleSpokes(ctx context.Context, kClient client.Client, mc *v1alpha1.Fleet
 		logger.V(0).Info("handleSpokes: found join condition", "reason", jc.Reason, "status", jc.Status, "message", jc.Message)
 		if jc.Status != metav1.ConditionTrue {
 			msg := fmt.Sprintf("failed to join spoke cluster %s: %s", spoke.Name, jc.Message)
-			mc.SetConditions(true, v1alpha1.NewCondition(
+			fc.SetConditions(true, v1alpha1.NewCondition(
 				msg, spoke.JoinType(), metav1.ConditionFalse, metav1.ConditionTrue,
 			))
 			logger.V(0).Info("handleSpokes: join failed", "reason", jc.Reason, "status", jc.Status, "message", jc.Message)
@@ -124,7 +124,7 @@ func handleSpokes(ctx context.Context, kClient client.Client, mc *v1alpha1.Fleet
 		}
 
 		// spoke cluster has joined successfully
-		mc.SetConditions(true, v1alpha1.NewCondition(
+		fc.SetConditions(true, v1alpha1.NewCondition(
 			"Joined", spoke.JoinType(), metav1.ConditionTrue, metav1.ConditionTrue,
 		))
 
@@ -155,8 +155,8 @@ func handleSpokes(ctx context.Context, kClient client.Client, mc *v1alpha1.Fleet
 	}
 
 	// Only spokes which are joined, are eligible to be unjoined
-	for _, spoke := range mc.Spec.Spokes {
-		joinedCondition := mc.GetCondition(spoke.JoinType())
+	for _, spoke := range fc.Spec.Spokes {
+		joinedCondition := fc.GetCondition(spoke.JoinType())
 		if joinedCondition == nil || joinedCondition.Status != metav1.ConditionTrue {
 			continue
 		}
@@ -167,7 +167,7 @@ func handleSpokes(ctx context.Context, kClient client.Client, mc *v1alpha1.Fleet
 		}
 		joinedSpokes = append(joinedSpokes, js)
 	}
-	mc.Status.JoinedSpokes = joinedSpokes
+	fc.Status.JoinedSpokes = joinedSpokes
 
 	return nil
 }
@@ -217,15 +217,15 @@ type tokenMeta struct {
 }
 
 // getToken gets a join token from the Hub cluster via 'clusteradm get token'
-func getToken(ctx context.Context, kClient client.Client, mc *v1alpha1.FleetConfig) (*tokenMeta, error) {
+func getToken(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetConfig) (*tokenMeta, error) {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("getToken")
 
 	tokenArgs := []string{"get", "token", "--output=json"}
-	if mc.Spec.Hub.ClusterManager != nil {
-		tokenArgs = append(tokenArgs, fmt.Sprintf("--use-bootstrap-token=%t", mc.Spec.Hub.ClusterManager.UseBootstrapToken))
+	if fc.Spec.Hub.ClusterManager != nil {
+		tokenArgs = append(tokenArgs, fmt.Sprintf("--use-bootstrap-token=%t", fc.Spec.Hub.ClusterManager.UseBootstrapToken))
 	}
-	tokenArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, mc.Spec.Hub.Kubeconfig, tokenArgs)
+	tokenArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, fc.Spec.Hub.Kubeconfig, tokenArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -442,12 +442,12 @@ func upgradeSpoke(ctx context.Context, kClient client.Client, spoke v1alpha1.Spo
 }
 
 // cleanupSpokes deregisters Spoke cluster(s) from the Hub cluster via 'clusteradm unjoin'
-func cleanupSpokes(ctx context.Context, kClient client.Client, mc *v1alpha1.FleetConfig) error {
+func cleanupSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetConfig) error {
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("cleanupSpokes", "fleetconfig", mc.Name)
+	logger.V(0).Info("cleanupSpokes", "fleetconfig", fc.Name)
 
-	for _, spoke := range mc.Spec.Spokes {
-		joinedCondition := mc.GetCondition(spoke.JoinType())
+	for _, spoke := range fc.Spec.Spokes {
+		joinedCondition := fc.GetCondition(spoke.JoinType())
 		if joinedCondition == nil || joinedCondition.Status != metav1.ConditionTrue {
 			logger.V(0).Info("skipping cleanup for unjoined spoke cluster",
 				"spoke", spoke.Name, "message", joinedCondition.Message, "reason", joinedCondition.Reason,

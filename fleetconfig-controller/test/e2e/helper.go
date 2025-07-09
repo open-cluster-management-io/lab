@@ -44,7 +44,7 @@ var (
 	useExistingCluster bool
 
 	// global test variables
-	multiClusterNN = ktypes.NamespacedName{Name: "fleetconfig", Namespace: fcNamespace}
+	fleetConfigNN = ktypes.NamespacedName{Name: "fleetconfig", Namespace: fcNamespace}
 )
 
 // E2EContext holds all the test-specific state.
@@ -229,7 +229,7 @@ func ensureFleetConfigProvisioned(tc *E2EContext, fc *v1alpha1.FleetConfig, extr
 
 	By("ensuring the FleetConfig is provisioned")
 	EventuallyWithOffset(1, func() error {
-		if err := tc.kClient.Get(tc.ctx, multiClusterNN, fc); err != nil {
+		if err := tc.kClient.Get(tc.ctx, fleetConfigNN, fc); err != nil {
 			utils.WarnError(err, "FleetConfig not provisioned")
 			return err
 		}
@@ -253,7 +253,7 @@ func ensureFleetConfigProvisioned(tc *E2EContext, fc *v1alpha1.FleetConfig, extr
 // removeSpokeFromHub removes the spoke from the FleetConfig
 func removeSpokeFromHub(tc *E2EContext, fc *v1alpha1.FleetConfig) {
 	By("removing the spoke")
-	if err := tc.kClient.Get(tc.ctx, multiClusterNN, fc); err != nil {
+	if err := tc.kClient.Get(tc.ctx, fleetConfigNN, fc); err != nil {
 		utils.WarnError(err, "failed to get FleetConfig")
 		ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	}
