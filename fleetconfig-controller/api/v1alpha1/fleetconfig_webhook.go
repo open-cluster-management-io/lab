@@ -146,13 +146,13 @@ func (v *FleetConfigCustomValidator) ValidateUpdate(_ context.Context, oldObj, n
 	if !ok {
 		return nil, fmt.Errorf("expected a FleetConfig object for the newObj but got %T", newObj)
 	}
-	oldMC, ok := oldObj.(*FleetConfig)
+	oldFc, ok := oldObj.(*FleetConfig)
 	if !ok {
 		return nil, fmt.Errorf("expected a FleetConfig object for the oldObj but got %T", oldObj)
 	}
 	log.Info("starting validation for FleetConfig update", "name", fc.GetName())
 
-	err := allowFleetConfigUpdate(fc, oldMC)
+	err := allowFleetConfigUpdate(fc, oldFc)
 	if err != nil {
 		return nil, err
 	}
