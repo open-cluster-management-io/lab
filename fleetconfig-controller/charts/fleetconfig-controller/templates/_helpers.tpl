@@ -92,11 +92,15 @@ This image has no additional binaries bundled, other than clusteradm.
 {{- define "controller.image" -}}
 {{- $baseImage := printf "%s%s:%s" .Values.imageRegistry .Values.image.repository .Values.image.tag -}}
 {{- $provider := "" -}}
-{{- if and .Values.global .Values.kubernetesProvider -}}
+{{- if and .Values.global .Values.global.kubernetesProvider -}}
+{{- $provider = .Values.global.kubernetesProvider | lower -}}
+{{- else if .Values.kubernetesProvider -}}
 {{- $provider = .Values.kubernetesProvider | lower -}}
 {{- end -}}
-{{- if or (eq $provider "eks") (eq $provider "gke") -}}
+{{- if eq $provider "eks" -}}
 {{- printf "%s-%s" $baseImage $provider -}}
+{{- else if hasPrefix "gke" $provider -}}
+{{- printf "%s-%s" $baseImage "gke" -}}
 {{- else -}}
 {{- $baseImage -}}
 {{- end -}}
