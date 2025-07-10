@@ -233,7 +233,7 @@ topologyResources:
 
 ## @section fleetconfig-controller parameters
 
-## @param kubernetesProvider Kubernetes provider of the cluster that fleetconfig-controller will be installed on. Valid values are "Generic", "EKS", "GKE".
+## @param kubernetesProvider Kubernetes provider of the cluster that fleetconfig-controller will be installed on. Valid values are "Generic", "EKS", "GKE-Ingress".
 kubernetesProvider: "Generic"
 
 ## @param replicas fleetconfig-controller replica count
