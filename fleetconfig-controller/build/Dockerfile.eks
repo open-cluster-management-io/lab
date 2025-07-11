@@ -3,8 +3,12 @@
 ARG OS
 ARG ARCH
 
+ARG GO_BASE_IMAGE=golang:1.24.4-alpine3.22
+ARG PYTHON_BASE_IMAGE=python:3.13-alpine
+ARG DISTROLESS_IMAGE=gcr.io/distroless/static:nonroot
+
 ## Stage 1: Build the manager binary
-FROM golang:1.24.4-alpine3.22 AS builder
+FROM ${GO_BASE_IMAGE} AS builder
 ARG OS
 ARG ARCH
 
@@ -27,7 +31,7 @@ COPY pkg/ pkg/
 RUN CGO_ENABLED=0 GOOS=${OS:-linux} GOARCH=${ARCH} go build -a -o manager cmd/main.go
 
 ## Stage 2: Install dependencies
-FROM golang:1.24.4-alpine3.22 AS dependencies
+FROM ${GO_BASE_IMAGE} AS dependencies
 ARG OS
 ARG ARCH
 
@@ -44,7 +48,7 @@ RUN curl -Lo aws-iam-authenticator https://github.com/kubernetes-sigs/aws-iam-au
     mv aws-iam-authenticator /usr/local/bin/aws-iam-authenticator
 
 ## Stage 3: Compress binaries with upx to reduce image size
-FROM python:3.13-alpine AS upx
+FROM ${PYTHON_BASE_IMAGE} AS upx
 RUN apk update && apk add --no-cache upx
 
 WORKDIR /output
@@ -59,7 +63,7 @@ RUN mkdir -p /output && \
 
 ## Stage 4: Finalize
 
-FROM gcr.io/distroless/static:nonroot AS production
+FROM ${DISTROLESS_IMAGE} AS production
 
 WORKDIR /
 

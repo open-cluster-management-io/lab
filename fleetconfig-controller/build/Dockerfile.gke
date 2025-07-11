@@ -3,8 +3,11 @@
 ARG OS
 ARG ARCH
 
+ARG GO_BASE_IMAGE=golang:1.24.4-alpine3.22
+ARG PYTHON_BASE_IMAGE=python:3.13-alpine
+
 ## Stage 1: Build the manager binary
-FROM golang:1.24.4-alpine3.22 AS builder
+FROM ${GO_BASE_IMAGE} AS builder
 ARG OS
 ARG ARCH
 
@@ -27,7 +30,7 @@ COPY pkg/ pkg/
 RUN CGO_ENABLED=0 GOOS=${OS:-linux} GOARCH=${ARCH} go build -a -o manager cmd/main.go
 
 ## Stage 2: Install dependencies
-FROM golang:1.24.4-alpine3.22 AS dependencies
+FROM ${GO_BASE_IMAGE} AS dependencies
 ARG OS
 ARG ARCH
 
@@ -38,7 +41,7 @@ ARG CLUSTERADM_VERSION=1.0.0
 RUN curl -L https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/install.sh | bash -s -- ${CLUSTERADM_VERSION}
 
 ## Stage 3: Compress binaries with upx to reduce image size
-FROM python:3.13-alpine AS upx
+FROM ${PYTHON_BASE_IMAGE} AS upx
 RUN apk update && apk add --no-cache upx
 
 WORKDIR /output
@@ -52,7 +55,7 @@ RUN mkdir -p /output && \
 ## Stage 4: Finalize
 
 # Use Python image instead of distroless to support gcloud
-FROM python:3.13-alpine AS production
+FROM ${PYTHON_BASE_IMAGE} AS production
 ARG OS
 ARG ARCH
 

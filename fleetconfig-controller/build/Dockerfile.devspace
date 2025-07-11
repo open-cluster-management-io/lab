@@ -2,8 +2,10 @@ ARG OS
 ARG ARCH
 ARG PROVIDER
 
+ARG GO_BASE_IMAGE=golang:1.24.4-alpine3.22
+
 # Build the manager binary
-FROM golang:1.24.4-alpine3.22 AS builder
+FROM ${GO_BASE_IMAGE} AS builder
 ARG OS
 ARG ARCH
 ARG PROVIDER
