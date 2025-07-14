@@ -29,6 +29,7 @@ type FleetConfigSpec struct {
 	Hub              Hub               `json:"hub"`
 	Spokes           []Spoke           `json:"spokes"`
 	RegistrationAuth *RegistrationAuth `json:"registrationAuth,omitempty"`
+	AddOns           []*AddOnConfig    `json:"addOns,omitempty"`
 }
 
 // FleetConfigStatus defines the observed state of FleetConfig.
@@ -306,6 +307,21 @@ type Spoke struct {
 	// ClusterARN is the ARN of the spoke cluster.
 	// This field is optionally used for AWS IRSA registration authentication.
 	ClusterARN string `json:"clusterARN,omitempty"`
+
+	// AddOns are the add-ons to enable for the spoke cluster.
+	AddOns []SpokeAddOn `json:"addOns,omitempty"`
+}
+
+// SpokeAddOn is the configuration for enabling add-on installation on the spoke cluster.
+type SpokeAddOn struct {
+	// The name of the add-on. Must match one of the default or manually configured addon names.
+	Name string `json:"name"`
+
+	// The spoke cluster namespace to install the add-on in. If left empty, installs into "open-cluster-managedment-addon" namespace.
+	InstallNamespace string `json:"installNamespace,omitempty"`
+
+	// Optional annotations to apply to the add-on.
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // JoinType returns a status condition type indicating that a particular Spoke cluster has joined the Hub.
@@ -448,6 +464,31 @@ type RegistrationAuth struct {
 	// List of AWS EKS ARN patterns so any EKS clusters with these patterns will be auto accepted to join with hub cluster.
 	// Example pattern: "arn:aws:eks:us-west-2:123456789013:cluster/.*"
 	AutoApprovedARNPatterns []string `json:"autoApprovedARNPatterns,omitempty"`
+}
+
+// AddOnConfig is the configuration of a custom AddOn that can be installed on spoke clusters.
+type AddOnConfig struct {
+	// The name of the add-on.
+	Name string `json:"name"`
+
+	// The add-on version. Optional, defaults to "v0.0.1"
+	// +optional
+	// +kubebuilder:default:="v0.0.1"
+	Version string `json:"version,omitempty"`
+
+	// The rolebinding to the clusterrole in the cluster namespace for the addon agent
+	// +optional
+	ClusterRoleBinding string `json:"clusterRoleBinding,omitempty"`
+
+	// Enable the agent to register to the hub cluster. Optional, defaults to false.
+	// +optional
+	// +kubebuilder:default:=false
+	HubRegistration bool `json:"hubRegistration,omitempty"`
+
+	// Whether to overwrite the add-on if it already exists. Optional, defaults to false.
+	// +optional
+	// +kubebuilder:default:=false
+	Overwrite bool `json:"overwrite,omitempty"`
 }
 
 // +kubebuilder:object:root=true

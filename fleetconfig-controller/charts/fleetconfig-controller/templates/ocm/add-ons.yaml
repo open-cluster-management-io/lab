@@ -1,0 +1,17 @@
+{{- if .Values.fleetConfig.addOns }}
+{{ $addOns := .Values.fleetConfig.addOns }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fleet-add-ons
+  namespace: {{ .Release.Namespace }}
+data:
+  {{- range $addOns }}
+  {{- if or (hasPrefix "http://" .manifests) (hasPrefix "https://" .manifests) (hasPrefix "oci://" .manifests) }}
+  {{ .name }}: {{ .manifests }}
+  {{- else }}
+  {{ .name }}: |-
+    {{- .manifests | nindent 4 }}
+  {{- end }}
+  {{- end }}
+{{- end }}

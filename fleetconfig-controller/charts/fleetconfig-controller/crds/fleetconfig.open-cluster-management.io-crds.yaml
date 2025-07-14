@@ -56,6 +56,36 @@ spec:
           spec:
             description: FleetConfigSpec defines the desired state of FleetConfig.
             properties:
+              addOns:
+                items:
+                  description: AddOnConfig is the configuration of a custom AddOn
+                    that can be installed on spoke clusters.
+                  properties:
+                    clusterRoleBinding:
+                      description: The rolebinding to the clusterrole in the cluster
+                        namespace for the addon agent
+                      type: string
+                    hubRegistration:
+                      default: false
+                      description: Enable the agent to register to the hub cluster.
+                        Optional, defaults to false.
+                      type: boolean
+                    name:
+                      description: The name of the add-on.
+                      type: string
+                    overwrite:
+                      default: false
+                      description: Whether to overwrite the add-on if it already exists.
+                        Optional, defaults to false.
+                      type: boolean
+                    version:
+                      default: v0.0.1
+                      description: The add-on version. Optional, defaults to "v0.0.1"
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
               hub:
                 description: Hub provides specifications for an OCM hub cluster.
                 properties:
@@ -281,6 +311,31 @@ spec:
                   description: Spoke provides specifications for joining and potentially
                     upgrading spokes.
                   properties:
+                    addOns:
+                      description: AddOns are the add-ons to enable for the spoke
+                        cluster.
+                      items:
+                        description: SpokeAddOn is the configuration for enabling
+                          add-on installation on the spoke cluster.
+                        properties:
+                          annotations:
+                            additionalProperties:
+                              type: string
+                            description: Optional annotations to apply to the add-on.
+                            type: object
+                          installNamespace:
+                            description: The spoke cluster namespace to install the
+                              add-on in. If left empty, installs into "open-cluster-managedment-addon"
+                              namespace.
+                            type: string
+                          name:
+                            description: The name of the add-on. Must match one of
+                              the default or manually configured addon names.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
                     ca:
                       description: Hub cluster CA certificate, optional
                       type: string

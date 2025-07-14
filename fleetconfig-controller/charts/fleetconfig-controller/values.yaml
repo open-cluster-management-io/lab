@@ -224,6 +224,29 @@ fleetConfig:
         # # Options: [ Default | BestEffort | ResourceRequirement ].
         # qosClass: "Default"
       singleton: false
+    # Add-on configuration for the spoke cluster.
+    # ## @param fleetConfig.spokes[0].addOns[0].name Name of the add-on.
+    # ## @param fleetConfig.spokes[0].addOns[0].installNamespace Namespace to install the add-on.
+    # ## @param fleetConfig.spokes[0].addOns[0].annotations Annotations to apply to the add-on.
+    # addOns:
+    # - name: ""
+    #   installNamespace: ""
+    #   annotations: {}
+
+  # Global add-on configuration for the hub cluster.
+  # ## @param fleetConfig.addOns[0].name Name of the add-on.
+  # ## @param fleetConfig.addOns[0].manifests Manifests to install. Can either be inline or a URL.
+  # ## @param fleetConfig.addOns[0].version Version of the add-on.
+  # ## @param fleetConfig.addOns[0].clusterRoleBinding Cluster role binding to apply to the add-on.
+  # ## @param fleetConfig.addOns[0].hubRegistration Enable the agent to register to the hub cluster.
+  # ## @param fleetConfig.addOns[0].overwrite Whether to overwrite the add-on if it already exists.
+  # addOns:
+  # - name: ""
+  #   manifests: ""
+  #   version: "v0.0.1"
+  #   clusterRoleBinding: ""
+  #   hubRegistration: false
+  #   overwrite: false
 
 ## @section Topology Resources
 
