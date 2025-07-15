@@ -234,13 +234,13 @@ fleetConfig:
     #   annotations: {}
 
   # Global add-on configuration for the hub cluster.
-  # ## @param fleetConfig.addOns[0].name Name of the add-on.
-  # ## @param fleetConfig.addOns[0].manifests Manifests to install. Can either be inline or a URL.
-  # ## @param fleetConfig.addOns[0].version Version of the add-on.
-  # ## @param fleetConfig.addOns[0].clusterRoleBinding Cluster role binding to apply to the add-on.
-  # ## @param fleetConfig.addOns[0].hubRegistration Enable the agent to register to the hub cluster.
-  # ## @param fleetConfig.addOns[0].overwrite Whether to overwrite the add-on if it already exists.
-  # addOns:
+  # ## @param fleetConfig.addOnConfigs[0].name Name of the add-on.
+  # ## @param fleetConfig.addOnConfigs[0].manifests Manifests to install. Can either be inline or a URL.
+  # ## @param fleetConfig.addOnConfigs[0].version Version of the add-on.
+  # ## @param fleetConfig.addOnConfigs[0].clusterRoleBinding Cluster role binding to apply to the add-on.
+  # ## @param fleetConfig.addOnConfigs[0].hubRegistration Enable the agent to register to the hub cluster.
+  # ## @param fleetConfig.addOnConfigs[0].overwrite Whether to overwrite the add-on if it already exists.
+  # addOnConfigs:
   # - name: ""
   #   manifests: ""
   #   version: "v0.0.1"

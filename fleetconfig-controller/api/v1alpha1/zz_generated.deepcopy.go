@@ -185,8 +185,8 @@ func (in *FleetConfigSpec) DeepCopyInto(out *FleetConfigSpec) {
 		*out = new(RegistrationAuth)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.AddOns != nil {
-		in, out := &in.AddOns, &out.AddOns
+	if in.AddOnConfigs != nil {
+		in, out := &in.AddOnConfigs, &out.AddOnConfigs
 		*out = make([]*AddOnConfig, len(*in))
 		for i := range *in {
 			if (*in)[i] != nil {

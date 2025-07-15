@@ -56,7 +56,7 @@ spec:
           spec:
             description: FleetConfigSpec defines the desired state of FleetConfig.
             properties:
-              addOns:
+              addOnConfigs:
                 items:
                   description: AddOnConfig is the configuration of a custom AddOn
                     that can be installed on spoke clusters.
@@ -325,7 +325,7 @@ spec:
                             type: object
                           installNamespace:
                             description: The spoke cluster namespace to install the
-                              add-on in. If left empty, installs into "open-cluster-managedment-addon"
+                              add-on in. If left empty, installs into the "open-cluster-management-addon"
                               namespace.
                             type: string
                           name:

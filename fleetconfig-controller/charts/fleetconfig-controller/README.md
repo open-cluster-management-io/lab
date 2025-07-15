@@ -57,11 +57,11 @@ If provided, deploy a singleton control plane instead of Cluster Manager.
 To enable singleton mode, `fleetConfig.hub.singletonControlPlane` must be uncommented and configured with the following options:
 - **name**: The name of the singleton control plane (default: "singleton-controlplane")
 - **helm**: Helm configuration for the multicluster-controlplane Helm chart
-- **values**: Raw, YAML-formatted Helm values
-- **set**: List of comma-separated Helm values (e.g., key1=val1,key2=val2)
-- **setJson**: List of comma-separated Helm JSON values
-- **setLiteral**: List of comma-separated Helm literal STRING values
-- **setString**: List of comma-separated Helm STRING values
+  - **values**: Raw, YAML-formatted Helm values
+  - **set**: List of comma-separated Helm values (e.g., key1=val1,key2=val2)
+  - **setJson**: List of comma-separated Helm JSON values
+  - **setLiteral**: List of comma-separated Helm literal STRING values
+  - **setString**: List of comma-separated Helm STRING values
 
 Refer to the [Multicluster Controlplane configuration](https://github.com/open-cluster-management-io/multicluster-controlplane/blob/main/charts/multicluster-controlplane/values.yaml) for more details.
 

@@ -62,5 +62,5 @@ spec:
           registry: {{ $.Values.fleetConfig.source.registry }}
       addOns: {{- toYaml .addOns | nindent 8 }}
     {{- end }}
-  addOns: {{- toYaml .Values.fleetConfig.addOns | nindent 4 }}
+  addOnConfigs: {{- toYaml .Values.fleetConfig.addOnConfigs | nindent 4 }}
 {{- end }}

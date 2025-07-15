@@ -29,7 +29,7 @@ type FleetConfigSpec struct {
 	Hub              Hub               `json:"hub"`
 	Spokes           []Spoke           `json:"spokes"`
 	RegistrationAuth *RegistrationAuth `json:"registrationAuth,omitempty"`
-	AddOns           []*AddOnConfig    `json:"addOns,omitempty"`
+	AddOnConfigs     []*AddOnConfig    `json:"addOnConfigs,omitempty"`
 }
 
 // FleetConfigStatus defines the observed state of FleetConfig.
@@ -317,7 +317,7 @@ type SpokeAddOn struct {
 	// The name of the add-on. Must match one of the default or manually configured addon names.
 	Name string `json:"name"`
 
-	// The spoke cluster namespace to install the add-on in. If left empty, installs into "open-cluster-managedment-addon" namespace.
+	// The spoke cluster namespace to install the add-on in. If left empty, installs into the "open-cluster-management-addon" namespace.
 	InstallNamespace string `json:"installNamespace,omitempty"`
 
 	// Optional annotations to apply to the add-on.
