@@ -309,13 +309,13 @@ type Spoke struct {
 	ClusterARN string `json:"clusterARN,omitempty"`
 
 	// AddOns are the add-ons to enable for the spoke cluster.
-	AddOns []SpokeAddOn `json:"addOns,omitempty"`
+	AddOns []AddOn `json:"addOns,omitempty"`
 }
 
-// SpokeAddOn is the configuration for enabling add-on installation on the spoke cluster.
-type SpokeAddOn struct {
-	// The name of the add-on. Must match one of the default or manually configured addon names.
-	Name string `json:"name"`
+// AddOn enables add-on installation on the cluster.
+type AddOn struct {
+	// The name of the add-on being enabled. Must match one of the default or manually configured add-on names.
+	ConfigName string `json:"configName"`
 
 	// The spoke cluster namespace to install the add-on in. If left empty, installs into the "open-cluster-management-addon" namespace.
 	InstallNamespace string `json:"installNamespace,omitempty"`

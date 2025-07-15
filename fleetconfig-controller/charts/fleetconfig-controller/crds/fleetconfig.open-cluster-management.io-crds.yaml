@@ -315,25 +315,25 @@ spec:
                       description: AddOns are the add-ons to enable for the spoke
                         cluster.
                       items:
-                        description: SpokeAddOn is the configuration for enabling
-                          add-on installation on the spoke cluster.
+                        description: AddOn enables add-on installation on the cluster.
                         properties:
                           annotations:
                             additionalProperties:
                               type: string
                             description: Optional annotations to apply to the add-on.
                             type: object
+                          configName:
+                            description: The name of the add-on being enabled. Must
+                              match one of the default or manually configured add-on
+                              names.
+                            type: string
                           installNamespace:
                             description: The spoke cluster namespace to install the
                               add-on in. If left empty, installs into the "open-cluster-management-addon"
                               namespace.
                             type: string
-                          name:
-                            description: The name of the add-on. Must match one of
-                              the default or manually configured addon names.
-                            type: string
                         required:
-                        - name
+                        - configName
                         type: object
                       type: array
                     ca:
