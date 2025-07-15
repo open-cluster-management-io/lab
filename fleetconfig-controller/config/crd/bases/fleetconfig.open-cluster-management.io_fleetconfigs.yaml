@@ -49,7 +49,7 @@ spec:
               addOnConfigs:
                 items:
                   description: AddOnConfig is the configuration of a custom AddOn
-                    that can be installed on spoke clusters.
+                    that can be installed on a cluster.
                   properties:
                     clusterRoleBinding:
                       description: The rolebinding to the clusterrole in the cluster
@@ -318,8 +318,8 @@ spec:
                               names.
                             type: string
                           installNamespace:
-                            description: The spoke cluster namespace to install the
-                              add-on in. If left empty, installs into the "open-cluster-management-addon"
+                            description: The namespace to install the add-on in. If
+                              left empty, installs into the "open-cluster-management-addon"
                               namespace.
                             type: string
                         required:

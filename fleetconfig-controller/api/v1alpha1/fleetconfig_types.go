@@ -317,7 +317,7 @@ type AddOn struct {
 	// The name of the add-on being enabled. Must match one of the default or manually configured add-on names.
 	ConfigName string `json:"configName"`
 
-	// The spoke cluster namespace to install the add-on in. If left empty, installs into the "open-cluster-management-addon" namespace.
+	// The namespace to install the add-on in. If left empty, installs into the "open-cluster-management-addon" namespace.
 	InstallNamespace string `json:"installNamespace,omitempty"`
 
 	// Optional annotations to apply to the add-on.
@@ -466,7 +466,7 @@ type RegistrationAuth struct {
 	AutoApprovedARNPatterns []string `json:"autoApprovedARNPatterns,omitempty"`
 }
 
-// AddOnConfig is the configuration of a custom AddOn that can be installed on spoke clusters.
+// AddOnConfig is the configuration of a custom AddOn that can be installed on a cluster.
 type AddOnConfig struct {
 	// The name of the add-on.
 	Name string `json:"name"`
