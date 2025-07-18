@@ -40,3 +40,6 @@ go.work.sum
 venv/
 *__pycache__/
 requirements.txt
+
+# Temp files
+tmp/
