@@ -112,6 +112,7 @@ spec:
                           when the FleetConfig CR is deleted.
                         type: boolean
                       resources:
+                        default: {}
                         description: Resource specifications for all clustermanager-managed
                           containers.
                         properties:
@@ -151,8 +152,6 @@ spec:
                                   '8Gi'.
                                 type: string
                             type: object
-                        required:
-                        - qosClass
                         type: object
                       source:
                         default: {}
@@ -203,9 +202,9 @@ spec:
                           For same-cluster, must be provided unless InCluster is set to true.
                         properties:
                           kubeconfigKey:
-                            description: |-
-                              The map key to access the kubeconfig.
-                              Leave empty to use 'kubeconfig'.
+                            default: kubeconfig
+                            description: The map key to access the kubeconfig. Defaults
+                              to 'kubeconfig'.
                             type: string
                           name:
                             description: The name of the secret.
@@ -259,7 +258,6 @@ spec:
                         description: The name of the singleton control plane.
                         type: string
                     required:
-                    - helm
                     - name
                     type: object
                 required:
@@ -267,6 +265,7 @@ spec:
                 - kubeconfig
                 type: object
               registrationAuth:
+                default: {}
                 description: RegistrationAuth provides specifications for registration
                   authentication.
                 properties:
@@ -293,8 +292,6 @@ spec:
                     description: The Hub cluster ARN for awsirsa registration authentication.
                       Required when Type is awsirsa, otherwise ignored.
                     type: string
-                required:
-                - driver
                 type: object
               spokes:
                 items:
@@ -310,7 +307,7 @@ spec:
                           annotations:
                             additionalProperties:
                               type: string
-                            description: Optional annotations to apply to the add-on.
+                            description: Annotations to apply to the add-on.
                             type: object
                           configName:
                             description: The name of the add-on being enabled. Must
@@ -387,9 +384,9 @@ spec:
                                 For same-cluster, must be provided unless InCluster is set to true.
                               properties:
                                 kubeconfigKey:
-                                  description: |-
-                                    The map key to access the kubeconfig.
-                                    Leave empty to use 'kubeconfig'.
+                                  default: kubeconfig
+                                  description: The map key to access the kubeconfig.
+                                    Defaults to 'kubeconfig'.
                                   type: string
                                 name:
                                   description: The name of the secret.
@@ -416,6 +413,7 @@ spec:
                             when the klusterlet is unjoined from its Hub cluster.
                           type: boolean
                         resources:
+                          default: {}
                           description: Resource specifications for all klusterlet-managed
                             containers.
                           properties:
@@ -455,8 +453,6 @@ spec:
                                     '8Gi'.
                                   type: string
                               type: object
-                          required:
-                          - qosClass
                           type: object
                         singleton:
                           description: |-
@@ -500,9 +496,9 @@ spec:
                             For same-cluster, must be provided unless InCluster is set to true.
                           properties:
                             kubeconfigKey:
-                              description: |-
-                                The map key to access the kubeconfig.
-                                Leave empty to use 'kubeconfig'.
+                              default: kubeconfig
+                              description: The map key to access the kubeconfig. Defaults
+                                to 'kubeconfig'.
                               type: string
                             name:
                               description: The name of the secret.
@@ -626,9 +622,9 @@ spec:
                             For same-cluster, must be provided unless InCluster is set to true.
                           properties:
                             kubeconfigKey:
-                              description: |-
-                                The map key to access the kubeconfig.
-                                Leave empty to use 'kubeconfig'.
+                              default: kubeconfig
+                              description: The map key to access the kubeconfig. Defaults
+                                to 'kubeconfig'.
                               type: string
                             name:
                               description: The name of the secret.

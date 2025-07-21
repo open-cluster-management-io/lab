@@ -80,7 +80,7 @@ func UpdateManagedCluster(ctx context.Context, client *clusterapi.Clientset, man
 
 // PrepareKubeconfig parses a kubeconfig spec and returns updated clusteradm args.
 // The '--kubeconfig' flag is added and a cleanup function is returned to remove the temp kubeconfig file.
-func PrepareKubeconfig(ctx context.Context, kClient client.Client, kubeconfig *v1alpha1.Kubeconfig, args []string) ([]string, func(), error) {
+func PrepareKubeconfig(ctx context.Context, kClient client.Client, kubeconfig v1alpha1.Kubeconfig, args []string) ([]string, func(), error) {
 	logger := log.FromContext(ctx)
 
 	raw, err := kube.KubeconfigFromSecretOrCluster(ctx, kClient, kubeconfig)
@@ -105,13 +105,17 @@ func PrepareResources(resources v1alpha1.ResourceSpec) []string {
 	flags := []string{
 		"--resource-qos-class", resources.QosClass,
 	}
-	requests := resources.Requests.String()
-	if requests != "" {
-		flags = append(flags, "--resource-requests", requests)
+	if resources.Requests != nil {
+		requests := resources.Requests.String()
+		if requests != "" {
+			flags = append(flags, "--resource-requests", requests)
+		}
 	}
-	limits := resources.Limits.String()
-	if limits != "" {
-		flags = append(flags, "--resource-limits", limits)
+	if resources.Limits != nil {
+		limits := resources.Limits.String()
+		if limits != "" {
+			flags = append(flags, "--resource-limits", limits)
+		}
 	}
 	return flags
 }

@@ -37,18 +37,17 @@ fleetConfig:
     registry: quay.io/open-cluster-management
   ## @descriptionStart
   ## ### Registration Authentication Configuration
-  ## Registration authentication configuration for FleetConfig setup. authentication can be configured by uncommenting `fleetConfig.registrationAuth`
-  ## Optional Configuration for the Registration Authentication. If not provided, will default to using certificate signing requests (CSR).
-  ## For EKS FleetConfigs, set the driver to "awsirsa" to use AWS IAM Roles for Service Accounts.
+  ## Registration authentication configuration for FleetConfig setup. Uses certificate signing requests (CSR) by default.
   ## Available fields:
-  ## - **driver**: The authentication driver to use (default: "csr"). Set to "awsirsa" for EKS FleetConfigs.
+  ## - **driver**: The authentication driver to use (default: "csr"). Set to "awsirsa" to use AWS IAM Roles for Service Accounts (IRSA) for EKS FleetConfigs.
   ## - **hubClusterARN**: The ARN of the hub cluster (required for EKS FleetConfigs).
   ## - **autoApprovedARNPatterns**: Optional list of spoke cluster ARN patterns that the hub will auto approve.
   ## @descriptionEnd
-  # registrationAuth:
-  #   # The driver used for authentication. Default is "csr".
-  #   # If configuring an EKS FleetConfig, ensure this is set to "awsirsa".
-  #   driver: "csr"
+  ## @param fleetConfig.registrationAuth.driver The authentication driver to use (default: "csr"). Set to "awsirsa" to use AWS IAM Roles for Service Accounts (IRSA) for EKS FleetConfigs.
+  registrationAuth:
+    # The driver used for authentication. Default is "csr".
+    # If configuring an EKS FleetConfig, ensure this is set to "awsirsa".
+    driver: "csr"
   #   # The ARN of the hub cluster. This is only required if configuring an EKS FleetConfig.
   #   hubClusterARN: "arn:aws:eks:us-west-2:<HUB_AWS_ACCOUNT_ID>:cluster/<HUB_CLUSTER_NAME>"
   #   # Optional list of spoke cluster name ARN patterns that the hub will auto approve

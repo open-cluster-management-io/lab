@@ -30,11 +30,9 @@ Available Spoke Feature Gates:
 - **RawFeedbackJsonString** (ALPHA - default=false) - Enables raw feedback JSON string support
 - **V1beta1CSRAPICompatibility** (ALPHA - default=false) - Enables v1beta1 CSR API compatibility
 ### Registration Authentication Configuration
-Registration authentication configuration for FleetConfig setup. authentication can be configured by uncommenting `fleetConfig.registrationAuth`
-Optional Configuration for the Registration Authentication. If not provided, will default to using certificate signing requests (CSR).
-For EKS FleetConfigs, set the driver to "awsirsa" to use AWS IAM Roles for Service Accounts.
+Registration authentication configuration for FleetConfig setup. Uses certificate signing requests (CSR) by default.
 Available fields:
-- **driver**: The authentication driver to use (default: "csr"). Set to "awsirsa" for EKS FleetConfigs.
+- **driver**: The authentication driver to use (default: "csr"). Set to "awsirsa" to use AWS IAM Roles for Service Accounts (IRSA) for EKS FleetConfigs.
 - **hubClusterARN**: The ARN of the hub cluster (required for EKS FleetConfigs).
 - **autoApprovedARNPatterns**: Optional list of spoke cluster ARN patterns that the hub will auto approve.
 ### Hub Cluster Manager Feature Gates
@@ -72,6 +70,7 @@ Refer to the [Multicluster Controlplane configuration](https://github.com/open-c
 | `fleetConfig.spokeFeatureGates.RawFeedbackJsonString`                 | RawFeedbackJsonString feature gate (ALPHA - default=false). Enables raw feedback JSON string support.                                                                                                                                                        | `true`                            |
 | `fleetConfig.source.bundleVersion`                                    | Bundle version.                                                                                                                                                                                                                                              | `v1.0.0`                          |
 | `fleetConfig.source.registry`                                         | Image registry.                                                                                                                                                                                                                                              | `quay.io/open-cluster-management` |
+| `fleetConfig.registrationAuth.driver`                                 | The authentication driver to use (default: "csr"). Set to "awsirsa" to use AWS IAM Roles for Service Accounts (IRSA) for EKS FleetConfigs.                                                                                                                   | `csr`                             |
 | `fleetConfig.hub.clusterManager.featureGates.DefaultClusterSet`       | DefaultClusterSet feature gate.                                                                                                                                                                                                                              | `true`                            |
 | `fleetConfig.hub.clusterManager.featureGates.ManifestWorkReplicaSet`  | ManifestWorkReplicaSet feature gate.                                                                                                                                                                                                                         | `true`                            |
 | `fleetConfig.hub.clusterManager.featureGates.ResourceCleanup`         | ResourceCleanup feature gate.                                                                                                                                                                                                                                | `true`                            |

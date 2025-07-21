@@ -19,10 +19,10 @@ func allowFleetConfigUpdate(newObject *FleetConfig, oldObject *FleetConfig) erro
 		newHubCopy := newObject.Spec.Hub
 
 		if oldHubCopy.ClusterManager != nil {
-			oldHubCopy.ClusterManager.Source = nil
+			oldHubCopy.ClusterManager.Source = (OCMSource{})
 		}
 		if newHubCopy.ClusterManager != nil {
-			newHubCopy.ClusterManager.Source = nil
+			newHubCopy.ClusterManager.Source = (OCMSource{})
 		}
 
 		if !reflect.DeepEqual(oldHubCopy, newHubCopy) {
@@ -43,8 +43,8 @@ func allowFleetConfigUpdate(newObject *FleetConfig, oldObject *FleetConfig) erro
 			if oldSpoke, exists := oldSpokes[newSpoke.Name]; exists {
 				oldSpokeCopy := oldSpoke
 				newSpokeCopy := newSpoke
-				oldSpokeCopy.Klusterlet.Source = nil
-				newSpokeCopy.Klusterlet.Source = nil
+				oldSpokeCopy.Klusterlet.Source = (OCMSource{})
+				newSpokeCopy.Klusterlet.Source = (OCMSource{})
 
 				if !reflect.DeepEqual(oldSpokeCopy, newSpokeCopy) {
 					return fmt.Errorf("spoke '%s' contains changes which are not allowed; only changes to spec.spokes[*].klusterlet.source.* are allowed when updating a spoke", newSpoke.Name)

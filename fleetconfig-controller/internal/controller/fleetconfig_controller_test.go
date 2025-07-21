@@ -59,7 +59,7 @@ var _ = Describe("FleetConfig Controller", Ordered, func() {
 				},
 				Spec: v1alpha1.FleetConfigSpec{
 					Hub: v1alpha1.Hub{
-						Kubeconfig: &v1alpha1.Kubeconfig{
+						Kubeconfig: v1alpha1.Kubeconfig{
 							InCluster: true,
 						},
 					},

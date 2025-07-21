@@ -16,12 +16,12 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 			name: "RegistrationAuth change are allowed",
 			oldObject: &FleetConfig{
 				Spec: FleetConfigSpec{
-					RegistrationAuth: &RegistrationAuth{Driver: "csr"},
+					RegistrationAuth: RegistrationAuth{Driver: "csr"},
 				},
 			},
 			newObject: &FleetConfig{
 				Spec: FleetConfigSpec{
-					RegistrationAuth: &RegistrationAuth{Driver: "awsirsa", HubClusterARN: "11111111:11111111:11111111:11111111"},
+					RegistrationAuth: RegistrationAuth{Driver: "awsirsa", HubClusterARN: "11111111:11111111:11111111:11111111"},
 				},
 			},
 			wantErr: false,
@@ -32,7 +32,7 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 				Spec: FleetConfigSpec{
 					Hub: Hub{CreateNamespace: true},
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "old-registry"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "old-registry"}}},
 					},
 				},
 			},
@@ -40,7 +40,7 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 				Spec: FleetConfigSpec{
 					Hub: Hub{CreateNamespace: true},
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "old-registry"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "old-registry"}}},
 					},
 				},
 			},
@@ -67,7 +67,7 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 				Spec: FleetConfigSpec{
 					Hub: Hub{
 						ClusterManager: &ClusterManager{
-							Source: &OCMSource{Registry: "old-registry"},
+							Source: OCMSource{Registry: "old-registry"},
 						},
 					},
 				},
@@ -76,7 +76,7 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 				Spec: FleetConfigSpec{
 					Hub: Hub{
 						ClusterManager: &ClusterManager{
-							Source: &OCMSource{Registry: "new-registry"},
+							Source: OCMSource{Registry: "new-registry"},
 						},
 					},
 				},
@@ -89,7 +89,7 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 				Spec: FleetConfigSpec{
 					Hub: Hub{
 						ClusterManager: &ClusterManager{
-							Source: &OCMSource{BundleVersion: "v0.6.0"},
+							Source: OCMSource{BundleVersion: "v0.6.0"},
 						},
 					},
 				},
@@ -98,7 +98,7 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 				Spec: FleetConfigSpec{
 					Hub: Hub{
 						ClusterManager: &ClusterManager{
-							Source: &OCMSource{BundleVersion: "v0.7.0"},
+							Source: OCMSource{BundleVersion: "v0.7.0"},
 						},
 					},
 				},
@@ -112,7 +112,7 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 					Hub: Hub{
 						CreateNamespace: true,
 						ClusterManager: &ClusterManager{
-							Source: &OCMSource{Registry: "old-registry"},
+							Source: OCMSource{Registry: "old-registry"},
 						},
 					},
 				},
@@ -122,7 +122,7 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 					Hub: Hub{
 						CreateNamespace: false,
 						ClusterManager: &ClusterManager{
-							Source: &OCMSource{Registry: "new-registry"},
+							Source: OCMSource{Registry: "new-registry"},
 						},
 					},
 				},
@@ -135,14 +135,14 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 			oldObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "old-registry"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "old-registry"}}},
 					},
 				},
 			},
 			newObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "new-registry"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "new-registry"}}},
 					},
 				},
 			},
@@ -153,15 +153,15 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 			oldObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "registry"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "registry"}}},
 					},
 				},
 			},
 			newObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "registry"}}},
-						{Name: "spoke2", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "registry2"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "registry"}}},
+						{Name: "spoke2", Klusterlet: Klusterlet{Source: OCMSource{Registry: "registry2"}}},
 					},
 				},
 			},
@@ -172,15 +172,15 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 			oldObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "registry"}}},
-						{Name: "spoke2", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "registry2"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "registry"}}},
+						{Name: "spoke2", Klusterlet: Klusterlet{Source: OCMSource{Registry: "registry2"}}},
 					},
 				},
 			},
 			newObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "registry"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "registry"}}},
 					},
 				},
 			},
@@ -191,15 +191,15 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 			oldObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "old-registry"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "old-registry"}}},
 					},
 				},
 			},
 			newObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "new-registry"}}},
-						{Name: "spoke2", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "registry2"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "new-registry"}}},
+						{Name: "spoke2", Klusterlet: Klusterlet{Source: OCMSource{Registry: "registry2"}}},
 					},
 				},
 			},
@@ -210,14 +210,14 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 			oldObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", CreateNamespace: true, Klusterlet: Klusterlet{Source: &OCMSource{Registry: "registry"}}},
+						{Name: "spoke1", CreateNamespace: true, Klusterlet: Klusterlet{Source: OCMSource{Registry: "registry"}}},
 					},
 				},
 			},
 			newObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", CreateNamespace: false, Klusterlet: Klusterlet{Source: &OCMSource{Registry: "registry"}}},
+						{Name: "spoke1", CreateNamespace: false, Klusterlet: Klusterlet{Source: OCMSource{Registry: "registry"}}},
 					},
 				},
 			},
@@ -229,14 +229,14 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 			oldObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", CreateNamespace: true, Klusterlet: Klusterlet{Source: &OCMSource{Registry: "old-registry"}}},
+						{Name: "spoke1", CreateNamespace: true, Klusterlet: Klusterlet{Source: OCMSource{Registry: "old-registry"}}},
 					},
 				},
 			},
 			newObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", CreateNamespace: false, Klusterlet: Klusterlet{Source: &OCMSource{Registry: "new-registry"}}},
+						{Name: "spoke1", CreateNamespace: false, Klusterlet: Klusterlet{Source: OCMSource{Registry: "new-registry"}}},
 					},
 				},
 			},
@@ -248,15 +248,15 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 			oldObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "old-registry"}}},
-						{Name: "spoke2", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "old-registry"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "old-registry"}}},
+						{Name: "spoke2", Klusterlet: Klusterlet{Source: OCMSource{Registry: "old-registry"}}},
 					},
 				},
 			},
 			newObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "new-registry"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "new-registry"}}},
 					},
 				},
 			},
@@ -267,16 +267,16 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 			oldObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "old-registry1"}}},
-						{Name: "spoke2", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "old-registry2"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "old-registry1"}}},
+						{Name: "spoke2", Klusterlet: Klusterlet{Source: OCMSource{Registry: "old-registry2"}}},
 					},
 				},
 			},
 			newObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "new-registry1"}}},
-						{Name: "spoke2", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "new-registry2"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "new-registry1"}}},
+						{Name: "spoke2", Klusterlet: Klusterlet{Source: OCMSource{Registry: "new-registry2"}}},
 					},
 				},
 			},
@@ -287,14 +287,14 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 			oldObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{BundleVersion: "v0.6.0"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{BundleVersion: "v0.6.0"}}},
 					},
 				},
 			},
 			newObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{BundleVersion: "v0.7.0"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{BundleVersion: "v0.7.0"}}},
 					},
 				},
 			},
@@ -305,13 +305,13 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 			oldObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Hub:              Hub{CreateNamespace: true},
-					RegistrationAuth: &RegistrationAuth{Driver: "csr"},
+					RegistrationAuth: RegistrationAuth{Driver: "csr"},
 				},
 			},
 			newObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Hub:              Hub{CreateNamespace: false},
-					RegistrationAuth: &RegistrationAuth{Driver: "awsirsa"},
+					RegistrationAuth: RegistrationAuth{Driver: "awsirsa"},
 				},
 			},
 			wantErr: true,
@@ -322,16 +322,16 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 			oldObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "old-registry1"}}},
-						{Name: "spoke2", CreateNamespace: true, Klusterlet: Klusterlet{Source: &OCMSource{Registry: "old-registry2"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "old-registry1"}}},
+						{Name: "spoke2", CreateNamespace: true, Klusterlet: Klusterlet{Source: OCMSource{Registry: "old-registry2"}}},
 					},
 				},
 			},
 			newObject: &FleetConfig{
 				Spec: FleetConfigSpec{
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "new-registry1"}}},
-						{Name: "spoke2", CreateNamespace: false, Klusterlet: Klusterlet{Source: &OCMSource{Registry: "new-registry2"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "new-registry1"}}},
+						{Name: "spoke2", CreateNamespace: false, Klusterlet: Klusterlet{Source: OCMSource{Registry: "new-registry2"}}},
 					},
 				},
 			},
@@ -344,12 +344,12 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 				Spec: FleetConfigSpec{
 					Hub: Hub{
 						ClusterManager: &ClusterManager{
-							Source: &OCMSource{Registry: "old-hub-registry", BundleVersion: "v0.6.0"},
+							Source: OCMSource{Registry: "old-hub-registry", BundleVersion: "v0.6.0"},
 						},
 					},
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "old-spoke1-registry"}}},
-						{Name: "spoke2", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "old-spoke2-registry"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "old-spoke1-registry"}}},
+						{Name: "spoke2", Klusterlet: Klusterlet{Source: OCMSource{Registry: "old-spoke2-registry"}}},
 					},
 				},
 			},
@@ -357,12 +357,12 @@ func TestAllowFleetConfigUpdate(t *testing.T) {
 				Spec: FleetConfigSpec{
 					Hub: Hub{
 						ClusterManager: &ClusterManager{
-							Source: &OCMSource{Registry: "new-hub-registry", BundleVersion: "v0.7.0"},
+							Source: OCMSource{Registry: "new-hub-registry", BundleVersion: "v0.7.0"},
 						},
 					},
 					Spokes: []Spoke{
-						{Name: "spoke1", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "new-spoke1-registry"}}},
-						{Name: "spoke3", Klusterlet: Klusterlet{Source: &OCMSource{Registry: "new-spoke3-registry"}}},
+						{Name: "spoke1", Klusterlet: Klusterlet{Source: OCMSource{Registry: "new-spoke1-registry"}}},
+						{Name: "spoke3", Klusterlet: Klusterlet{Source: OCMSource{Registry: "new-spoke3-registry"}}},
 					},
 				},
 			},

@@ -269,17 +269,19 @@ func joinSpoke(ctx context.Context, kClient client.Client, spec v1alpha1.FleetCo
 		"--image-registry", spoke.Klusterlet.Source.Registry,
 	}
 
+	// resources args
+	joinArgs = append(joinArgs, common.PrepareResources(spoke.Klusterlet.Resources)...)
+
 	// Use hub API server from spec if provided, otherwise fall back to tokenMeta
-	if spec.Hub.APIServer != nil {
-		joinArgs = append(joinArgs, "--hub-apiserver", *spec.Hub.APIServer)
+	if spec.Hub.APIServer != "" {
+		joinArgs = append(joinArgs, "--hub-apiserver", spec.Hub.APIServer)
 	} else if tokenMeta.HubAPIServer != "" {
 		joinArgs = append(joinArgs, "--hub-apiserver", tokenMeta.HubAPIServer)
 	}
 
-	registrationDriver := spec.RegistrationAuth.GetDriver()
-	if registrationDriver == v1alpha1.AWSIRSARegistrationDriver {
+	if spec.RegistrationAuth.Driver == v1alpha1.AWSIRSARegistrationDriver {
 		raArgs := []string{
-			fmt.Sprintf("--registration-auth=%s", registrationDriver),
+			fmt.Sprintf("--registration-auth=%s", spec.RegistrationAuth.Driver),
 		}
 		if spec.RegistrationAuth.HubClusterARN != "" {
 			raArgs = append(raArgs, fmt.Sprintf("--hub-cluster-arn=%s", spec.RegistrationAuth.HubClusterARN))
@@ -289,10 +291,6 @@ func joinSpoke(ctx context.Context, kClient client.Client, spec v1alpha1.FleetCo
 		}
 
 		joinArgs = append(joinArgs, raArgs...)
-	}
-
-	if spoke.Klusterlet.Resources != nil {
-		joinArgs = append(joinArgs, common.PrepareResources(*spoke.Klusterlet.Resources)...)
 	}
 
 	if spoke.Klusterlet.Mode == string(operatorv1.InstallModeHosted) {
@@ -464,7 +462,7 @@ func cleanupSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Flee
 }
 
 // unjoinSpoke unjoins a single spoke cluster from the Hub cluster via `clusteradm unjoin`
-func unjoinSpoke(ctx context.Context, kClient client.Client, kubeconfig *v1alpha1.Kubeconfig, spokeName string, purgeOperator bool) error {
+func unjoinSpoke(ctx context.Context, kClient client.Client, kubeconfig v1alpha1.Kubeconfig, spokeName string, purgeOperator bool) error {
 	logger := log.FromContext(ctx)
 
 	unjoinArgs := []string{

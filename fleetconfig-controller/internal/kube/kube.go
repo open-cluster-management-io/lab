@@ -84,11 +84,7 @@ func RawFromInClusterRestConfig() ([]byte, error) {
 }
 
 // KubeconfigFromSecretOrCluster loads a kubeconfig from a secret or generates one from inCluster
-func KubeconfigFromSecretOrCluster(ctx context.Context, kClient client.Client, kubeconfig *v1alpha1.Kubeconfig) ([]byte, error) {
-	var (
-		raw []byte
-		err error
-	)
+func KubeconfigFromSecretOrCluster(ctx context.Context, kClient client.Client, kubeconfig v1alpha1.Kubeconfig) (raw []byte, err error) {
 	// exactly 1 of these 2 cases is always true
 	switch {
 	case kubeconfig.InCluster:
@@ -100,7 +96,7 @@ func KubeconfigFromSecretOrCluster(ctx context.Context, kClient client.Client, k
 }
 
 // KubeconfigFromSecret loads a kubeconfig from a secret in the cluster
-func KubeconfigFromSecret(ctx context.Context, kClient client.Client, kubeconfig *v1alpha1.Kubeconfig) ([]byte, error) {
+func KubeconfigFromSecret(ctx context.Context, kClient client.Client, kubeconfig v1alpha1.Kubeconfig) ([]byte, error) {
 	secretRef := kubeconfig.SecretReference
 	secret := corev1.Secret{}
 	nn := types.NamespacedName{Name: secretRef.Name, Namespace: secretRef.Namespace}
@@ -109,8 +105,8 @@ func KubeconfigFromSecret(ctx context.Context, kClient client.Client, kubeconfig
 	}
 
 	kubeconfigKey := defaultKubeconfigKey
-	if secretRef.KubeconfigKey != nil {
-		kubeconfigKey = *secretRef.KubeconfigKey
+	if secretRef.KubeconfigKey != "" {
+		kubeconfigKey = secretRef.KubeconfigKey
 	}
 	raw, ok := secret.Data[kubeconfigKey]
 	if !ok {
