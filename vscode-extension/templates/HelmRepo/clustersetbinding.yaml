@@ -1,0 +1,8 @@
+---
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: helloworld-clusterset # the name should be identical to the underlying ManagedClusterSet
+  namespace: helloworld-app
+spec:
+  clusterSet: helloworld-clusterset

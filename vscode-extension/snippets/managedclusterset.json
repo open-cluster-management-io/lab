@@ -1,0 +1,14 @@
+{
+	"managedclusterset-v1beta2": {
+		"scope": "yaml",
+		"prefix": "OCM ManagedClusterSet v1beta2",
+		"description": "The managed cluster set represents a set of clusters to select from.",
+		"body": [
+			"---",
+			"apiVersion: cluster.open-cluster-management.io/v1beta2",
+			"kind: ManagedClusterSet",
+			"metadata:",
+			"  name: ${1:<managed-clustterset-name>}"
+		]
+	}
+}

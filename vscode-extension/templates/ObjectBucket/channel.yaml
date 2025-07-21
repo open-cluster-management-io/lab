@@ -1,0 +1,9 @@
+---
+apiVersion: apps.open-cluster-management.io/v1
+kind: Channel
+metadata:
+  name: helloworld-channel
+  namespace: helloworld-chn
+spec:
+  type: ObjectBucket
+  pathname: https://address-of-bucket>/helloworld-channel # bucket name should matche the CR name

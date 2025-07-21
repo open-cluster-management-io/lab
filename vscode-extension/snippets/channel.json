@@ -1,0 +1,21 @@
+{
+	"channel-v1": {
+		"scope": "yaml",
+		"prefix": "OCM Channel v1",
+		"description": "The channel configures the source of truth for the subscription.",
+		"body": [
+			"---",
+			"apiVersion: apps.open-cluster-management.io/v1",
+			"kind: Channel",
+			"metadata:",
+			"  name: ${1:<channel-name>}",
+			"  namespace: ${2:<channel-namespace>}",
+			"spec:",
+			"  type: ${3|git,helmrepo,objectbucket|}",
+			"  pathname: ${4:<channel-path>} # i.e, https://github.com/<your-user>/<your-repo>",
+			"# secret ref is optional. if no credentials are needed, delete this section",
+			"  secretRef:",
+			"    name: ${5:<secret-name>}"
+		]
+	}
+}

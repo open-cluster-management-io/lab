@@ -1,0 +1,17 @@
+apiVersion: apps.open-cluster-management.io/v1
+kind: Subscription
+metadata:
+  name: helloworld-subscription
+  namespace: helloworld-app
+  annotations:
+    apps.open-cluster-management.io/reconcile-option: merge # optional can be replace/merge
+    apps.open-cluster-management.io/reconcile-rate: medium # optional, can be off/low/medium/high
+spec:
+  channel: helloworld-chn/helloworld-channel
+  packageOverrides:
+    - packageName: <package_name>
+      packageAlias: <package_alias>
+  placement:
+    placementRef:
+      kind: Placement
+      name: helloworld-placement

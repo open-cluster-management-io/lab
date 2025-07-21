@@ -29,6 +29,7 @@ For new add-on projects, please use the
 
 - [dashboard](./dashboard/README.md): OCM UI Dashboard.
 - [fleetconfig-controller](./fleetconfig-controller/README.md): Declarative orchestrator for OCM multi-clusters.
+- [vscode-extension](./vscode-extension/README.md): OCM VScode extension.
 
 ## Onboarding a New Project
 

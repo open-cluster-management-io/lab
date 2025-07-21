@@ -1,0 +1,10 @@
+---
+apiVersion: apps.open-cluster-management.io/v1
+kind: Channel
+metadata:
+  name: helloworld-channel
+  namespace: helloworld-chn
+spec:
+  type: HelmRepo
+  pathname: https://charts.helm.sh/stable/ # replace with the path to the Helm repository
+

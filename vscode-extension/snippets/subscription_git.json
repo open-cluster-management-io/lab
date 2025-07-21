@@ -1,0 +1,27 @@
+{
+	"subscription-git-v1": {
+		"scope": "yaml",
+		"prefix": "OCM Subscription Git v1",
+		"description": "A subscription for a git type channel.",
+		"body": [
+			"---",
+			"apiVersion: apps.open-cluster-management.io/v1",
+			"kind: Subscription",
+			"metadata:",
+			"  name: ${1:<subscription-name>}",
+			"  namespace: ${2:<subscription-namespace>}",
+			"  annotations:",
+			"    apps.open-cluster-management.io/git-branch: ${3:<git-branch-name>}",
+			"    apps.open-cluster-management.io/git-path: ${4:<path-inside-repo>} # optional, defaults to root",
+			"    apps.open-cluster-management.io/git-clone-depth: \"${5:20}\" # optional",
+			"    apps.open-cluster-management.io/reconcile-option: ${6|merge,replace|} # optional",
+			"    apps.open-cluster-management.io/reconcile-rate: ${7|medium,low,high,off|} # optional",
+			"spec:",
+			"  channel: ${8:<channel-name>} # namespace/name",
+			"  placement:",
+			"    placementRef:",
+			"      kind: Placement",
+			"      name: ${9:<placement-name>}"
+		]
+	}
+}

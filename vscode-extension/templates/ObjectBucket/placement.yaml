@@ -1,0 +1,15 @@
+---
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: helloworld-placement
+  namespace: helloworld-app
+spec:
+  numberOfClusters: 1
+  clusterSets:
+    - helloworld-clusterset
+  predicates:
+    - requiredClusterSelector:
+        labelSelector:
+          matchLabels:
+            usage: development

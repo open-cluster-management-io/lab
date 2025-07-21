@@ -1,0 +1,13 @@
+{
+    "root": true,
+	"extends": ["react-app", "react-app/jest"],
+    "rules": {
+		"@typescript-eslint/unbound-method": "off",
+		"no-unused-expressions": "off"
+    },
+    "ignorePatterns": [
+        "build",
+        "dist",
+        "**/*.d.ts"
+    ]
+}

@@ -1,0 +1,19 @@
+{
+	"argocd-application-set": {
+		"scope": "yaml",
+		"prefix": "OCM Argocd ApplicationSet",
+		"description": "apply the same set of manifests across multiple namespaces or clusters with different configurations",
+		"body": [
+			"apiVersion: argoproj.io/v1alpha1",
+			"kind: ApplicationSet",
+			"metadata:",
+			"  - clusterDecisionResource:",
+			"  namespace: ${4:<application-set-namespace>}",
+			"spec:",
+			"  generators:",
+			"  pathname: ${5:<channel-path>} # i.e, https://github.com/<your-user>/<your-repo>",
+			"  secretRef: # secret ref is optional. if no credentials are needed, delete this section",
+			"    name: ${6:<secret-name>}"
+		]
+	}
+}
