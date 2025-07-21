@@ -114,9 +114,9 @@ func (v *FleetConfigCustomValidator) ValidateCreate(_ context.Context, obj runti
 	// spokes
 	for i, spoke := range fc.Spec.Spokes {
 		if spoke.Klusterlet.Mode == string(operatorv1.InstallModeHosted) {
-			if spoke.Klusterlet.ManagedClusterKubeconfig == (Kubeconfig{}) {
+			if spoke.Klusterlet.ManagedClusterKubeconfig.SecretReference == nil {
 				allErrs = append(allErrs, field.Invalid(
-					field.NewPath("spokes").Index(i), fc.Spec.Spokes, "managedClusterKubeconfig is required in hosted mode"),
+					field.NewPath("spokes").Index(i), fc.Spec.Spokes, "managedClusterKubeconfig.secretReference is required in hosted mode"),
 				)
 			} else {
 				if valid, msg := isKubeconfigValid(spoke.Klusterlet.ManagedClusterKubeconfig); !valid {
