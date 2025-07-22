@@ -52,7 +52,7 @@ Available Hub Cluster Manager Feature Gates:
 
 ### Singleton Control Plane Configuration
 If provided, deploy a singleton control plane instead of Cluster Manager.
-To enable singleton mode, `fleetConfig.hub.singletonControlPlane` must be uncommented and configured with the following options:
+To enable singleton mode, `fleetConfig.hub.clusterManager` must be commented out and `fleetConfig.hub.singletonControlPlane` must be uncommented and configured with the following options:
 - **name**: The name of the singleton control plane (default: "singleton-controlplane")
 - **helm**: Helm configuration for the multicluster-controlplane Helm chart
   - **values**: Raw, YAML-formatted Helm values
