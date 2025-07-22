@@ -96,7 +96,6 @@ spec:
                       using in-cluster kubeconfig when that kubeconfig would return an incorrect API server URL.
                     type: string
                   clusterManager:
-                    default: {}
                     description: ClusterManager configuration.
                     properties:
                       featureGates:
@@ -267,11 +266,8 @@ spec:
                         default: singleton-controlplane
                         description: The name of the singleton control plane.
                         type: string
-                    required:
-                    - name
                     type: object
                 required:
-                - createNamespace
                 - kubeconfig
                 type: object
               registrationAuth:
@@ -538,7 +534,6 @@ spec:
                         agent resources.
                       type: boolean
                   required:
-                  - createNamespace
                   - kubeconfig
                   - name
                   type: object

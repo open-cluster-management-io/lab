@@ -63,11 +63,6 @@ func (d *FleetConfigCustomDefaulter) Default(_ context.Context, obj runtime.Obje
 	}
 	log.Info("Defaulting for FleetConfig", "name", fc.GetName())
 
-	if fc.Spec.Hub.SingletonControlPlane != nil {
-		fc.Spec.Hub.ClusterManager = nil
-		log.V(1).Info("Defaulted hub.clusterManager to nil as hub.singletonControlPlane is set", "name", fc.GetName())
-	}
-
 	return nil
 }
 

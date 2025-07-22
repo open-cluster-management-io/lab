@@ -16,6 +16,7 @@ rules:
   resources:
   - "configmaps"
   - "namespaces"
+  - "persistentvolumeclaims"
   - "secrets"
   - "serviceaccounts"
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"]

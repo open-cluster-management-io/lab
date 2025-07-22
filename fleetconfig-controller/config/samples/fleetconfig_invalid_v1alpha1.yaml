@@ -7,12 +7,9 @@ metadata:
   name: fleetconfig-sample
 spec:
   hub:
-    clusterManager: {}
     kubeconfig:
       inCluster: true
   spokes:
   - name: hub-as-spoke
-    klusterlet:
-      forceInternalEndpointLookup: true
     kubeconfig:
       inCluster: true

@@ -118,8 +118,7 @@ func initializeHub(ctx context.Context, kClient client.Client, fc *v1alpha1.Flee
 		initArgs = append(initArgs, raArgs...)
 	}
 
-	// hub.clusterManager defaults to an empty object so check singleton control plane first
-	if fc.Spec.Hub.SingletonControlPlane != nil && fc.Spec.Hub.SingletonControlPlane.Name != "" {
+	if fc.Spec.Hub.SingletonControlPlane != nil {
 		initArgs = append(initArgs, "--singleton=true")
 		initArgs = append(initArgs, "--singleton-name", fc.Spec.Hub.SingletonControlPlane.Name)
 		if fc.Spec.Hub.SingletonControlPlane.Helm != nil {
@@ -146,7 +145,7 @@ func initializeHub(ctx context.Context, kClient client.Client, fc *v1alpha1.Flee
 				initArgs = append(initArgs, "--set-string", s)
 			}
 		}
-	} else {
+	} else if fc.Spec.Hub.ClusterManager != nil {
 		// clustermanager args
 		initArgs = append(initArgs, "--feature-gates", fc.Spec.Hub.ClusterManager.FeatureGates)
 		initArgs = append(initArgs, fmt.Sprintf("--use-bootstrap-token=%t", fc.Spec.Hub.ClusterManager.UseBootstrapToken))
@@ -155,6 +154,9 @@ func initializeHub(ctx context.Context, kClient client.Client, fc *v1alpha1.Flee
 		initArgs = append(initArgs, "--image-registry", fc.Spec.Hub.ClusterManager.Source.Registry)
 		// resources args
 		initArgs = append(initArgs, common.PrepareResources(fc.Spec.Hub.ClusterManager.Resources)...)
+	} else {
+		// one of clusterManager or singletonControlPlane must be specified, per validating webhook, but handle the edge case anyway
+		return fmt.Errorf("unknown hub type, must specify either hub.clusterManager or hub.singletonControlPlane")
 	}
 
 	initArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, fc.Spec.Hub.Kubeconfig, initArgs)

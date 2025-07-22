@@ -7,7 +7,7 @@ metadata:
   name: fleetconfig-sample
 spec:
   hub:
-    clusterManager: {}
+    singleton: {}
     kubeconfig:
       inCluster: true
   spokes:

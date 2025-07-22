@@ -26,7 +26,9 @@ import (
 
 // FleetConfigSpec defines the desired state of FleetConfig.
 type FleetConfigSpec struct {
-	Hub    Hub     `json:"hub"`
+	// +required
+	Hub Hub `json:"hub"`
+	// +required
 	Spokes []Spoke `json:"spokes"`
 	// +kubebuilder:default:={}
 	// +optional
@@ -146,19 +148,20 @@ func (c Condition) Equal(other Condition) bool {
 // Hub provides specifications for an OCM hub cluster.
 type Hub struct {
 	// ClusterManager configuration.
-	// +kubebuilder:default:={}
 	// +optional
 	ClusterManager *ClusterManager `json:"clusterManager,omitempty"`
 
 	// If true, create open-cluster-management namespace, otherwise use existing one.
 	// +kubebuilder:default:=true
-	CreateNamespace bool `json:"createNamespace"`
+	// +optional
+	CreateNamespace bool `json:"createNamespace,omitempty"`
 
 	// If set, the hub will be reinitialized.
 	// +optional
 	Force bool `json:"force,omitempty"`
 
 	// Kubeconfig details for the Hub cluster.
+	// +required
 	Kubeconfig Kubeconfig `json:"kubeconfig"`
 
 	// Singleton control plane configuration. If provided, deploy a singleton control plane instead of clustermanager.
@@ -177,7 +180,8 @@ type Hub struct {
 type SingletonControlPlane struct {
 	// The name of the singleton control plane.
 	// +kubebuilder:default:="singleton-controlplane"
-	Name string `json:"name"`
+	// +optional
+	Name string `json:"name,omitempty"`
 
 	// Helm configuration for the multicluster-controlplane Helm chart.
 	// For now https://open-cluster-management.io/helm-charts/ocm/multicluster-controlplane is always used - no private registry support.
@@ -284,9 +288,11 @@ type Kubeconfig struct {
 // SecretReference describes how to retrieve a kubeconfig stored as a secret
 type SecretReference struct {
 	// The name of the secret.
+	// +required
 	Name string `json:"name"`
 
 	// The namespace the secret is in.
+	// +required
 	Namespace string `json:"namespace"`
 
 	// The map key to access the kubeconfig. Defaults to 'kubeconfig'.
@@ -300,18 +306,21 @@ type Spoke struct {
 	// The name of the spoke cluster.
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+	// +required
 	Name string `json:"name"`
 
 	// If true, create open-cluster-management namespace and agent namespace (open-cluster-management-agent for Default mode,
 	// <klusterlet-name> for Hosted mode), otherwise use existing one.
 	// +kubebuilder:default:=true
-	CreateNamespace bool `json:"createNamespace"`
+	// +optional
+	CreateNamespace bool `json:"createNamespace,omitempty"`
 
 	// If true, sync the labels from klusterlet to all agent resources.
 	// +optional
 	SyncLabels bool `json:"syncLabels,omitempty"`
 
 	// Kubeconfig details for the Spoke cluster.
+	// +required
 	Kubeconfig Kubeconfig `json:"kubeconfig"`
 
 	// Hub cluster CA certificate, optional
@@ -344,6 +353,7 @@ type Spoke struct {
 // AddOn enables add-on installation on the cluster.
 type AddOn struct {
 	// The name of the add-on being enabled. Must match one of the default or manually configured add-on names.
+	// +required
 	ConfigName string `json:"configName"`
 
 	// The namespace to install the add-on in. If left empty, installs into the "open-cluster-management-addon" namespace.
@@ -519,6 +529,7 @@ type RegistrationAuth struct {
 // AddOnConfig is the configuration of a custom AddOn that can be installed on a cluster.
 type AddOnConfig struct {
 	// The name of the add-on.
+	// +required
 	Name string `json:"name"`
 
 	// The add-on version. Optional, defaults to "v0.0.1"
