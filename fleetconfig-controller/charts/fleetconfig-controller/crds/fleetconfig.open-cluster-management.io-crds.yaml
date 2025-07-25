@@ -636,6 +636,13 @@ spec:
                   description: JoinedSpoke represents a spoke that has been joined
                     to a hub.
                   properties:
+                    enabledAddons:
+                      default: []
+                      description: EnabledAddons is the list of addons that are currently
+                        enabled for the cluster.
+                      items:
+                        type: string
+                      type: array
                     kubeconfig:
                       description: Kubeconfig details for the Spoke cluster.
                       properties:

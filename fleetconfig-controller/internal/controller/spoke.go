@@ -64,7 +64,8 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 		}
 	}
 
-	for _, spoke := range fc.Spec.Spokes {
+	allEnabledAddons := make([][]string, len(fc.Spec.Spokes))
+	for i, spoke := range fc.Spec.Spokes {
 		logger.V(0).Info("handleSpokes: reconciling spoke cluster", "name", spoke.Name)
 
 		// check if the spoke has already been joined to the hub
@@ -158,10 +159,29 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 				return fmt.Errorf("failed to upgrade spoke cluster %s: %w", spoke.Name, err)
 			}
 		}
+
+		var enabledAddons []string
+		// check if this spoke already has any addons enabled
+		if len(fc.Status.JoinedSpokes) > 0 {
+			js := v1alpha1.JoinedSpoke{}
+			idx := slices.IndexFunc(fc.Status.JoinedSpokes, func(s v1alpha1.JoinedSpoke) bool {
+				return s.Name == spoke.Name
+			})
+			if idx == -1 {
+				continue
+			}
+			js = fc.Status.JoinedSpokes[idx]
+			enabledAddons = append(enabledAddons, js.EnabledAddons...)
+		}
+		enabledAddons, err = handleSpokeAddons(ctx, spoke.Name, spoke.AddOns, enabledAddons)
+		if err != nil {
+			return fmt.Errorf("failed to enable addons for spoke cluster %s: %w", spoke.Name, err)
+		}
+		allEnabledAddons[i] = enabledAddons
 	}
 
 	// Only spokes which are joined, are eligible to be unjoined
-	for _, spoke := range fc.Spec.Spokes {
+	for i, spoke := range fc.Spec.Spokes {
 		joinedCondition := fc.GetCondition(spoke.JoinType())
 		if joinedCondition == nil || joinedCondition.Status != metav1.ConditionTrue {
 			continue
@@ -170,6 +190,7 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 			Name:                    spoke.Name,
 			Kubeconfig:              spoke.Kubeconfig,
 			PurgeKlusterletOperator: spoke.Klusterlet.PurgeOperator,
+			EnabledAddons:           allEnabledAddons[i],
 		}
 		joinedSpokes = append(joinedSpokes, js)
 	}
@@ -543,12 +564,17 @@ func deregisterSpoke(ctx context.Context, kClient client.Client, hubKubeconfig [
 	if err != nil {
 		return fmt.Errorf("failed to list manifestWorks for managedCluster %s: %w", managedCluster.Name, err)
 	}
-	if len(manifestWorks.Items) > 0 {
+	// if number of manifestWorks is the same as number of addons, then all manifestWorks ARE addons and will be cleaned up properly before the unjoin
+	if len(manifestWorks.Items) > len(spoke.EnabledAddons) {
 		msg := fmt.Sprintf("Found manifestWorks for ManagedCluster %s; cannot unjoin spoke cluster while it has active ManifestWorks", managedCluster.Name)
 		logger.Info(msg)
 		return errors.New(msg)
 	}
 
+	// remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
+	if err := handleAddonDisable(ctx, []string{spoke.Name}, spoke.EnabledAddons); err != nil {
+		return err
+	}
 	// unjoin spoke
 	if err := unjoinSpoke(ctx, kClient, fc, spoke); err != nil {
 		return err

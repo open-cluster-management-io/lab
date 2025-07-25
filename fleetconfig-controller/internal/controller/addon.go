@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os/exec"
 	"slices"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
@@ -150,6 +151,7 @@ func handleAddonCreate(ctx context.Context, kClient client.Client, fc *v1alpha1.
 			args = append(args, fmt.Sprintf("--cluster-role-bind=%s", a.ClusterRoleBinding))
 		}
 
+		logger.V(7).Info("running", "command", clusteradm, "args", args)
 		cmd := exec.Command(clusteradm, args...)
 		stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm addon create' to complete...")
 		if err != nil {
@@ -169,6 +171,10 @@ func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, fc *v1al
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("deleteAddOns", "fleetconfig", fc.Name)
 
+	allSpokeNames := make([]string, 0)
+	for _, js := range fc.Status.JoinedSpokes {
+		allSpokeNames = append(allSpokeNames, js.Name)
+	}
 	// a list of addons which may or may not need to be purged at the end (ClusterManagementAddOns needs to be deleted)
 	purgeList := make([]string, 0)
 	errs := make([]error, 0)
@@ -178,6 +184,13 @@ func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, fc *v1al
 		if err != nil && !kerrs.IsNotFound(err) {
 			errs = append(errs, fmt.Errorf("failed to delete addon %s: %v", addonName, err))
 			continue
+		}
+
+		baseAddonName := addon.Spec.AddonName
+		// disable the addon on all spokes
+		err = handleAddonDisable(ctx, allSpokeNames, []string{baseAddonName})
+		if err != nil {
+			return err
 		}
 
 		// delete the addon template
@@ -190,7 +203,7 @@ func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, fc *v1al
 		}
 
 		// get the addon name without a version suffix, add it to purge list
-		purgeList = append(purgeList, addon.Spec.AddonName)
+		purgeList = append(purgeList, baseAddonName)
 		logger.V(0).Info("deleted addon", "AddOnTemplate", addonName)
 	}
 
@@ -225,5 +238,131 @@ func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, fc *v1al
 		return fmt.Errorf("one or more addons were not deleted: %v", errs)
 	}
 
+	return nil
+}
+
+func handleSpokeAddons(ctx context.Context, spokeName string, addons []v1alpha1.AddOn, enabledAddons []string) ([]string, error) {
+	if len(addons) == 0 && len(enabledAddons) == 0 {
+		// nothing to do
+		return nil, nil
+	}
+
+	// compare existing to requested
+	requestedAddonNames := make([]string, len(addons))
+	for i, addon := range addons {
+		requestedAddonNames[i] = addon.ConfigName
+	}
+
+	// Find addons that need to be enabled (present in requested, missing from prevEnabledAddons)
+	addonsToEnable := make([]v1alpha1.AddOn, 0)
+	for i, requestedName := range requestedAddonNames {
+		if !slices.Contains(enabledAddons, requestedName) {
+			addonsToEnable = append(addonsToEnable, addons[i])
+		}
+	}
+
+	// Find addons that need to be disabled (present in prevEnabledAddons, missing from requested)
+	addonsToDisable := make([]string, 0)
+	for _, prevEnabledAddon := range enabledAddons {
+		if !slices.Contains(requestedAddonNames, prevEnabledAddon) {
+			addonsToDisable = append(addonsToDisable, prevEnabledAddon)
+		}
+	}
+
+	// do disables first, then enables/updates
+	err := handleAddonDisable(ctx, []string{spokeName}, addonsToDisable)
+	if err != nil {
+		return enabledAddons, err
+	}
+
+	// Remove disabled addons from enabledAddons
+	for _, disabledAddon := range addonsToDisable {
+		enabledAddons = slices.DeleteFunc(enabledAddons, func(ea string) bool {
+			return ea == disabledAddon
+		})
+	}
+
+	// Enable new addons and updated addons
+	newEnabledAddons, err := handleAddonEnable(ctx, spokeName, addonsToEnable)
+	// even if an error is returned, any addon which was successfully enabled is tracked, so append before returning
+	enabledAddons = append(enabledAddons, newEnabledAddons...)
+	if err != nil {
+		return enabledAddons, err
+	}
+
+	return enabledAddons, nil
+}
+
+func handleAddonEnable(ctx context.Context, spokeName string, addons []v1alpha1.AddOn) ([]string, error) {
+	if len(addons) == 0 {
+		return nil, nil
+	}
+
+	logger := log.FromContext(ctx)
+	logger.V(0).Info("enableAddOns", "managedcluster", spokeName)
+
+	baseArgs := []string{
+		addon,
+		enable,
+		fmt.Sprintf("--cluster=%s", spokeName),
+	}
+
+	var enableErrs []error
+	enabledAddons := make([]string, 0)
+	for _, a := range addons {
+		args := []string{
+			fmt.Sprintf("--names=%s", a.ConfigName),
+		}
+		if a.InstallNamespace != "" {
+			args = append(args, fmt.Sprintf("--namespace=%s", a.InstallNamespace))
+		}
+		var annots []string
+		for k, v := range a.Annotations {
+			annots = append(annots, fmt.Sprintf("%s=%s", k, v))
+		}
+		annot := strings.Join(annots, ",")
+		args = append(args, fmt.Sprintf("--annotate=%s", annot))
+
+		args = append(baseArgs, args...)
+		logger.V(7).Info("running", "command", clusteradm, "args", args)
+		cmd := exec.Command(clusteradm, args...)
+		out, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm addon enable' to complete...")
+		if err != nil {
+			enableErrs = append(enableErrs, fmt.Errorf("failed to enable addon: %v, output: %s", err, string(out)))
+			continue
+		}
+
+		enabledAddons = append(enabledAddons, a.ConfigName)
+		logger.V(3).Info("enabled addon", "managedcluster", spokeName, "addon", a.ConfigName)
+	}
+
+	if len(enableErrs) > 0 {
+		return enabledAddons, fmt.Errorf("one or more addons were not enabled: %v", enableErrs)
+	}
+	return enabledAddons, nil
+}
+
+func handleAddonDisable(ctx context.Context, spokeNames []string, addons []string) error {
+	if len(addons) == 0 {
+		return nil
+	}
+
+	logger := log.FromContext(ctx)
+	logger.V(0).Info("disableAddOns", "managedclusters", spokeNames)
+
+	args := []string{
+		addon,
+		disable,
+		fmt.Sprintf("--names=%s", strings.Join(addons, ",")),
+		fmt.Sprintf("--clusters=%s", strings.Join(spokeNames, ",")),
+	}
+
+	logger.V(7).Info("running", "command", clusteradm, "args", args)
+	cmd := exec.Command(clusteradm, args...)
+	out, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm addon disable' to complete...")
+	if err != nil {
+		return fmt.Errorf("failed to disable addons: %v, output: %s", err, string(out))
+	}
+	logger.V(3).Info("disabled addons", "managedcluster", spokeNames, "addons", addons)
 	return nil
 }

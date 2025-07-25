@@ -1,5 +1,7 @@
 {{- if .Values.fleetConfig.addOnConfigs }}
 {{- $namespace := .Release.Namespace }}
+{{- $labels := include "chart.labels" . }}
+{{- $annotations := include "chart.annotations" . }}
 {{- range .Values.fleetConfig.addOnConfigs }}
 {{ $versionedName := printf "%s-%s" .name .version }}
 apiVersion: v1
@@ -8,10 +10,10 @@ metadata:
   name: fleet-addon-{{ $versionedName }}
   namespace: {{ $namespace }}
   annotations:
-    {{- include "chart.annotations" . | nindent 4 }}
+    {{- $annotations | nindent 4 }}
     helm.sh/hook: pre-install,pre-upgrade
   labels:
-  {{- include "chart.labels" . | nindent 4 }}
+  {{- $labels | nindent 4 }}
 data:
   {{- if or (hasPrefix "http://" .manifests) (hasPrefix "https://" .manifests) }}
   manifestsURL: {{ .manifests }}

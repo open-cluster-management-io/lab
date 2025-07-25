@@ -232,11 +232,11 @@ fleetConfig:
         # qosClass: "Default"
       singleton: false
     # Add-on configuration for the spoke cluster.
-    # ## @param fleetConfig.spokes[0].addOns[0].name Name of the add-on.
+    # ## @param fleetConfig.spokes[0].addOns[0].configName Name of the add-on to enable. Must match one of the configured add-on names in fleetConfig.addOnConfigs.
     # ## @param fleetConfig.spokes[0].addOns[0].installNamespace Namespace to install the add-on.
     # ## @param fleetConfig.spokes[0].addOns[0].annotations Annotations to apply to the add-on.
     # addOns:
-    # - name: ""
+    # - configName: ""
     #   installNamespace: ""
     #   annotations: {}
 

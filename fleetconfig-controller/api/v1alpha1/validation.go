@@ -55,6 +55,8 @@ func allowFleetConfigUpdate(newObject *FleetConfig, oldObject *FleetConfig) erro
 				newSpokeCopy := newSpoke
 				oldSpokeCopy.Klusterlet.Source = (OCMSource{})
 				newSpokeCopy.Klusterlet.Source = (OCMSource{})
+				newSpokeCopy.AddOns = []AddOn{}
+				oldSpokeCopy.AddOns = []AddOn{}
 
 				if !reflect.DeepEqual(oldSpokeCopy, newSpokeCopy) {
 					return fmt.Errorf("spoke '%s' contains changes which are not allowed; only changes to spec.spokes[*].klusterlet.source.* are allowed when updating a spoke", newSpoke.Name)

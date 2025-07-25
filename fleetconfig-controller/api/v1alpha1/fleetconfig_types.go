@@ -431,6 +431,11 @@ type JoinedSpoke struct {
 	// +kubebuilder:default:=true
 	// +optional
 	PurgeKlusterletOperator bool `json:"purgeKlusterletOperator,omitempty"`
+
+	// EnabledAddons is the list of addons that are currently enabled for the cluster.
+	// +kubebuilder:default:={}
+	// +optional
+	EnabledAddons []string `json:"enabledAddons,omitempty"`
 }
 
 // GetName returns the name of the joined spoke cluster.
