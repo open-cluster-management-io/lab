@@ -173,11 +173,22 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 			js = fc.Status.JoinedSpokes[idx]
 			enabledAddons = append(enabledAddons, js.EnabledAddons...)
 		}
+
 		enabledAddons, err = handleSpokeAddons(ctx, spoke.Name, spoke.AddOns, enabledAddons)
-		if err != nil {
-			return fmt.Errorf("failed to enable addons for spoke cluster %s: %w", spoke.Name, err)
-		}
 		allEnabledAddons[i] = enabledAddons
+		if err != nil {
+			msg := fmt.Sprintf("failed to enable addons for spoke cluster %s: %s", spoke.Name, err.Error())
+			fc.SetConditions(true, v1alpha1.NewCondition(
+				msg, spoke.AddonEnabledType(), metav1.ConditionFalse, metav1.ConditionTrue,
+			))
+			continue
+		}
+
+		if len(enabledAddons) > 0 {
+			fc.SetConditions(true, v1alpha1.NewCondition(
+				"AddonsEnabled", spoke.AddonEnabledType(), metav1.ConditionTrue, metav1.ConditionTrue,
+			))
+		}
 	}
 
 	// Only spokes which are joined, are eligible to be unjoined

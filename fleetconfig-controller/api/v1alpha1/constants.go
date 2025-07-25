@@ -10,8 +10,14 @@ const (
 	// FleetConfigHubInitialized means that the Hub has been initialized.
 	FleetConfigHubInitialized = "HubInitialized"
 
+	// FleetConfigAddonsConfigured means that all addons have been configured on the Hub.
+	FleetConfigAddonsConfigured = "AddonsConfigured"
+
 	// FleetConfigCleanupFailed means that a failure occurred during cleanup.
 	FleetConfigCleanupFailed = "CleanupFailed"
+
+	// FleetConfigAddonsEnabled means that all addons have been enabled for a particular Spoke.
+	FleetConfigAddonsEnabled = "AddonsEnabled"
 )
 
 // FleetConfig condition reasons

@@ -418,6 +418,24 @@ type AddOn struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
+// JoinType returns a status condition type indicating that a particular Spoke cluster has joined the Hub.
+func (s *Spoke) JoinType() string {
+	return fmt.Sprintf("spoke-cluster-%s-joined", s.conditionName(42)) // 63 - 21
+}
+
+// AddonEnabledType returns a status condition type indicating that a particular Spoke cluster has joined the Hub.
+func (s *Spoke) AddonEnabledType() string {
+	return fmt.Sprintf("spoke-cluster-%s-addons-enabled", s.conditionName(34)) // 63 - 29
+}
+
+func (s *Spoke) conditionName(c int) string {
+	name := s.Name
+	if len(name) > c {
+		name = name[:c] // account for extra c chars in the condition type (max. total of 63)
+	}
+	return name
+}
+
 // JoinedSpoke represents a spoke that has been joined to a hub.
 type JoinedSpoke struct {
 	// The name of the spoke cluster.
