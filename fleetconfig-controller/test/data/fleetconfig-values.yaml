@@ -1,4 +1,6 @@
 fleetConfig:
+  timeout: 300
+  logVerbosity: 5
   spokeAnnotations:
     foo: "not-bar"
     baz: "quux"

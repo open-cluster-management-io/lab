@@ -115,7 +115,7 @@ test-unit: manifests generate fmt vet envtest ## Run unit tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
 		go test -v \
 		-coverpkg=./... \
-		-coverprofile=cover.out \
+		-coverprofile=$(COVER_DIR)/unit/cover.out \
 		$(shell go list ./... | grep -v '/test/e2e')
 
 .PHONY: test-e2e

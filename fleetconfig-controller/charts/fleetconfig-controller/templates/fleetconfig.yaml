@@ -7,6 +7,8 @@ metadata:
   name: fleetconfig
   namespace: {{ .Release.Namespace }}
 spec:
+  timeout: {{ .Values.fleetConfig.timeout }}
+  logVerbosity: {{ .Values.fleetConfig.logVerbosity }}
   {{- with .Values.fleetConfig.registrationAuth }}
   registrationAuth:
     driver: {{ .driver | quote }}
@@ -36,9 +38,8 @@ spec:
     createNamespace: {{ .Values.fleetConfig.hub.createNamespace }}
     force: {{ .Values.fleetConfig.hub.force }}
     kubeconfig: {{- toYaml .Values.fleetConfig.hub.kubeconfig | nindent 6 }}
-    {{- with .Values.fleetConfig.hub.apiServer }}
-    apiServer: {{ . | quote }}
-    {{- end }}
+    apiServer: {{ .Values.fleetConfig.hub.apiServer | quote }}
+    ca: {{ .Values.fleetConfig.hub.ca | quote }}
   spokes:
     {{- $spokeFeatureGates := .Values.fleetConfig.spokeFeatureGates }}
     {{- range .Values.fleetConfig.spokes }}
@@ -46,7 +47,6 @@ spec:
       createNamespace: {{ .createNamespace }}
       syncLabels: {{ .syncLabels }}
       kubeconfig: {{- toYaml .kubeconfig | nindent 8 }}
-      ca: {{ .ca | quote }}
       proxyCa: {{ .proxyCa | quote }}
       proxyUrl: {{ .proxyUrl | quote }}
       {{- if .clusterARN }}

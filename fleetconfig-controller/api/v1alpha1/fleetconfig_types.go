@@ -28,13 +28,27 @@ import (
 type FleetConfigSpec struct {
 	// +required
 	Hub Hub `json:"hub"`
+
 	// +required
 	Spokes []Spoke `json:"spokes"`
+
 	// +kubebuilder:default:={}
 	// +optional
-	RegistrationAuth RegistrationAuth `json:"registrationAuth,omitempty"`
+	RegistrationAuth RegistrationAuth `json:"registrationAuth,omitzero"`
+
 	// +optional
 	AddOnConfigs []AddOnConfig `json:"addOnConfigs,omitempty"`
+
+	// Timeout is the timeout in seconds for all clusteradm operations, including init, accept, join, upgrade, etc.
+	// +kubebuilder:default:=300
+	// +optional
+	Timeout int `json:"timeout,omitempty"`
+
+	// LogVerbosity is the verbosity of the logs.
+	// +kubebuilder:validation:Enum=0;1;2;3;4;5;6;7;8;9;10
+	// +kubebuilder:default:=0
+	// +optional
+	LogVerbosity int `json:"logVerbosity,omitempty"`
 }
 
 // FleetConfigStatus defines the observed state of FleetConfig.
@@ -147,6 +161,16 @@ func (c Condition) Equal(other Condition) bool {
 
 // Hub provides specifications for an OCM hub cluster.
 type Hub struct {
+	// APIServer is the API server URL for the Hub cluster. If provided, spokes clusters will
+	// join the hub using this API server instead of the one in the bootstrap kubeconfig.
+	// Spoke clusters with ForceInternalEndpointLookup set to true will ignore this field.
+	// +optional
+	APIServer string `json:"apiServer,omitempty"`
+
+	// Hub cluster CA certificate, optional
+	// +optional
+	Ca string `json:"ca,omitempty"`
+
 	// ClusterManager configuration.
 	// +optional
 	ClusterManager *ClusterManager `json:"clusterManager,omitempty"`
@@ -168,12 +192,6 @@ type Hub struct {
 	// This is an alpha stage flag.
 	// +optional
 	SingletonControlPlane *SingletonControlPlane `json:"singleton,omitempty"`
-
-	// APIServer is the API server URL for the Hub cluster. If provided, the hub will be joined
-	// using this API server instead of the one in the obtained kubeconfig. This is useful when
-	// using in-cluster kubeconfig when that kubeconfig would return an incorrect API server URL.
-	// +optional
-	APIServer string `json:"apiServer,omitempty"`
 }
 
 // SingletonControlPlane is the configuration for a singleton control plane
@@ -240,12 +258,12 @@ type ClusterManager struct {
 	// Resource specifications for all clustermanager-managed containers.
 	// +kubebuilder:default:={}
 	// +optional
-	Resources ResourceSpec `json:"resources,omitempty"`
+	Resources ResourceSpec `json:"resources,omitzero"`
 
 	// Version and image registry details for the cluster manager.
 	// +kubebuilder:default:={}
 	// +optional
-	Source OCMSource `json:"source,omitempty"`
+	Source OCMSource `json:"source,omitzero"`
 
 	// If set, the bootstrap token will used instead of a service account token.
 	// +optional
@@ -301,6 +319,17 @@ type SecretReference struct {
 	KubeconfigKey string `json:"kubeconfigKey,omitempty"`
 }
 
+// ISpoke is an interface that both Spoke and JoinedSpoke implement.
+// +kubebuilder:object:generate=false
+type ISpoke interface {
+	GetName() string
+	GetKubeconfig() Kubeconfig
+	GetPurgeKlusterletOperator() bool
+}
+
+var _ ISpoke = &Spoke{}
+var _ ISpoke = &JoinedSpoke{}
+
 // Spoke provides specifications for joining and potentially upgrading spokes.
 type Spoke struct {
 	// The name of the spoke cluster.
@@ -323,10 +352,6 @@ type Spoke struct {
 	// +required
 	Kubeconfig Kubeconfig `json:"kubeconfig"`
 
-	// Hub cluster CA certificate, optional
-	// +optional
-	Ca string `json:"ca,omitempty"`
-
 	// Proxy CA certificate, optional
 	// +optional
 	ProxyCa string `json:"proxyCa,omitempty"`
@@ -338,7 +363,7 @@ type Spoke struct {
 	// Klusterlet configuration.
 	// +kubebuilder:default:={}
 	// +optional
-	Klusterlet Klusterlet `json:"klusterlet,omitempty"`
+	Klusterlet Klusterlet `json:"klusterlet,omitzero"`
 
 	// ClusterARN is the ARN of the spoke cluster.
 	// This field is optionally used for AWS IRSA registration authentication.
@@ -348,6 +373,34 @@ type Spoke struct {
 	// AddOns are the add-ons to enable for the spoke cluster.
 	// +optional
 	AddOns []AddOn `json:"addOns,omitempty"`
+}
+
+// GetName returns the name of the spoke cluster.
+func (s *Spoke) GetName() string {
+	return s.Name
+}
+
+// GetKubeconfig returns the kubeconfig for the spoke cluster.
+func (s *Spoke) GetKubeconfig() Kubeconfig {
+	return s.Kubeconfig
+}
+
+// GetPurgeKlusterletOperator returns the purge klusterlet operator flag.
+func (s *Spoke) GetPurgeKlusterletOperator() bool {
+	return s.Klusterlet.PurgeOperator
+}
+
+// JoinType returns a status condition type indicating that a particular Spoke cluster has joined the Hub.
+func (s *Spoke) JoinType() string {
+	return fmt.Sprintf("spoke-cluster-%s-joined", s.conditionName())
+}
+
+func (s *Spoke) conditionName() string {
+	name := s.Name
+	if len(name) > 42 {
+		name = name[:42] // account for extra 21 chars in the condition type (max. total of 63)
+	}
+	return name
 }
 
 // AddOn enables add-on installation on the cluster.
@@ -365,19 +418,6 @@ type AddOn struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-// JoinType returns a status condition type indicating that a particular Spoke cluster has joined the Hub.
-func (s *Spoke) JoinType() string {
-	return fmt.Sprintf("spoke-cluster-%s-joined", s.conditionName())
-}
-
-func (s *Spoke) conditionName() string {
-	name := s.Name
-	if len(name) > 42 {
-		name = name[:42] // account for extra 21 chars in the condition type (max. total of 63)
-	}
-	return name
-}
-
 // JoinedSpoke represents a spoke that has been joined to a hub.
 type JoinedSpoke struct {
 	// The name of the spoke cluster.
@@ -391,6 +431,21 @@ type JoinedSpoke struct {
 	// +kubebuilder:default:=true
 	// +optional
 	PurgeKlusterletOperator bool `json:"purgeKlusterletOperator,omitempty"`
+}
+
+// GetName returns the name of the joined spoke cluster.
+func (j *JoinedSpoke) GetName() string {
+	return j.Name
+}
+
+// GetKubeconfig returns the kubeconfig for the joined spoke cluster.
+func (j *JoinedSpoke) GetKubeconfig() Kubeconfig {
+	return j.Kubeconfig
+}
+
+// GetPurgeKlusterletOperator returns the purge klusterlet operator flag for the joined spoke cluster.
+func (j *JoinedSpoke) GetPurgeKlusterletOperator() bool {
+	return j.PurgeKlusterletOperator
 }
 
 // UnjoinType returns a status condition type indicating that a particular Spoke cluster has been removed from the Hub.
@@ -445,7 +500,7 @@ type Klusterlet struct {
 
 	// External managed cluster kubeconfig, required if using hosted mode.
 	// +optional
-	ManagedClusterKubeconfig Kubeconfig `json:"managedClusterKubeconfig,omitempty"`
+	ManagedClusterKubeconfig Kubeconfig `json:"managedClusterKubeconfig,omitzero"`
 
 	// If true, the klusterlet accesses the managed cluster using the internal endpoint from the public
 	// cluster-info in the managed cluster instead of using managedClusterKubeconfig.
@@ -455,7 +510,7 @@ type Klusterlet struct {
 	// Resource specifications for all klusterlet-managed containers.
 	// +kubebuilder:default:={}
 	// +optional
-	Resources ResourceSpec `json:"resources,omitempty"`
+	Resources ResourceSpec `json:"resources,omitzero"`
 
 	// If true, deploy klusterlet in singleton mode, with registration and work agents running in a single pod.
 	// This is an alpha stage flag.
@@ -465,7 +520,7 @@ type Klusterlet struct {
 	// Version and image registry details for the klusterlet.
 	// +kubebuilder:default:={}
 	// +optional
-	Source OCMSource `json:"source,omitempty"`
+	Source OCMSource `json:"source,omitzero"`
 }
 
 // ResourceSpec defines resource limits and requests for all managed clusters.
@@ -565,10 +620,18 @@ type AddOnConfig struct {
 // FleetConfig is the Schema for the fleetconfigs API.
 type FleetConfig struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata,omitzero"`
 
-	Spec   FleetConfigSpec   `json:"spec,omitempty"`
+	Spec   FleetConfigSpec   `json:"spec,omitzero"`
 	Status FleetConfigStatus `json:"status,omitempty"`
+}
+
+// BaseArgs returns the base arguments for all clusteradm commands.
+func (m *FleetConfig) BaseArgs() []string {
+	return []string{
+		fmt.Sprintf("--timeout=%d", m.Spec.Timeout),
+		fmt.Sprintf("--v=%d", m.Spec.LogVerbosity),
+	}
 }
 
 // GetCondition gets the condition with the supplied type, if it exists.
@@ -586,7 +649,7 @@ func (m *FleetConfig) SetConditions(cover bool, c ...Condition) {
 // FleetConfigList contains a list of FleetConfig.
 type FleetConfigList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata,omitzero"`
 	Items           []FleetConfig `json:"items"`
 }
 

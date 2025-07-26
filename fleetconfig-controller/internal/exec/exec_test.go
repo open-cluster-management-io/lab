@@ -50,13 +50,14 @@ func TestCmdWithLogs(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), tt.timeout)
 			defer cancel()
 
-			out, err := CmdWithLogs(ctx, tt.cmdFunc(), "waiting for command...")
+			stdout, stderr, err := CmdWithLogs(ctx, tt.cmdFunc(), "waiting for command...")
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CmdWithLogs() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			outStr := strings.TrimSpace(string(out))
+			combinedOut := string(stdout) + string(stderr)
+			outStr := strings.TrimSpace(combinedOut)
 			if tt.wantOut != "" && !strings.Contains(outStr, tt.wantOut) {
 				t.Errorf("output = %q, want to contain %q", outStr, tt.wantOut)
 			}

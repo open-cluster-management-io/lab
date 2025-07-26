@@ -91,9 +91,12 @@ spec:
                 properties:
                   apiServer:
                     description: |-
-                      APIServer is the API server URL for the Hub cluster. If provided, the hub will be joined
-                      using this API server instead of the one in the obtained kubeconfig. This is useful when
-                      using in-cluster kubeconfig when that kubeconfig would return an incorrect API server URL.
+                      APIServer is the API server URL for the Hub cluster. If provided, spokes clusters will
+                      join the hub using this API server instead of the one in the bootstrap kubeconfig.
+                      Spoke clusters with ForceInternalEndpointLookup set to true will ignore this field.
+                    type: string
+                  ca:
+                    description: Hub cluster CA certificate, optional
                     type: string
                   clusterManager:
                     description: ClusterManager configuration.
@@ -270,6 +273,22 @@ spec:
                 required:
                 - kubeconfig
                 type: object
+              logVerbosity:
+                default: 0
+                description: LogVerbosity is the verbosity of the logs.
+                enum:
+                - 0
+                - 1
+                - 2
+                - 3
+                - 4
+                - 5
+                - 6
+                - 7
+                - 8
+                - 9
+                - 10
+                type: integer
               registrationAuth:
                 default: {}
                 description: RegistrationAuth provides specifications for registration
@@ -329,9 +348,6 @@ spec:
                         - configName
                         type: object
                       type: array
-                    ca:
-                      description: Hub cluster CA certificate, optional
-                      type: string
                     clusterARN:
                       description: |-
                         ClusterARN is the ARN of the spoke cluster.
@@ -545,6 +561,11 @@ spec:
                   - name
                   type: object
                 type: array
+              timeout:
+                default: 300
+                description: Timeout is the timeout in seconds for all clusteradm
+                  operations, including init, accept, join, upgrade, etc.
+                type: integer
             required:
             - hub
             - spokes
@@ -666,6 +687,9 @@ spec:
               phase:
                 type: string
             type: object
+        required:
+        - metadata
+        - spec
         type: object
     served: true
     storage: true

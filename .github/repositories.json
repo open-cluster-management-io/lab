@@ -1,5 +1,5 @@
 {
   "fleetconfig-controller": {
-    "e2e-artifacts": ["hub-bundle.tar.gz", "spoke-bundle.tar.gz"]
+    "e2e-artifacts": ["test/e2e/hub-bundle.tar.gz", "test/e2e/spoke-bundle.tar.gz"]
   }
 }

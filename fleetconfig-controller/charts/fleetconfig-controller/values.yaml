@@ -10,6 +10,10 @@
 fleetConfig:
   ## @param fleetConfig.enabled Whether to create a FleetConfig resource.
   enabled: true
+  ## @param fleetConfig.timeout Timeout in seconds for all clusteradm operations, including init, accept, join, upgrade, etc.
+  timeout: 300
+  ## @param fleetConfig.logVerbosity Log verbosity. Valid values: 0-10, 0 is the least verbose, 10 is the most verbose.
+  logVerbosity: 0
   ## @param fleetConfig.spokeAnnotations Global annotations to apply to all spoke clusters. If not present, the 'agent.open-cluster-management.io/' prefix is added to each key. Each annotation is added to klusterlet.spec.registrationConfiguration.clusterAnnotations on every spoke and subsequently to the ManagedClusters on the hub. Per-spoke annotations take precedence over the global annotations.
   spokeAnnotations: {}
   ## @descriptionStart
@@ -104,8 +108,10 @@ fleetConfig:
     createNamespace: true
     ## @param fleetConfig.hub.force If set, the hub will be reinitialized.
     force: false
-    ## The Hub clusters API Server. Required when configuring an EKS, or GKE FleetConfig.
-    # apiServer: "https://<API_SERVER_HOST_AND_PORT>"
+    ## @param fleetConfig.hub.apiServer The Hub cluster's API Server. Required when configuring an EKS, or GKE FleetConfig.
+    apiServer: ""
+    ## @param fleetConfig.hub.ca The Hub cluster's CA certificate. Optional.
+    ca: ""
     ## Kubeconfig details for the Hub cluster.
     kubeconfig:
       ## @param fleetConfig.hub.kubeconfig.context The context to use in the kubeconfig file. Leave empty to use the current context.
@@ -156,7 +162,6 @@ fleetConfig:
   ## @param fleetConfig.spokes[0].syncLabels If true, sync the labels from klusterlet to all agent resources.
   ## @param fleetConfig.spokes[0].kubeconfig.context The context to use in the kubeconfig file. Leave empty to use the current context.
   ## @param fleetConfig.spokes[0].kubeconfig.inCluster If set, the kubeconfig will be read from the cluster. Only applicable for same-cluster operations.
-  ## @param fleetConfig.spokes[0].ca Hub cluster CA certificate, optional.
   ## @param fleetConfig.spokes[0].proxyCa Proxy CA certificate, optional.
   ## @param fleetConfig.spokes[0].proxyUrl URL of a forward proxy server used by agents to connect to the Hub cluster, optional.
   ## @param fleetConfig.spokes[0].klusterlet.annotations Annotations to apply to the spoke cluster. If not present, the 'agent.open-cluster-management.io/' prefix is added to each key. Each annotation is added to klusterlet.spec.registrationConfiguration.clusterAnnotations on the spoke and subsequently to the ManagedCluster on the hub. These annotations take precedence over the global spoke annotations.
@@ -185,7 +190,6 @@ fleetConfig:
       #   namespace: ""
       #   ## @param fleetConfig.spokes[0].kubeconfig.secretReference.kubeconfigKey The map key to access the kubeconfig.
       #   kubeconfigKey: "kubeconfig"
-    ca: ""
     proxyCa: ""
     proxyUrl: ""
     ## Configuration for the Klusterlet on the Spoke cluster.
@@ -273,7 +277,7 @@ imageRegistry: ""
 ## @param image.pullPolicy Image pull policy
 image:
   repository: quay.io/open-cluster-management/fleetconfig-controller
-  tag: v0.0.6
+  tag: v0.0.7
   pullPolicy: IfNotPresent
 
 ## @param imagePullSecrets Image pull secrets

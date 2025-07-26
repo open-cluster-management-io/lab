@@ -111,11 +111,12 @@ func initializeHub(ctx context.Context, kClient client.Client, fc *v1alpha1.Flee
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("initHub", "fleetconfig", fc.Name)
 
-	initArgs := []string{"init",
+	initArgs := append([]string{
+		"init",
 		fmt.Sprintf("--create-namespace=%t", fc.Spec.Hub.CreateNamespace),
 		fmt.Sprintf("--force=%t", fc.Spec.Hub.Force),
 		"--wait=true",
-	}
+	}, fc.BaseArgs()...)
 
 	if fc.Spec.RegistrationAuth.Driver == v1alpha1.AWSIRSARegistrationDriver {
 		raArgs := []string{
@@ -182,11 +183,12 @@ func initializeHub(ctx context.Context, kClient client.Client, fc *v1alpha1.Flee
 	logger.V(1).Info("clusteradm init", "args", initArgs)
 
 	cmd := exec.Command(clusteradm, initArgs...)
-	out, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm init' to complete...")
+	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm init' to complete...")
 	if err != nil {
+		out := append(stdout, stderr...)
 		return fmt.Errorf("failed to init hub: %v, output: %s", err, string(out))
 	}
-	logger.V(1).Info("hub initialized", "output", string(out))
+	logger.V(1).Info("hub initialized", "output", string(stdout))
 
 	return nil
 }
@@ -253,22 +255,25 @@ func upgradeHub(ctx context.Context, fc *v1alpha1.FleetConfig) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("upgradeHub", "fleetconfig", fc.Name)
 
-	upgradeArgs := []string{"upgrade", "clustermanager",
+	upgradeArgs := append([]string{
+		"upgrade", "clustermanager",
 		"--bundle-version", fc.Spec.Hub.ClusterManager.Source.BundleVersion,
 		"--image-registry", fc.Spec.Hub.ClusterManager.Source.Registry,
 		"--wait=true",
-	}
+	}, fc.BaseArgs()...)
+
 	logger.V(1).Info("clusteradm upgrade clustermanager", "args", upgradeArgs)
 
 	cmd := exec.Command(clusteradm, upgradeArgs...)
-	out, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm upgrade clustermanager' to complete...")
+	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm upgrade clustermanager' to complete...")
 	if err != nil {
+		out := append(stdout, stderr...)
 		return fmt.Errorf(
 			"failed to upgrade hub clustermanager to %s: %v, output: %s",
 			fc.Spec.Hub.ClusterManager.Source.BundleVersion, err, string(out),
 		)
 	}
-	logger.V(1).Info("clustermanager upgraded", "output", string(out))
+	logger.V(1).Info("clustermanager upgraded", "output", string(stdout))
 
 	return nil
 }
@@ -294,19 +299,21 @@ func cleanHub(ctx context.Context, kClient client.Client, hubKubeconfig []byte, 
 		return err
 	}
 
-	cleanArgs := []string{"clean",
+	cleanArgs := append([]string{
+		"clean",
 		// name is omitted, as the default name, 'cluster-manager', is always used
 		fmt.Sprintf("--purge-operator=%t", fc.Spec.Hub.ClusterManager.PurgeOperator),
-	}
+	}, fc.BaseArgs()...)
+
 	logger.V(1).Info("clusteradm clean", "args", cleanArgs)
 
 	cmd := exec.Command(clusteradm, cleanArgs...)
-	out, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm clean' to complete...")
+	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm clean' to complete...")
 	if err != nil {
+		out := append(stdout, stderr...)
 		return fmt.Errorf("failed to clean hub cluster: %v, output: %s", err, string(out))
 	}
-
-	logger.V(1).Info("hub cleaned", "output", string(out))
+	logger.V(1).Info("hub cleaned", "output", string(stdout))
 
 	return nil
 }

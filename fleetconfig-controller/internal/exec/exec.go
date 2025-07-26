@@ -2,6 +2,7 @@
 package exec
 
 import (
+	"bytes"
 	"context"
 	"os/exec"
 	"time"
@@ -13,20 +14,27 @@ const logInterval = 5 * time.Second
 
 // CmdWithLogs executes the passed in command in a goroutine while the main thread waits for the command to complete.
 // The main thread logs a message at regular intervals until the command completes.
-func CmdWithLogs(ctx context.Context, cmd *exec.Cmd, message string) ([]byte, error) {
+// Returns stdout, stderr, and error separately.
+func CmdWithLogs(ctx context.Context, cmd *exec.Cmd, message string) ([]byte, []byte, error) {
 	logger := log.FromContext(ctx)
 
 	resultCh := make(chan struct {
-		out []byte
-		err error
+		stdout []byte
+		stderr []byte
+		err    error
 	}, 1)
 
 	go func() {
-		out, err := cmd.CombinedOutput()
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+
+		err := cmd.Run()
 		resultCh <- struct {
-			out []byte
-			err error
-		}{out: out, err: err}
+			stdout []byte
+			stderr []byte
+			err    error
+		}{stdout: stdout.Bytes(), stderr: stderr.Bytes(), err: err}
 	}()
 
 	ticker := time.NewTicker(logInterval)
@@ -36,9 +44,9 @@ func CmdWithLogs(ctx context.Context, cmd *exec.Cmd, message string) ([]byte, er
 		select {
 		case <-ctx.Done():
 			_ = cmd.Process.Kill()
-			return nil, ctx.Err()
+			return nil, nil, ctx.Err()
 		case res := <-resultCh:
-			return res.out, res.err
+			return res.stdout, res.stderr, res.err
 		case <-ticker.C:
 			logger.V(1).Info(message)
 		}
