@@ -224,6 +224,7 @@ func ensureFleetConfigProvisioned(tc *E2EContext, fc *v1alpha1.FleetConfig, extr
 	expectedConditions := map[string]metav1.ConditionStatus{
 		v1alpha1.FleetConfigHubInitialized:                     metav1.ConditionTrue,
 		v1alpha1.FleetConfigCleanupFailed:                      metav1.ConditionFalse,
+		v1alpha1.FleetConfigAddonsConfigured:                   metav1.ConditionTrue,
 		fmt.Sprintf("spoke-cluster-%s-joined", hubAsSpokeName): metav1.ConditionTrue,
 		fmt.Sprintf("spoke-cluster-%s-joined", spokeName):      metav1.ConditionTrue,
 	}
