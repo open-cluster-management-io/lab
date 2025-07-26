@@ -9,8 +9,12 @@ import (
 	"slices"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -68,7 +72,8 @@ func allowFleetConfigUpdate(newObject *FleetConfig, oldObject *FleetConfig) erro
 	return nil
 }
 
-func validateAddonConfigs(ctx context.Context, client client.Client, newObject *FleetConfig) field.ErrorList {
+// checks that each addOnConfig specifies a valid source of manifests
+func validateAddonConfigs(ctx context.Context, client client.Client, oldObject, newObject *FleetConfig) field.ErrorList {
 	errs := field.ErrorList{}
 	for i, a := range newObject.Spec.AddOnConfigs {
 		cm := corev1.ConfigMap{}
@@ -102,5 +107,90 @@ func validateAddonConfigs(ctx context.Context, client client.Client, newObject *
 		}
 	}
 
+	if oldObject != nil {
+		oldAddOnConfigs := make(map[string]struct{})
+		for _, a := range oldObject.Spec.AddOnConfigs {
+			key := fmt.Sprintf("%s-%s", a.Name, a.Version)
+			oldAddOnConfigs[key] = struct{}{}
+		}
+
+		newAddOnConfigs := make(map[string]struct{})
+		for _, a := range newObject.Spec.AddOnConfigs {
+			key := fmt.Sprintf("%s-%s", a.Name, a.Version)
+			newAddOnConfigs[key] = struct{}{}
+		}
+
+		removedAddOnConfigs := make([]string, 0)
+		for key := range oldAddOnConfigs {
+			if _, found := newAddOnConfigs[key]; !found {
+				removedAddOnConfigs = append(removedAddOnConfigs, key)
+			}
+		}
+
+		// Check if any removed addon configs are still in use by managed cluster addons
+		if len(removedAddOnConfigs) > 0 {
+			mcAddOns, err := getManagedClusterAddOns(ctx)
+			if err != nil {
+				errs = append(errs, field.InternalError(field.NewPath("addOnConfigs"), err))
+			} else {
+				// Check if any removed addon configs are still in use
+				for _, removedConfig := range removedAddOnConfigs {
+					if isAddonConfigInUse(mcAddOns, removedConfig) {
+						errs = append(errs, field.Invalid(field.NewPath("addOnConfigs"), removedConfig,
+							fmt.Sprintf("cannot remove addon config %s as it is still in use by managedclusteraddons", removedConfig)))
+					}
+				}
+			}
+		}
+	}
+
 	return errs
+}
+
+// validates that any addon which is enabled on a spoke is configured
+func validateAddons(newObject *FleetConfig) field.ErrorList {
+	errs := field.ErrorList{}
+	configuredAddons := make([]string, 0)
+	for _, ca := range newObject.Spec.AddOnConfigs {
+		configuredAddons = append(configuredAddons, ca.Name)
+	}
+	for i, s := range newObject.Spec.Spokes {
+		for j, a := range s.AddOns {
+			if !slices.Contains(configuredAddons, a.ConfigName) {
+				errs = append(errs, field.Invalid(field.NewPath("Spokes").Index(i).Child("AddOns").Index(j), a.ConfigName, fmt.Sprintf("cannot enable addon %s for spoke %s, no configuration found in spec.AddOnConfigs", a.ConfigName, s.Name)))
+			}
+		}
+	}
+
+	return errs
+}
+
+// getManagedClusterAddOns lists all ManagedClusterAddOns in all namespaces.
+func getManagedClusterAddOns(ctx context.Context) ([]addonv1alpha1.ManagedClusterAddOn, error) {
+	restConfig, err := ctrl.GetConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get rest config: %w", err)
+	}
+	addonClientset, err := addonapi.NewForConfig(restConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create addon clientset: %w", err)
+	}
+	addonList, err := addonClientset.AddonV1alpha1().ManagedClusterAddOns(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list ManagedClusterAddOns: %w", err)
+	}
+	return addonList.Items, nil
+}
+
+// isAddonConfigInUse checks if a removed addon config is still referenced by any ManagedClusterAddOn.
+// You will need to adjust this function to match your actual struct fields.
+func isAddonConfigInUse(mcAddOns []addonv1alpha1.ManagedClusterAddOn, removedConfig string) bool {
+	for _, mcao := range mcAddOns {
+		for _, cr := range mcao.Status.ConfigReferences {
+			if cr.DesiredConfig.Name == removedConfig {
+				return true
+			}
+		}
+	}
+	return false
 }

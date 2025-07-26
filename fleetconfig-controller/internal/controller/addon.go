@@ -171,10 +171,6 @@ func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, fc *v1al
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("deleteAddOns", "fleetconfig", fc.Name)
 
-	allSpokeNames := make([]string, 0)
-	for _, js := range fc.Status.JoinedSpokes {
-		allSpokeNames = append(allSpokeNames, js.Name)
-	}
 	// a list of addons which may or may not need to be purged at the end (ClusterManagementAddOns needs to be deleted)
 	purgeList := make([]string, 0)
 	errs := make([]error, 0)
@@ -186,13 +182,6 @@ func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, fc *v1al
 			continue
 		}
 
-		baseAddonName := addon.Spec.AddonName
-		// disable the addon on all spokes
-		err = handleAddonDisable(ctx, allSpokeNames, []string{baseAddonName})
-		if err != nil {
-			return err
-		}
-
 		// delete the addon template
 		if addon != nil {
 			err = addonC.AddonV1alpha1().AddOnTemplates().Delete(ctx, addonName, metav1.DeleteOptions{})
@@ -202,6 +191,7 @@ func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, fc *v1al
 			}
 		}
 
+		baseAddonName := addon.Spec.AddonName
 		// get the addon name without a version suffix, add it to purge list
 		purgeList = append(purgeList, baseAddonName)
 		logger.V(0).Info("deleted addon", "AddOnTemplate", addonName)
@@ -270,7 +260,7 @@ func handleSpokeAddons(ctx context.Context, spokeName string, addons []v1alpha1.
 	}
 
 	// do disables first, then enables/updates
-	err := handleAddonDisable(ctx, []string{spokeName}, addonsToDisable)
+	err := handleAddonDisable(ctx, spokeName, addonsToDisable)
 	if err != nil {
 		return enabledAddons, err
 	}
@@ -342,19 +332,19 @@ func handleAddonEnable(ctx context.Context, spokeName string, addons []v1alpha1.
 	return enabledAddons, nil
 }
 
-func handleAddonDisable(ctx context.Context, spokeNames []string, addons []string) error {
+func handleAddonDisable(ctx context.Context, spokeName string, addons []string) error {
 	if len(addons) == 0 {
 		return nil
 	}
 
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("disableAddOns", "managedclusters", spokeNames)
+	logger.V(0).Info("disableAddOns", "managedcluster", spokeName)
 
 	args := []string{
 		addon,
 		disable,
 		fmt.Sprintf("--names=%s", strings.Join(addons, ",")),
-		fmt.Sprintf("--clusters=%s", strings.Join(spokeNames, ",")),
+		fmt.Sprintf("--clusters=%s", spokeName),
 	}
 
 	logger.V(7).Info("running", "command", clusteradm, "args", args)
@@ -363,6 +353,6 @@ func handleAddonDisable(ctx context.Context, spokeNames []string, addons []strin
 	if err != nil {
 		return fmt.Errorf("failed to disable addons: %v, output: %s", err, string(out))
 	}
-	logger.V(3).Info("disabled addons", "managedcluster", spokeNames, "addons", addons)
+	logger.V(3).Info("disabled addons", "managedcluster", spokeName, "addons", addons)
 	return nil
 }

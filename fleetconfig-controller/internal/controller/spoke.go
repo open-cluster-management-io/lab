@@ -583,7 +583,7 @@ func deregisterSpoke(ctx context.Context, kClient client.Client, hubKubeconfig [
 	}
 
 	// remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
-	if err := handleAddonDisable(ctx, []string{spoke.Name}, spoke.EnabledAddons); err != nil {
+	if err := handleAddonDisable(ctx, spoke.Name, spoke.EnabledAddons); err != nil {
 		return err
 	}
 	// unjoin spoke

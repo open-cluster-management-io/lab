@@ -130,8 +130,8 @@ func (v *FleetConfigCustomValidator) ValidateCreate(ctx context.Context, obj run
 		}
 	}
 
-	allErrs = append(allErrs, validateAddonConfigs(ctx, v.client, fc)...)
-
+	allErrs = append(allErrs, validateAddonConfigs(ctx, v.client, nil, fc)...)
+	allErrs = append(allErrs, validateAddons(fc)...)
 	if len(allErrs) > 0 {
 		return warnings, errors.NewInvalid(GroupKind, fc.Name, allErrs)
 	}
@@ -166,7 +166,8 @@ func (v *FleetConfigCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 		return nil, err
 	}
 
-	errs := validateAddonConfigs(ctx, v.client, fc)
+	errs := validateAddonConfigs(ctx, v.client, oldFc, fc)
+	errs = append(errs, validateAddons(fc)...)
 	if len(errs) > 0 {
 		return nil, errors.NewInvalid(GroupKind, fc.Name, errs)
 	}
