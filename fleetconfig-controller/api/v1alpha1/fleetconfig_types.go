@@ -409,13 +409,14 @@ type AddOn struct {
 	// +required
 	ConfigName string `json:"configName"`
 
-	// The namespace to install the add-on in. If left empty, installs into the "open-cluster-management-addon" namespace.
-	// +optional
-	InstallNamespace string `json:"installNamespace,omitempty"`
+// GetKubeconfig returns the kubeconfig for the spoke cluster.
+func (s *Spoke) GetKubeconfig() Kubeconfig {
+	return s.Kubeconfig
+}
 
-	// Annotations to apply to the add-on.
-	// +optional
-	Annotations map[string]string `json:"annotations,omitempty"`
+// GetPurgeKlusterletOperator returns the purge klusterlet operator flag.
+func (s *Spoke) GetPurgeKlusterletOperator() bool {
+	return s.Klusterlet.PurgeOperator
 }
 
 // JoinType returns a status condition type indicating that a particular Spoke cluster has joined the Hub.
@@ -436,6 +437,21 @@ func (s *Spoke) conditionName(c int) string {
 	return name
 }
 
+// AddOn enables add-on installation on the cluster.
+type AddOn struct {
+	// The name of the add-on being enabled. Must match one of the default or manually configured add-on names.
+	// +required
+	ConfigName string `json:"configName"`
+
+	// The namespace to install the add-on in. If left empty, installs into the "open-cluster-management-addon" namespace.
+	// +optional
+	InstallNamespace string `json:"installNamespace,omitempty"`
+
+	// Annotations to apply to the add-on.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
 // JoinedSpoke represents a spoke that has been joined to a hub.
 type JoinedSpoke struct {
 	// The name of the spoke cluster.
@@ -454,6 +470,21 @@ type JoinedSpoke struct {
 	// +kubebuilder:default:={}
 	// +optional
 	EnabledAddons []string `json:"enabledAddons,omitempty"`
+}
+
+// GetName returns the name of the joined spoke cluster.
+func (j *JoinedSpoke) GetName() string {
+	return j.Name
+}
+
+// GetKubeconfig returns the kubeconfig for the joined spoke cluster.
+func (j *JoinedSpoke) GetKubeconfig() Kubeconfig {
+	return j.Kubeconfig
+}
+
+// GetPurgeKlusterletOperator returns the purge klusterlet operator flag for the joined spoke cluster.
+func (j *JoinedSpoke) GetPurgeKlusterletOperator() bool {
+	return j.PurgeKlusterletOperator
 }
 
 // GetName returns the name of the joined spoke cluster.
