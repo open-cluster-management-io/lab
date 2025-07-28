@@ -459,13 +459,18 @@ func (j *JoinedSpoke) GetPurgeKlusterletOperator() bool {
 
 // UnjoinType returns a status condition type indicating that a particular Spoke cluster has been removed from the Hub.
 func (j *JoinedSpoke) UnjoinType() string {
-	return fmt.Sprintf("spoke-cluster-%s-unjoined", j.conditionName())
+	return fmt.Sprintf("spoke-cluster-%s-unjoined", j.conditionName(40)) // 63-23
 }
 
-func (j *JoinedSpoke) conditionName() string {
+// UnjoinType returns a status condition type indicating that a particular Spoke cluster has been removed from the Hub.
+func (j *JoinedSpoke) AddonDisableType() string {
+	return fmt.Sprintf("spoke-cluster-%s-addons-disabled", j.conditionName(33)) // 63-30
+}
+
+func (j *JoinedSpoke) conditionName(c int) string {
 	name := j.Name
-	if len(name) > 40 {
-		name = name[:40] // account for extra 23 chars in the condition type (max. total of 63)
+	if len(name) > c {
+		name = name[:c] // account for extra c chars in the condition type (max. total of 63)
 	}
 	return name
 }

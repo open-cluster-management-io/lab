@@ -76,10 +76,7 @@ var _ = Describe("fleetconfig", Label("fleetconfig"), Ordered, func() {
 		})
 
 		It("should verify addons configured on the hub and enabled on the spoke", func() {
-			By("verifying that the addon is configured and propagated successfully")
-			EventuallyWithOffset(1, func() error {
-				return ensureAddonCreated(tc, "test-addon", "v1.0.0")
-			}, 1*time.Minute, 1*time.Second).Should(Succeed())
+			ensureAddonCreated(tc, 0)
 		})
 
 		It("should verify spoke cluster annotations", func() {
@@ -121,13 +118,8 @@ var _ = Describe("fleetconfig", Label("fleetconfig"), Ordered, func() {
 		})
 
 		It("should update an addon and make sure its propagated to the spoke", func() {
-			By("updating the addon")
 			updateAddon(tc, fc)
-
-			By("verifying that the addon is configured and propagated successfully")
-			EventuallyWithOffset(1, func() error {
-				return ensureAddonCreated(tc, "test-addon", "v2.0.0")
-			}, 1*time.Minute, 1*time.Second).Should(Succeed())
+			ensureAddonCreated(tc, 1)
 		})
 
 		It("should remove a spoke from the hub", func() {
@@ -187,11 +179,14 @@ var _ = Describe("fleetconfig", Label("fleetconfig"), Ordered, func() {
 					conditions[i] = c.Condition
 				}
 				if err = utils.AssertConditions(conditions, map[string]metav1.ConditionStatus{
-					v1alpha1.FleetConfigHubInitialized:                     metav1.ConditionTrue,
-					v1alpha1.FleetConfigCleanupFailed:                      metav1.ConditionFalse,
-					fmt.Sprintf("spoke-cluster-%s-joined", hubAsSpokeName): metav1.ConditionTrue,
-					fmt.Sprintf("spoke-cluster-%s-joined", spokeName):      metav1.ConditionTrue,
-					fmt.Sprintf("spoke-cluster-%s-unjoined", spokeName):    metav1.ConditionTrue,
+					v1alpha1.FleetConfigHubInitialized:                         metav1.ConditionTrue,
+					v1alpha1.FleetConfigCleanupFailed:                          metav1.ConditionFalse,
+					v1alpha1.FleetConfigAddonsConfigured:                       metav1.ConditionTrue,
+					fmt.Sprintf("spoke-cluster-%s-joined", hubAsSpokeName):     metav1.ConditionTrue,
+					fmt.Sprintf("spoke-cluster-%s-joined", spokeName):          metav1.ConditionTrue,
+					fmt.Sprintf("spoke-cluster-%s-addons-enabled", spokeName):  metav1.ConditionTrue,
+					fmt.Sprintf("spoke-cluster-%s-unjoined", spokeName):        metav1.ConditionTrue,
+					fmt.Sprintf("spoke-cluster-%s-addons-disabled", spokeName): metav1.ConditionTrue,
 				}); err != nil {
 					utils.WarnError(err, "Spoke does not have expected condition")
 					return err
@@ -216,11 +211,14 @@ var _ = Describe("fleetconfig", Label("fleetconfig"), Ordered, func() {
 					conditions[i] = c.Condition
 				}
 				if err := utils.AssertConditions(conditions, map[string]metav1.ConditionStatus{
-					v1alpha1.FleetConfigHubInitialized:                     metav1.ConditionTrue,
-					v1alpha1.FleetConfigCleanupFailed:                      metav1.ConditionTrue,
-					fmt.Sprintf("spoke-cluster-%s-joined", hubAsSpokeName): metav1.ConditionTrue,
-					fmt.Sprintf("spoke-cluster-%s-joined", spokeName):      metav1.ConditionTrue,
-					fmt.Sprintf("spoke-cluster-%s-unjoined", spokeName):    metav1.ConditionTrue,
+					v1alpha1.FleetConfigHubInitialized:                         metav1.ConditionTrue,
+					v1alpha1.FleetConfigCleanupFailed:                          metav1.ConditionTrue,
+					v1alpha1.FleetConfigAddonsConfigured:                       metav1.ConditionTrue,
+					fmt.Sprintf("spoke-cluster-%s-joined", hubAsSpokeName):     metav1.ConditionTrue,
+					fmt.Sprintf("spoke-cluster-%s-joined", spokeName):          metav1.ConditionTrue,
+					fmt.Sprintf("spoke-cluster-%s-addons-enabled", spokeName):  metav1.ConditionTrue,
+					fmt.Sprintf("spoke-cluster-%s-unjoined", spokeName):        metav1.ConditionTrue,
+					fmt.Sprintf("spoke-cluster-%s-addons-disabled", spokeName): metav1.ConditionTrue,
 				}); err != nil {
 					utils.WarnError(err, "FleetConfig deletion not blocked")
 					return err

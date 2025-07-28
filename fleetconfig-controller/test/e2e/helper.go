@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	ktypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
@@ -34,27 +36,36 @@ const (
 	fcNamespace                = "fleetconfig-system"
 	spokeSecretName            = "test-fleetconfig-kubeconfig"
 	klusterletAnnotationPrefix = "agent.open-cluster-management.io"
-	devspaceLocal              = "local"
-	devspaceCI                 = "ci"
 	kubeconfigSecretKey        = "value"
 	hubAsSpokeName             = v1alpha1.ManagedClusterTypeHubAsSpoke
 	spokeName                  = v1alpha1.ManagedClusterTypeSpoke
-	// addon consts
-	addonName       = "test-addon"
-	addon1Namespace = "test-addon"
-	addon1Version   = "v1.0.0"
-	addon2Namespace = "test-addon-2"
-	addon2Version   = "v2.0.0"
 )
 
 var (
 	// global test context variables
-	devspaceProfile    string
 	useExistingCluster bool
 
 	// global test variables
 	fleetConfigNN = ktypes.NamespacedName{Name: "fleetconfig", Namespace: fcNamespace}
 	klusterletNN  = ktypes.NamespacedName{Name: "klusterlet"}
+
+	// addon vars
+	addonData = []struct {
+		name      string
+		namespace string
+		version   string
+	}{
+		{
+			name:      "test-addon",
+			namespace: "test-addon",
+			version:   "v1.0.0",
+		},
+		{
+			name:      "test-addon",
+			namespace: "test-addon-2",
+			version:   "v2.0.0",
+		},
+	}
 )
 
 // E2EContext holds all the test-specific state.
@@ -133,6 +144,7 @@ func setupTestEnvironment() *E2EContext {
 	Expect(clusterv1beta2.AddToScheme(scheme.Scheme)).To(Succeed())
 	Expect(operatorv1.AddToScheme(scheme.Scheme)).To(Succeed())
 	Expect(workv1.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(addonv1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
 
 	By("creating a kubernetes client for the hub cluster")
 	tc.kClient, err = utils.NewClient(tc.hubKubeconfig, scheme.Scheme)
@@ -355,32 +367,74 @@ func assertKlusterletAnnotation(klusterlet *operatorv1.Klusterlet, key, expected
 	return nil
 }
 
-func ensureAddonCreated(tc *E2EContext, addonName, addonVersion string) error {
-	cmao := addonv1alpha1.ClusterManagementAddOn{}
-	if err := tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Name: addonName}, &cmao); err != nil {
-		return err
-	}
-	mcao := addonv1alpha1.ManagedClusterAddOn{}
-	if err := tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Name: addonName, Namespace: spokeName}, &mcao); err != nil {
-		return err
-	}
-	ns := corev1.Namespace{}
-	if err := tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Name: addon1Namespace}, &ns); err != nil {
-		return err
-	}
-	return nil
+func ensureAddonCreated(tc *E2EContext, addonIdx int) {
+	By("verifying that the addon is configured and propagated successfully")
+	EventuallyWithOffset(1, func() error {
+		addon := addonData[addonIdx]
+		cmao := addonv1alpha1.ClusterManagementAddOn{}
+		if err := tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Name: addon.name}, &cmao); err != nil {
+			utils.WarnError(err, "failed to get ClusterManagementAddOn %s", addon.name)
+			return err
+		}
+		expectedConfigName := fmt.Sprintf("%s-%s", addon.name, addon.version)
+		if cmao.Spec.SupportedConfigs[0].DefaultConfig.Name != expectedConfigName {
+			err := fmt.Errorf("wrong addon version configured. want %s, have %s", expectedConfigName, cmao.Spec.SupportedConfigs[0].DefaultConfig.Name)
+			utils.WarnError(err, "addon version mismatch for %s", addon.name)
+			return err
+		}
+		mcao := addonv1alpha1.ManagedClusterAddOn{}
+		if err := tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Name: addon.name, Namespace: spokeName}, &mcao); err != nil {
+			utils.WarnError(err, "failed to get ManagedClusterAddOn %s in namespace %s", addon.name, spokeName)
+			return err
+		}
+		ns := corev1.Namespace{}
+		if err := tc.kClientSpoke.Get(tc.ctx, ktypes.NamespacedName{Name: addon.namespace}, &ns); err != nil {
+			utils.WarnError(err, "failed to get namespace %s in spoke cluster", addon.namespace)
+			return err
+		}
+		return nil
+	}, 1*time.Minute, 1*time.Second).Should(Succeed())
 }
 
 func updateAddon(tc *E2EContext, fc *v1alpha1.FleetConfig) {
-	By("adding a new version of test-addon")
+	By("creating a configmap containing the source manifests")
+	EventuallyWithOffset(1, func() error {
+		projDir, err := utils.GetProjectDir()
+		if err != nil {
+			return err
+		}
+		path := filepath.Join(projDir, "test", "data", "addon-2-cm.yaml")
+		cmYaml, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		cm := &corev1.ConfigMap{}
+		err = yaml.Unmarshal(cmYaml, cm)
+		if err != nil {
+			utils.WarnError(err, "failed to unmarshal configmap")
+			return err
+		}
+		cm.Namespace = fcNamespace
+		err = tc.kClient.Create(tc.ctx, cm)
+		if err != nil {
+			utils.WarnError(err, "failed to create configmap")
+			return err
+		}
+		return nil
 
+	}, 1*time.Minute, 1*time.Second).Should(Succeed())
+
+	By("adding a new version of test-addon")
+	addon := addonData[1]
 	if err := tc.kClient.Get(tc.ctx, fleetConfigNN, fc); err != nil {
 		utils.WarnError(err, "failed to get FleetConfig")
 		ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	}
 	fc.Spec.AddOnConfigs = append(fc.Spec.AddOnConfigs, v1alpha1.AddOnConfig{
-		Name:    addonName,
-		Version: addon2Version,
+		Name:      addon.name,
+		Version:   addon.version,
+		Overwrite: true,
 	})
 
+	ExpectWithOffset(1, tc.kClient.Update(tc.ctx, fc)).NotTo(HaveOccurred())
 }

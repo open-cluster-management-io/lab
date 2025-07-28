@@ -3,8 +3,8 @@ fleetConfig:
   logVerbosity: 5
   addOnConfigs:
   - name: test-addon
-    version: "1.0.0"
-    manifest: |
+    version: "v1.0.0"
+    manifests: |
       apiVersion: v1
       kind: Namespace
       metadata:
@@ -28,6 +28,8 @@ fleetConfig:
       forceInternalEndpointLookupManaged: false
       singleton: false
   - name: spoke
+    addOns:
+    - configName: test-addon
     createNamespace: true
     syncLabels: false
     kubeconfig:

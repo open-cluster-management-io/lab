@@ -161,7 +161,8 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 		}
 
 		var enabledAddons []string
-		// check if this spoke already has any addons enabled
+
+		// check if this spoke already has any addons enabled, or if it has been unjoined
 		if len(fc.Status.JoinedSpokes) > 0 {
 			js := v1alpha1.JoinedSpoke{}
 			idx := slices.IndexFunc(fc.Status.JoinedSpokes, func(s v1alpha1.JoinedSpoke) bool {
@@ -171,6 +172,12 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 				continue
 			}
 			js = fc.Status.JoinedSpokes[idx]
+
+			// if unjoined, return early since addons are already uninstalled
+			unjoinedCond := fc.GetCondition(js.UnjoinType())
+			if unjoinedCond != nil && unjoinedCond.Status == metav1.ConditionTrue {
+				continue
+			}
 			enabledAddons = append(enabledAddons, js.EnabledAddons...)
 		}
 
@@ -584,7 +591,15 @@ func deregisterSpoke(ctx context.Context, kClient client.Client, hubKubeconfig [
 
 	// remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
 	if err := handleAddonDisable(ctx, spoke.Name, spoke.EnabledAddons); err != nil {
+		fc.SetConditions(true, v1alpha1.NewCondition(
+			"AddonsDisabled", spoke.AddonDisableType(), metav1.ConditionFalse, metav1.ConditionTrue,
+		))
 		return err
+	}
+	if len(spoke.EnabledAddons) > 0 {
+		fc.SetConditions(true, v1alpha1.NewCondition(
+			"AddonsDisabled", spoke.AddonDisableType(), metav1.ConditionTrue, metav1.ConditionTrue,
+		))
 	}
 	// unjoin spoke
 	if err := unjoinSpoke(ctx, kClient, fc, spoke); err != nil {
