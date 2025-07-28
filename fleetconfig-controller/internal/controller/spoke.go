@@ -160,40 +160,19 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 			}
 		}
 
-		var enabledAddons []string
-
-		// check if this spoke already has any addons enabled, or if it has been unjoined
-		if len(fc.Status.JoinedSpokes) > 0 {
-			js := v1alpha1.JoinedSpoke{}
-			idx := slices.IndexFunc(fc.Status.JoinedSpokes, func(s v1alpha1.JoinedSpoke) bool {
-				return s.Name == spoke.Name
-			})
-			if idx == -1 {
-				continue
-			}
-			js = fc.Status.JoinedSpokes[idx]
-
-			// if unjoined, return early since addons are already uninstalled
-			unjoinedCond := fc.GetCondition(js.UnjoinType())
-			if unjoinedCond != nil && unjoinedCond.Status == metav1.ConditionTrue {
-				continue
-			}
-			enabledAddons = append(enabledAddons, js.EnabledAddons...)
-		}
-
-		enabledAddons, err = handleSpokeAddons(ctx, spoke.Name, spoke.AddOns, enabledAddons)
+		enabledAddons, err := handleSpokeAddons(ctx, spoke, fc)
 		allEnabledAddons[i] = enabledAddons
 		if err != nil {
 			msg := fmt.Sprintf("failed to enable addons for spoke cluster %s: %s", spoke.Name, err.Error())
 			fc.SetConditions(true, v1alpha1.NewCondition(
-				msg, spoke.AddonEnabledType(), metav1.ConditionFalse, metav1.ConditionTrue,
+				msg, spoke.AddonEnableType(), metav1.ConditionFalse, metav1.ConditionTrue,
 			))
 			continue
 		}
 
 		if len(enabledAddons) > 0 {
 			fc.SetConditions(true, v1alpha1.NewCondition(
-				"AddonsEnabled", spoke.AddonEnabledType(), metav1.ConditionTrue, metav1.ConditionTrue,
+				"AddonsEnabled", spoke.AddonEnableType(), metav1.ConditionTrue, metav1.ConditionTrue,
 			))
 		}
 	}

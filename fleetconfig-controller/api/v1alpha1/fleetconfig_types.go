@@ -395,7 +395,8 @@ func (s *Spoke) JoinType() string {
 	return fmt.Sprintf("spoke-cluster-%s-joined", s.conditionName(42)) // 63-21
 }
 
-func (s *Spoke) AddonEnabledType() string {
+// AddonEnableType returns a status condition type indicating that a particular Spoke cluster's addons have been disabled.
+func (s *Spoke) AddonEnableType() string {
 	return fmt.Sprintf("spoke-cluster-%s-addons-enabled", s.conditionName(34)) // 63-29
 }
 
@@ -462,7 +463,7 @@ func (j *JoinedSpoke) UnjoinType() string {
 	return fmt.Sprintf("spoke-cluster-%s-unjoined", j.conditionName(40)) // 63-23
 }
 
-// UnjoinType returns a status condition type indicating that a particular Spoke cluster has been removed from the Hub.
+// AddonDisableType returns a status condition type indicating that a particular Spoke cluster's addons have been disabled.
 func (j *JoinedSpoke) AddonDisableType() string {
 	return fmt.Sprintf("spoke-cluster-%s-addons-disabled", j.conditionName(33)) // 63-30
 }

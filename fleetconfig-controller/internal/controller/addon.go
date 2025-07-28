@@ -231,7 +231,29 @@ func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, fc *v1al
 	return nil
 }
 
-func handleSpokeAddons(ctx context.Context, spokeName string, addons []v1alpha1.AddOn, enabledAddons []string) ([]string, error) {
+func handleSpokeAddons(ctx context.Context, spoke v1alpha1.Spoke, fc *v1alpha1.FleetConfig) ([]string, error) {
+	var enabledAddons []string
+
+	addons := spoke.AddOns
+	// check if this spoke already has any addons enabled, or if it has been unjoined
+	if len(fc.Status.JoinedSpokes) > 0 {
+		js := v1alpha1.JoinedSpoke{}
+		idx := slices.IndexFunc(fc.Status.JoinedSpokes, func(s v1alpha1.JoinedSpoke) bool {
+			return s.Name == spoke.Name
+		})
+		if idx == -1 {
+			return nil, nil
+		}
+		js = fc.Status.JoinedSpokes[idx]
+
+		// if unjoined, return early since addons are already uninstalled
+		unjoinedCond := fc.GetCondition(js.UnjoinType())
+		if unjoinedCond != nil && unjoinedCond.Status == metav1.ConditionTrue {
+			return nil, nil
+		}
+		enabledAddons = append(enabledAddons, js.EnabledAddons...)
+	}
+
 	if len(addons) == 0 && len(enabledAddons) == 0 {
 		// nothing to do
 		return nil, nil
@@ -260,7 +282,7 @@ func handleSpokeAddons(ctx context.Context, spokeName string, addons []v1alpha1.
 	}
 
 	// do disables first, then enables/updates
-	err := handleAddonDisable(ctx, spokeName, addonsToDisable)
+	err := handleAddonDisable(ctx, spoke.Name, addonsToDisable)
 	if err != nil {
 		return enabledAddons, err
 	}
@@ -273,7 +295,7 @@ func handleSpokeAddons(ctx context.Context, spokeName string, addons []v1alpha1.
 	}
 
 	// Enable new addons and updated addons
-	newEnabledAddons, err := handleAddonEnable(ctx, spokeName, addonsToEnable)
+	newEnabledAddons, err := handleAddonEnable(ctx, spoke.Name, addonsToEnable)
 	// even if an error is returned, any addon which was successfully enabled is tracked, so append before returning
 	enabledAddons = append(enabledAddons, newEnabledAddons...)
 	if err != nil {
