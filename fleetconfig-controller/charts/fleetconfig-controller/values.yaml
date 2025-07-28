@@ -277,7 +277,7 @@ imageRegistry: ""
 ## @param image.pullPolicy Image pull policy
 image:
   repository: quay.io/open-cluster-management/fleetconfig-controller
-  tag: v0.0.7
+  tag: v0.0.8
   pullPolicy: IfNotPresent
 
 ## @param imagePullSecrets Image pull secrets
@@ -321,17 +321,23 @@ healthCheck:
 
 ## @skip readinessProbe
 readinessProbe:
+  httpGet:
+    path: /readyz
+    port: healthz
   failureThreshold: 3
-  initialDelaySeconds: 30
+  initialDelaySeconds: 3
   periodSeconds: 5
   successThreshold: 1
   timeoutSeconds: 1
 
 ## @skip livenessProbe
 livenessProbe:
+  httpGet:
+    path: /healthz
+    port: healthz
   failureThreshold: 3
-  initialDelaySeconds: 90
-  periodSeconds: 5
+  initialDelaySeconds: 15
+  periodSeconds: 20
   successThreshold: 1
   timeoutSeconds: 1
 

@@ -46,10 +46,10 @@ spec:
         imagePullPolicy: {{ quote .Values.image.pullPolicy }}
         name: manager
         resources:
-        {{- toYaml .Values.resources | nindent 12 }}
+        {{- toYaml .Values.resources | nindent 10 }}
         securityContext:
-        {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-      {{ if .Values.admissionWebhooks.enabled }}
+        {{- toYaml .Values.containerSecurityContext | nindent 10 }}
+      {{- if .Values.admissionWebhooks.enabled }}
         ports:
         - containerPort: {{ .Values.webhookService.port }}
           name: webhook-server
@@ -57,24 +57,8 @@ spec:
         - containerPort: {{ .Values.healthCheck.port }}
           name: healthz
           protocol: TCP
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: healthz
-          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
-          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
-          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
-          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
-          successThreshold: {{ .Values.livenessProbe.successThreshold }}
-        readinessProbe:
-          httpGet:
-            path: /readyz
-            port: healthz
-          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
-          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
-          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
-          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
-          successThreshold: {{ .Values.readinessProbe.successThreshold }}
+        livenessProbe: {{- toYaml .Values.livenessProbe | nindent 10 }}
+        readinessProbe: {{- toYaml .Values.readinessProbe | nindent 10 }}
         volumeMounts:
         - mountPath: {{ .Values.admissionWebhooks.certificate.mountPath }}
           name: tls-cert-vol
