@@ -316,14 +316,14 @@ func handleAddonEnable(ctx context.Context, spokeName string, addons []v1alpha1.
 		args = append(baseArgs, args...)
 		logger.V(7).Info("running", "command", clusteradm, "args", args)
 		cmd := exec.Command(clusteradm, args...)
-		out, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm addon enable' to complete...")
+		stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm addon enable' to complete...")
+		out := append(stdout, stderr...)
 		if err != nil {
 			enableErrs = append(enableErrs, fmt.Errorf("failed to enable addon: %v, output: %s", err, string(out)))
 			continue
 		}
-
 		enabledAddons = append(enabledAddons, a.ConfigName)
-		logger.V(3).Info("enabled addon", "managedcluster", spokeName, "addon", a.ConfigName)
+		logger.V(3).Info("enabled addon", "managedcluster", spokeName, "addon", a.ConfigName, "output", string(stdout))
 	}
 
 	if len(enableErrs) > 0 {
@@ -349,10 +349,11 @@ func handleAddonDisable(ctx context.Context, spokeName string, addons []string) 
 
 	logger.V(7).Info("running", "command", clusteradm, "args", args)
 	cmd := exec.Command(clusteradm, args...)
-	out, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm addon disable' to complete...")
+	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm addon disable' to complete...")
 	if err != nil {
+		out := append(stdout, stderr...)
 		return fmt.Errorf("failed to disable addons: %v, output: %s", err, string(out))
 	}
-	logger.V(3).Info("disabled addons", "managedcluster", spokeName, "addons", addons)
+	logger.V(3).Info("disabled addons", "managedcluster", spokeName, "addons", addons, "output", string(stdout))
 	return nil
 }

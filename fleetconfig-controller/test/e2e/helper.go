@@ -19,6 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
@@ -38,6 +39,12 @@ const (
 	kubeconfigSecretKey        = "value"
 	hubAsSpokeName             = v1alpha1.ManagedClusterTypeHubAsSpoke
 	spokeName                  = v1alpha1.ManagedClusterTypeSpoke
+	// addon consts
+	addonName       = "test-addon"
+	addon1Namespace = "test-addon"
+	addon1Version   = "v1.0.0"
+	addon2Namespace = "test-addon-2"
+	addon2Version   = "v2.0.0"
 )
 
 var (
@@ -222,11 +229,12 @@ func teardownTestEnvironment(tc *E2EContext) {
 // ensureFleetConfigProvisioned checks that the FleetConfig is properly provisioned with expected conditions
 func ensureFleetConfigProvisioned(tc *E2EContext, fc *v1alpha1.FleetConfig, extraExpectedConditions map[string]metav1.ConditionStatus) {
 	expectedConditions := map[string]metav1.ConditionStatus{
-		v1alpha1.FleetConfigHubInitialized:                     metav1.ConditionTrue,
-		v1alpha1.FleetConfigCleanupFailed:                      metav1.ConditionFalse,
-		v1alpha1.FleetConfigAddonsConfigured:                   metav1.ConditionTrue,
-		fmt.Sprintf("spoke-cluster-%s-joined", hubAsSpokeName): metav1.ConditionTrue,
-		fmt.Sprintf("spoke-cluster-%s-joined", spokeName):      metav1.ConditionTrue,
+		v1alpha1.FleetConfigHubInitialized:                        metav1.ConditionTrue,
+		v1alpha1.FleetConfigCleanupFailed:                         metav1.ConditionFalse,
+		v1alpha1.FleetConfigAddonsConfigured:                      metav1.ConditionTrue,
+		fmt.Sprintf("spoke-cluster-%s-joined", hubAsSpokeName):    metav1.ConditionTrue,
+		fmt.Sprintf("spoke-cluster-%s-joined", spokeName):         metav1.ConditionTrue,
+		fmt.Sprintf("spoke-cluster-%s-addons-enabled", spokeName): metav1.ConditionTrue,
 	}
 	for k, v := range extraExpectedConditions {
 		expectedConditions[k] = v
@@ -345,4 +353,34 @@ func assertKlusterletAnnotation(klusterlet *operatorv1.Klusterlet, key, expected
 		return fmt.Errorf("expected %s=%s, got %s", expectedKey, expectedValue, v)
 	}
 	return nil
+}
+
+func ensureAddonCreated(tc *E2EContext, addonName, addonVersion string) error {
+	cmao := addonv1alpha1.ClusterManagementAddOn{}
+	if err := tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Name: addonName}, &cmao); err != nil {
+		return err
+	}
+	mcao := addonv1alpha1.ManagedClusterAddOn{}
+	if err := tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Name: addonName, Namespace: spokeName}, &mcao); err != nil {
+		return err
+	}
+	ns := corev1.Namespace{}
+	if err := tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Name: addon1Namespace}, &ns); err != nil {
+		return err
+	}
+	return nil
+}
+
+func updateAddon(tc *E2EContext, fc *v1alpha1.FleetConfig) {
+	By("adding a new version of test-addon")
+
+	if err := tc.kClient.Get(tc.ctx, fleetConfigNN, fc); err != nil {
+		utils.WarnError(err, "failed to get FleetConfig")
+		ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	}
+	fc.Spec.AddOnConfigs = append(fc.Spec.AddOnConfigs, v1alpha1.AddOnConfig{
+		Name:    addonName,
+		Version: addon2Version,
+	})
+
 }

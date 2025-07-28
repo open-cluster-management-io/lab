@@ -392,41 +392,11 @@ func (s *Spoke) GetPurgeKlusterletOperator() bool {
 
 // JoinType returns a status condition type indicating that a particular Spoke cluster has joined the Hub.
 func (s *Spoke) JoinType() string {
-	return fmt.Sprintf("spoke-cluster-%s-joined", s.conditionName())
+	return fmt.Sprintf("spoke-cluster-%s-joined", s.conditionName(42)) // 63-21
 }
 
-func (s *Spoke) conditionName() string {
-	name := s.Name
-	if len(name) > 42 {
-		name = name[:42] // account for extra 21 chars in the condition type (max. total of 63)
-	}
-	return name
-}
-
-// AddOn enables add-on installation on the cluster.
-type AddOn struct {
-	// The name of the add-on being enabled. Must match one of the default or manually configured add-on names.
-	// +required
-	ConfigName string `json:"configName"`
-
-// GetKubeconfig returns the kubeconfig for the spoke cluster.
-func (s *Spoke) GetKubeconfig() Kubeconfig {
-	return s.Kubeconfig
-}
-
-// GetPurgeKlusterletOperator returns the purge klusterlet operator flag.
-func (s *Spoke) GetPurgeKlusterletOperator() bool {
-	return s.Klusterlet.PurgeOperator
-}
-
-// JoinType returns a status condition type indicating that a particular Spoke cluster has joined the Hub.
-func (s *Spoke) JoinType() string {
-	return fmt.Sprintf("spoke-cluster-%s-joined", s.conditionName(42)) // 63 - 21
-}
-
-// AddonEnabledType returns a status condition type indicating that a particular Spoke cluster has joined the Hub.
 func (s *Spoke) AddonEnabledType() string {
-	return fmt.Sprintf("spoke-cluster-%s-addons-enabled", s.conditionName(34)) // 63 - 29
+	return fmt.Sprintf("spoke-cluster-%s-addons-enabled", s.conditionName(34)) // 63-29
 }
 
 func (s *Spoke) conditionName(c int) string {
@@ -470,21 +440,6 @@ type JoinedSpoke struct {
 	// +kubebuilder:default:={}
 	// +optional
 	EnabledAddons []string `json:"enabledAddons,omitempty"`
-}
-
-// GetName returns the name of the joined spoke cluster.
-func (j *JoinedSpoke) GetName() string {
-	return j.Name
-}
-
-// GetKubeconfig returns the kubeconfig for the joined spoke cluster.
-func (j *JoinedSpoke) GetKubeconfig() Kubeconfig {
-	return j.Kubeconfig
-}
-
-// GetPurgeKlusterletOperator returns the purge klusterlet operator flag for the joined spoke cluster.
-func (j *JoinedSpoke) GetPurgeKlusterletOperator() bool {
-	return j.PurgeKlusterletOperator
 }
 
 // GetName returns the name of the joined spoke cluster.
