@@ -321,17 +321,23 @@ healthCheck:
 
 ## @skip readinessProbe
 readinessProbe:
+  httpGet:
+    path: /readyz
+    port: healthz
   failureThreshold: 3
-  initialDelaySeconds: 30
+  initialDelaySeconds: 3
   periodSeconds: 5
   successThreshold: 1
   timeoutSeconds: 1
 
 ## @skip livenessProbe
 livenessProbe:
+  httpGet:
+    path: /healthz
+    port: healthz
   failureThreshold: 3
-  initialDelaySeconds: 90
-  periodSeconds: 5
+  initialDelaySeconds: 15
+  periodSeconds: 20
   successThreshold: 1
   timeoutSeconds: 1
 
