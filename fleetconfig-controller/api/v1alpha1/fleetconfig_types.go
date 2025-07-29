@@ -692,11 +692,13 @@ func (m *FleetConfig) IsUnjoined(spoke Spoke, joinedSpoke JoinedSpoke) bool {
 	if unjoinedC == nil {
 		return false
 	}
-	if unjoinedC.Status == metav1.ConditionFalse {
+	if unjoinedC.Status != metav1.ConditionTrue {
 		return false
 	}
-	if joinedC.Status == metav1.ConditionFalse {
-		return false
+	// at this point, unjoined is known to be true. if joined is not true, cluster has not been successfully rejoined
+	if joinedC.Status != metav1.ConditionTrue {
+		return true
 	}
+	// if both exist and are true, compare timestamps
 	return unjoinedC.LastTransitionTime.After(joinedC.LastTransitionTime.Time)
 }
