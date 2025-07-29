@@ -24,6 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const maxConditionTypeLen = 63
+
 // FleetConfigSpec defines the desired state of FleetConfig.
 type FleetConfigSpec struct {
 	// +required
@@ -392,18 +394,22 @@ func (s *Spoke) GetPurgeKlusterletOperator() bool {
 
 // JoinType returns a status condition type indicating that a particular Spoke cluster has joined the Hub.
 func (s *Spoke) JoinType() string {
-	return fmt.Sprintf("spoke-cluster-%s-joined", s.conditionName(42)) // 63-21
+	baseMsg := "spoke-cluster-%s-joined"
+	c := maxConditionTypeLen - (len(baseMsg) - 2)
+	return fmt.Sprintf(baseMsg, s.conditionName(c))
 }
 
 // AddonEnableType returns a status condition type indicating that a particular Spoke cluster's addons have been disabled.
 func (s *Spoke) AddonEnableType() string {
-	return fmt.Sprintf("spoke-cluster-%s-addons-enabled", s.conditionName(34)) // 63-29
+	baseMsg := "spoke-cluster-%s-addons-enabled"
+	c := maxConditionTypeLen - (len(baseMsg) - 2)
+	return fmt.Sprintf(baseMsg, s.conditionName(c))
 }
 
 func (s *Spoke) conditionName(c int) string {
 	name := s.Name
 	if len(name) > c {
-		name = name[:c] // account for extra c chars in the condition type (max. total of 63)
+		name = name[:c] // account for extra chars in the condition type (max. total of 63)
 	}
 	return name
 }
@@ -460,18 +466,22 @@ func (j *JoinedSpoke) GetPurgeKlusterletOperator() bool {
 
 // UnjoinType returns a status condition type indicating that a particular Spoke cluster has been removed from the Hub.
 func (j *JoinedSpoke) UnjoinType() string {
-	return fmt.Sprintf("spoke-cluster-%s-unjoined", j.conditionName(40)) // 63-23
+	baseMsg := "spoke-cluster-%s-unjoined"
+	c := maxConditionTypeLen - (len(baseMsg) - 2)
+	return fmt.Sprintf(baseMsg, j.conditionName(c))
 }
 
 // AddonDisableType returns a status condition type indicating that a particular Spoke cluster's addons have been disabled.
 func (j *JoinedSpoke) AddonDisableType() string {
-	return fmt.Sprintf("spoke-cluster-%s-addons-disabled", j.conditionName(33)) // 63-30
+	baseMsg := "spoke-cluster-%s-addons-disabled"
+	c := maxConditionTypeLen - (len(baseMsg) - 2)
+	return fmt.Sprintf(baseMsg, j.conditionName(c))
 }
 
 func (j *JoinedSpoke) conditionName(c int) string {
 	name := j.Name
 	if len(name) > c {
-		name = name[:c] // account for extra c chars in the condition type (max. total of 63)
+		name = name[:c] // account for extra chars in the condition type (max. total of 63)
 	}
 	return name
 }
