@@ -677,6 +677,6 @@ func init() {
 }
 
 func maxConditionNameLen(base string) int {
-	maxLen := 63 // a condition type can be most
+	maxLen := 316 // a metav1.Condition.Type type can be at most 316 chars long
 	return maxLen - (len(base) - 2)
 }

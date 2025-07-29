@@ -17,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
+	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -30,7 +31,10 @@ import (
 
 var csrSuffixPattern = regexp.MustCompile(`-[a-zA-Z0-9]{5}$`)
 
-const amwExistsError = "you should manually clean them, uninstall kluster will cause those works out of control."
+const (
+	amwExistsError      = "you should manually clean them, uninstall kluster will cause those works out of control."
+	managedClusterAddOn = "ManagedClusterAddOn"
+)
 
 // handleSpokes manages Spoke cluster join and upgrade operations
 func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetConfig) error {
@@ -548,10 +552,6 @@ func deregisterSpoke(ctx context.Context, kClient client.Client, hubKubeconfig [
 	if err != nil {
 		return err
 	}
-	addonC, err := common.AddOnClient(hubKubeconfig)
-	if err != nil {
-		return err
-	}
 	// skip clean up if the ManagedCluster resource is not found or if any manifestWorks exist
 	managedCluster, err := clusterC.ClusterV1().ManagedClusters().Get(ctx, spoke.Name, metav1.GetOptions{})
 	if kerrs.IsNotFound(err) {
@@ -564,18 +564,13 @@ func deregisterSpoke(ctx context.Context, kClient client.Client, hubKubeconfig [
 	if err != nil {
 		return fmt.Errorf("failed to list manifestWorks for managedCluster %s: %w", managedCluster.Name, err)
 	}
-	mcao, err := addonC.AddonV1alpha1().ManagedClusterAddOns(spoke.Name).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to list managedClusterAddOns for managedCluster %s: %w", managedCluster.Name, err)
-	}
 
-	numMW := len(manifestWorks.Items)
-	numMCAO := len(mcao.Items)
 	// check that the number of manifestWorks is the same as the number of addons enabled for that spoke
-	if numMW > 0 && numMW > numMCAO {
+	if len(manifestWorks.Items) > 0 && !allOwnersAddOns(manifestWorks.Items) {
 		msg := fmt.Sprintf("Found manifestWorks for ManagedCluster %s; cannot unjoin spoke cluster while it has active ManifestWorks", managedCluster.Name)
 		logger.Info(msg)
 		return errors.New(msg)
+
 	}
 
 	// remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
@@ -621,4 +616,15 @@ func deregisterSpoke(ctx context.Context, kClient client.Client, hubKubeconfig [
 	}
 
 	return nil
+}
+
+func allOwnersAddOns(mws []workv1.ManifestWork) bool {
+	for _, m := range mws {
+		if !slices.ContainsFunc(m.OwnerReferences, func(or metav1.OwnerReference) bool {
+			return or.Kind == managedClusterAddOn
+		}) {
+			return false
+		}
+	}
+	return true
 }
