@@ -150,13 +150,13 @@ func validateAddonConfigs(ctx context.Context, client client.Client, oldObject, 
 // validates that any addon which is enabled on a spoke is configured
 func validateAddons(newObject *FleetConfig) field.ErrorList {
 	errs := field.ErrorList{}
-	configuredAddons := make([]string, 0)
+	configuredAddons := make(map[string]bool)
 	for _, ca := range newObject.Spec.AddOnConfigs {
-		configuredAddons = append(configuredAddons, ca.Name)
+		configuredAddons[ca.Name] = true
 	}
 	for i, s := range newObject.Spec.Spokes {
 		for j, a := range s.AddOns {
-			if !slices.Contains(configuredAddons, a.ConfigName) {
+			if !configuredAddons[a.ConfigName] {
 				errs = append(errs, field.Invalid(field.NewPath("Spokes").Index(i).Child("AddOns").Index(j), a.ConfigName, fmt.Sprintf("cannot enable addon %s for spoke %s, no configuration found in spec.AddOnConfigs", a.ConfigName, s.Name)))
 			}
 		}
@@ -183,7 +183,6 @@ func getManagedClusterAddOns(ctx context.Context) ([]addonv1alpha1.ManagedCluste
 }
 
 // isAddonConfigInUse checks if a removed addon config is still referenced by any ManagedClusterAddOn.
-// You will need to adjust this function to match your actual struct fields.
 func isAddonConfigInUse(mcAddOns []addonv1alpha1.ManagedClusterAddOn, removedConfig string) bool {
 	for _, mcao := range mcAddOns {
 		for _, cr := range mcao.Status.ConfigReferences {
