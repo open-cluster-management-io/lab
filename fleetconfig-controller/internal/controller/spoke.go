@@ -622,5 +622,3 @@ func deregisterSpoke(ctx context.Context, kClient client.Client, hubKubeconfig [
 
 	return nil
 }
-
-func canDeregistedSpoke(ctx context.Context, kClient client.Client)
