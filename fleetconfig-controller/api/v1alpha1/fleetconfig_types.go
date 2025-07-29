@@ -688,14 +688,14 @@ func (m *FleetConfig) IsUnjoined(spoke Spoke, joinedSpoke JoinedSpoke) bool {
 	if joinedC == nil {
 		return false
 	}
-	if joinedC.Status == metav1.ConditionFalse {
-		return false
-	}
 	unjoinedC := m.GetCondition(joinedSpoke.UnjoinType())
 	if unjoinedC == nil {
 		return false
 	}
 	if unjoinedC.Status == metav1.ConditionFalse {
+		return false
+	}
+	if joinedC.Status == metav1.ConditionFalse {
 		return false
 	}
 	return unjoinedC.LastTransitionTime.After(joinedC.LastTransitionTime.Time)
