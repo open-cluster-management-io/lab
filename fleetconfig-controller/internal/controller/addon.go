@@ -247,8 +247,7 @@ func handleSpokeAddons(ctx context.Context, spoke v1alpha1.Spoke, fc *v1alpha1.F
 		js = fc.Status.JoinedSpokes[idx]
 
 		// if unjoined, return early since addons are already uninstalled
-		unjoinedCond := fc.GetCondition(js.UnjoinType())
-		if unjoinedCond != nil && unjoinedCond.Status == metav1.ConditionTrue {
+		if fc.IsUnjoined(spoke, js) {
 			return nil, nil
 		}
 		enabledAddons = append(enabledAddons, js.EnabledAddons...)

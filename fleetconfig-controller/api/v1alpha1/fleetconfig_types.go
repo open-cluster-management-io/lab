@@ -680,3 +680,23 @@ func maxConditionNameLen(base string) int {
 	maxLen := 316 // a metav1.Condition.Type type can be at most 316 chars long
 	return maxLen - (len(base) - 2)
 }
+
+// IsUnjoined returns true if a spoke cluster was successfully joined and then successfully unjoined, and the unjoined timestamp is after the joined timestamp.
+// Returns false in all other cases.
+func (m *FleetConfig) IsUnjoined(spoke Spoke, joinedSpoke JoinedSpoke) bool {
+	joinedC := m.GetCondition(spoke.JoinType())
+	if joinedC == nil {
+		return false
+	}
+	if joinedC.Status == metav1.ConditionFalse {
+		return false
+	}
+	unjoinedC := m.GetCondition(joinedSpoke.UnjoinType())
+	if unjoinedC == nil {
+		return false
+	}
+	if unjoinedC.Status == metav1.ConditionFalse {
+		return false
+	}
+	return unjoinedC.LastTransitionTime.After(joinedC.LastTransitionTime.Time)
+}
