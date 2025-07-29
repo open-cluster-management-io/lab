@@ -24,8 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const maxConditionTypeLen = 63
-
 // FleetConfigSpec defines the desired state of FleetConfig.
 type FleetConfigSpec struct {
 	// +required
@@ -395,15 +393,13 @@ func (s *Spoke) GetPurgeKlusterletOperator() bool {
 // JoinType returns a status condition type indicating that a particular Spoke cluster has joined the Hub.
 func (s *Spoke) JoinType() string {
 	baseMsg := "spoke-cluster-%s-joined"
-	c := maxConditionTypeLen - (len(baseMsg) - 2)
-	return fmt.Sprintf(baseMsg, s.conditionName(c))
+	return fmt.Sprintf(baseMsg, s.conditionName(maxConditionNameLen(baseMsg)))
 }
 
 // AddonEnableType returns a status condition type indicating that a particular Spoke cluster's addons have been disabled.
 func (s *Spoke) AddonEnableType() string {
 	baseMsg := "spoke-cluster-%s-addons-enabled"
-	c := maxConditionTypeLen - (len(baseMsg) - 2)
-	return fmt.Sprintf(baseMsg, s.conditionName(c))
+	return fmt.Sprintf(baseMsg, s.conditionName(maxConditionNameLen(baseMsg)))
 }
 
 func (s *Spoke) conditionName(c int) string {
@@ -467,15 +463,13 @@ func (j *JoinedSpoke) GetPurgeKlusterletOperator() bool {
 // UnjoinType returns a status condition type indicating that a particular Spoke cluster has been removed from the Hub.
 func (j *JoinedSpoke) UnjoinType() string {
 	baseMsg := "spoke-cluster-%s-unjoined"
-	c := maxConditionTypeLen - (len(baseMsg) - 2)
-	return fmt.Sprintf(baseMsg, j.conditionName(c))
+	return fmt.Sprintf(baseMsg, j.conditionName(maxConditionNameLen(baseMsg)))
 }
 
 // AddonDisableType returns a status condition type indicating that a particular Spoke cluster's addons have been disabled.
 func (j *JoinedSpoke) AddonDisableType() string {
 	baseMsg := "spoke-cluster-%s-addons-disabled"
-	c := maxConditionTypeLen - (len(baseMsg) - 2)
-	return fmt.Sprintf(baseMsg, j.conditionName(c))
+	return fmt.Sprintf(baseMsg, j.conditionName(maxConditionNameLen(baseMsg)))
 }
 
 func (j *JoinedSpoke) conditionName(c int) string {
@@ -680,4 +674,9 @@ type FleetConfigList struct {
 
 func init() {
 	SchemeBuilder.Register(&FleetConfig{}, &FleetConfigList{})
+}
+
+func maxConditionNameLen(base string) int {
+	maxLen := 63 // a condition type can be most
+	return maxLen - (len(base) - 2)
 }
