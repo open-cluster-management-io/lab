@@ -94,9 +94,11 @@ func handleHub(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetCon
 		return err
 	}
 
-	fc.SetConditions(true, v1alpha1.NewCondition(
-		v1alpha1.FleetConfigAddonsConfigured, v1alpha1.FleetConfigAddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
-	))
+	if len(fc.Spec.AddOnConfigs) > 0 {
+		fc.SetConditions(true, v1alpha1.NewCondition(
+			v1alpha1.FleetConfigAddonsConfigured, v1alpha1.FleetConfigAddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
+		))
+	}
 	// attempt an upgrade whenever the clustermanager's bundleVersion changes
 	upgrade, err := hubNeedsUpgrade(ctx, fc, operatorC)
 	if err != nil {
