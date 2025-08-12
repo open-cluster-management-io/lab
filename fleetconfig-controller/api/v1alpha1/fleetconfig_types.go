@@ -23,6 +23,7 @@ import (
 
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -545,7 +546,60 @@ type Klusterlet struct {
 
 	// Values for the klusterlet Helm chart.
 	// +optional
-	Values chart.KlusterletChartConfig `json:"values,omitempty"`
+	Values KlusterletChartConfig `json:"values,omitempty"`
+}
+
+// KlusterletChartConfig is a wrapper around the external chart.KlusterletChartConfig
+// to provide the required DeepCopy methods for code generation.
+type KlusterletChartConfig struct {
+	chart.KlusterletChartConfig `json:",inline"`
+}
+
+// DeepCopy returns a deep copy of the KlusterletChartConfig.
+func (in *KlusterletChartConfig) DeepCopy() *KlusterletChartConfig {
+	if in == nil {
+		return nil
+	}
+	out := new(KlusterletChartConfig)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto copies all properties of this object into another object of the
+// same type that is provided as a pointer.
+func (in *KlusterletChartConfig) DeepCopyInto(out *KlusterletChartConfig) {
+	*out = *in
+
+	out.KlusterletChartConfig = in.KlusterletChartConfig
+
+	if in.NodeSelector != nil {
+		in, out := &in.NodeSelector, &out.NodeSelector
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
+		*out = make([]corev1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+
+	in.Affinity.DeepCopyInto(&out.Affinity)
+	in.Resources.DeepCopyInto(&out.Resources)
+	in.PodSecurityContext.DeepCopyInto(&out.PodSecurityContext)
+	in.SecurityContext.DeepCopyInto(&out.SecurityContext)
+
+	out.Images = in.Images
+	out.Klusterlet = in.Klusterlet
+
+	if in.MultiHubBootstrapHubKubeConfigs != nil {
+		in, out := &in.MultiHubBootstrapHubKubeConfigs, &out.MultiHubBootstrapHubKubeConfigs
+		*out = make([]chart.BootStrapKubeConfig, len(*in))
+		copy(*out, *in)
+	}
 }
 
 // ResourceSpec defines resource limits and requests for all managed clusters.
