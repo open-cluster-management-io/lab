@@ -160,3 +160,5 @@ replace (
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.33.1
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.33.1
 )
+
+replace helm.sh/helm/v3 => helm.sh/helm/v3 v3.17.4

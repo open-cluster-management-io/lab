@@ -513,7 +513,7 @@ gopkg.in/inf.v0
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# helm.sh/helm/v3 v3.17.3
+# helm.sh/helm/v3 v3.17.3 => helm.sh/helm/v3 v3.17.4
 ## explicit; go 1.23.0
 helm.sh/helm/v3/internal/sympath
 helm.sh/helm/v3/internal/version
@@ -1110,3 +1110,4 @@ sigs.k8s.io/yaml/goyaml.v3
 # k8s.io/mount-utils => k8s.io/mount-utils v0.33.1
 # k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.33.1
 # k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.33.1
+# helm.sh/helm/v3 => helm.sh/helm/v3 v3.17.4
