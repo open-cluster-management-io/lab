@@ -20,6 +20,7 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/yaml"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
@@ -378,6 +379,21 @@ func joinSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetCon
 	}
 	if spoke.ProxyURL != "" {
 		joinArgs = append(joinArgs, fmt.Sprintf("--proxy-url=%s", spoke.ProxyURL))
+	}
+
+	if !spoke.Klusterlet.Values.IsEmpty() {
+		valuesYAML, err := yaml.Marshal(spoke.Klusterlet.Values)
+		if err != nil {
+			return fmt.Errorf("failed to marshal klusterlet values to YAML: %w", err)
+		}
+		valuesFile, valuesCleanup, err := file.TmpFile(valuesYAML, "klusterlet-values")
+		if valuesCleanup != nil {
+			defer valuesCleanup()
+		}
+		if err != nil {
+			return fmt.Errorf("failed to write klusterlet values to disk: %w", err)
+		}
+		joinArgs = append(joinArgs, "--klusterlet-values-file", valuesFile)
 	}
 
 	joinArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, spoke.Kubeconfig, joinArgs)

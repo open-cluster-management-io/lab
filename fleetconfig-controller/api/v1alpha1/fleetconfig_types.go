@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"time"
 
@@ -600,6 +601,11 @@ func (in *KlusterletChartConfig) DeepCopyInto(out *KlusterletChartConfig) {
 		*out = make([]chart.BootStrapKubeConfig, len(*in))
 		copy(*out, *in)
 	}
+}
+
+// IsEmpty checks if the KlusterletChartConfig is empty/default/zero-valued
+func (k *KlusterletChartConfig) IsEmpty() bool {
+	return reflect.DeepEqual(*k, KlusterletChartConfig{})
 }
 
 // ResourceSpec defines resource limits and requests for all managed clusters.
