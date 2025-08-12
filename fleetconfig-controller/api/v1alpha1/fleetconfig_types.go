@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 	"sort"
 	"time"
@@ -557,49 +558,47 @@ type KlusterletChartConfig struct {
 }
 
 // DeepCopy returns a deep copy of the KlusterletChartConfig.
-func (in *KlusterletChartConfig) DeepCopy() *KlusterletChartConfig {
-	if in == nil {
+func (k *KlusterletChartConfig) DeepCopy() *KlusterletChartConfig {
+	if k == nil {
 		return nil
 	}
 	out := new(KlusterletChartConfig)
-	in.DeepCopyInto(out)
+	k.DeepCopyInto(out)
 	return out
 }
 
 // DeepCopyInto copies all properties of this object into another object of the
 // same type that is provided as a pointer.
-func (in *KlusterletChartConfig) DeepCopyInto(out *KlusterletChartConfig) {
-	*out = *in
+func (k *KlusterletChartConfig) DeepCopyInto(out *KlusterletChartConfig) {
+	*out = *k
 
-	out.KlusterletChartConfig = in.KlusterletChartConfig
+	out.KlusterletChartConfig = k.KlusterletChartConfig
 
-	if in.NodeSelector != nil {
-		in, out := &in.NodeSelector, &out.NodeSelector
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
+	if k.NodeSelector != nil {
+		k, out := &k.NodeSelector, &out.NodeSelector
+		*out = make(map[string]string, len(*k))
+		maps.Copy(*out, *k)
+	}
+	if k.Tolerations != nil {
+		k, out := &k.Tolerations, &out.Tolerations
+		*out = make([]corev1.Toleration, len(*k))
+		for i := range *k {
+			(*k)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.Tolerations != nil {
-		in, out := &in.Tolerations, &out.Tolerations
-		*out = make([]corev1.Toleration, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
 
-	in.Affinity.DeepCopyInto(&out.Affinity)
-	in.Resources.DeepCopyInto(&out.Resources)
-	in.PodSecurityContext.DeepCopyInto(&out.PodSecurityContext)
-	in.SecurityContext.DeepCopyInto(&out.SecurityContext)
+	k.Affinity.DeepCopyInto(&out.Affinity)
+	k.Resources.DeepCopyInto(&out.Resources)
+	k.PodSecurityContext.DeepCopyInto(&out.PodSecurityContext)
+	k.SecurityContext.DeepCopyInto(&out.SecurityContext)
 
-	out.Images = in.Images
-	out.Klusterlet = in.Klusterlet
+	out.Images = k.Images
+	out.Klusterlet = k.Klusterlet
 
-	if in.MultiHubBootstrapHubKubeConfigs != nil {
-		in, out := &in.MultiHubBootstrapHubKubeConfigs, &out.MultiHubBootstrapHubKubeConfigs
-		*out = make([]chart.BootStrapKubeConfig, len(*in))
-		copy(*out, *in)
+	if k.MultiHubBootstrapHubKubeConfigs != nil {
+		k, out := &k.MultiHubBootstrapHubKubeConfigs, &out.MultiHubBootstrapHubKubeConfigs
+		*out = make([]chart.BootStrapKubeConfig, len(*k))
+		copy(*out, *k)
 	}
 }
 
