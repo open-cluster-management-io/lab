@@ -21,6 +21,8 @@ import (
 	"sort"
 	"time"
 
+	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -540,6 +542,10 @@ type Klusterlet struct {
 	// +kubebuilder:default:={}
 	// +optional
 	Source OCMSource `json:"source,omitzero"`
+
+	// Values for the klusterlet Helm chart.
+	// +optional
+	Values chart.KlusterletChartConfig `json:"values,omitempty"`
 }
 
 // ResourceSpec defines resource limits and requests for all managed clusters.
