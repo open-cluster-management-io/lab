@@ -18,9 +18,14 @@ package v1alpha1
 
 import (
 	"fmt"
+	"maps"
+	"reflect"
 	"sort"
 	"time"
 
+	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
+
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -540,6 +545,66 @@ type Klusterlet struct {
 	// +kubebuilder:default:={}
 	// +optional
 	Source OCMSource `json:"source,omitzero"`
+
+	// Values for the klusterlet Helm chart.
+	// +optional
+	Values *KlusterletChartConfig `json:"values,omitempty"`
+}
+
+// KlusterletChartConfig is a wrapper around the external chart.KlusterletChartConfig
+// to provide the required DeepCopy methods for code generation.
+type KlusterletChartConfig struct {
+	chart.KlusterletChartConfig `json:",inline"`
+}
+
+// DeepCopy returns a deep copy of the KlusterletChartConfig.
+func (k *KlusterletChartConfig) DeepCopy() *KlusterletChartConfig {
+	if k == nil {
+		return nil
+	}
+	out := new(KlusterletChartConfig)
+	k.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto copies all properties of this object into another object of the
+// same type that is provided as a pointer.
+func (k *KlusterletChartConfig) DeepCopyInto(out *KlusterletChartConfig) {
+	*out = *k
+
+	out.KlusterletChartConfig = k.KlusterletChartConfig
+
+	if k.NodeSelector != nil {
+		k, out := &k.NodeSelector, &out.NodeSelector
+		*out = make(map[string]string, len(*k))
+		maps.Copy(*out, *k)
+	}
+	if k.Tolerations != nil {
+		k, out := &k.Tolerations, &out.Tolerations
+		*out = make([]corev1.Toleration, len(*k))
+		for i := range *k {
+			(*k)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+
+	k.Affinity.DeepCopyInto(&out.Affinity)
+	k.Resources.DeepCopyInto(&out.Resources)
+	k.PodSecurityContext.DeepCopyInto(&out.PodSecurityContext)
+	k.SecurityContext.DeepCopyInto(&out.SecurityContext)
+
+	out.Images = k.Images
+	out.Klusterlet = k.Klusterlet
+
+	if k.MultiHubBootstrapHubKubeConfigs != nil {
+		k, out := &k.MultiHubBootstrapHubKubeConfigs, &out.MultiHubBootstrapHubKubeConfigs
+		*out = make([]chart.BootStrapKubeConfig, len(*k))
+		copy(*out, *k)
+	}
+}
+
+// IsEmpty checks if the KlusterletChartConfig is empty/default/zero-valued
+func (k *KlusterletChartConfig) IsEmpty() bool {
+	return reflect.DeepEqual(*k, KlusterletChartConfig{})
 }
 
 // ResourceSpec defines resource limits and requests for all managed clusters.

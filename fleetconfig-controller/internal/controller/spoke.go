@@ -19,6 +19,7 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/yaml"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
@@ -380,6 +381,15 @@ func joinSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetCon
 		joinArgs = append(joinArgs, fmt.Sprintf("--proxy-url=%s", spoke.ProxyURL))
 	}
 
+	valuesArgs, valuesCleanup, err := prepareKlusterletValuesFile(spoke.Klusterlet.Values)
+	if valuesCleanup != nil {
+		defer valuesCleanup()
+	}
+	if err != nil {
+		return err
+	}
+	joinArgs = append(joinArgs, valuesArgs...)
+
 	joinArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, spoke.Kubeconfig, joinArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
@@ -463,6 +473,15 @@ func upgradeSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 		"--image-registry", spoke.Klusterlet.Source.Registry,
 		"--wait=true",
 	}, fc.BaseArgs()...)
+
+	valuesArgs, valuesCleanup, err := prepareKlusterletValuesFile(spoke.Klusterlet.Values)
+	if valuesCleanup != nil {
+		defer valuesCleanup()
+	}
+	if err != nil {
+		return err
+	}
+	upgradeArgs = append(upgradeArgs, valuesArgs...)
 
 	upgradeArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, spoke.Kubeconfig, upgradeArgs)
 	if cleanupKcfg != nil {
@@ -627,4 +646,24 @@ func allOwnersAddOns(mws []workv1.ManifestWork) bool {
 		}
 	}
 	return true
+}
+
+// prepareKlusterletValuesFile creates a temporary file with klusterlet values and returns
+// args to append and a cleanup function. Returns empty slice if values are empty.
+func prepareKlusterletValuesFile(values *v1alpha1.KlusterletChartConfig) ([]string, func(), error) {
+	if values == nil {
+		return nil, nil, nil
+	}
+	if values.IsEmpty() {
+		return nil, nil, nil
+	}
+	valuesYAML, err := yaml.Marshal(values)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal klusterlet values to YAML: %w", err)
+	}
+	valuesFile, valuesCleanup, err := file.TmpFile(valuesYAML, "klusterlet-values")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to write klusterlet values to disk: %w", err)
+	}
+	return []string{"--klusterlet-values-file", valuesFile}, valuesCleanup, nil
 }

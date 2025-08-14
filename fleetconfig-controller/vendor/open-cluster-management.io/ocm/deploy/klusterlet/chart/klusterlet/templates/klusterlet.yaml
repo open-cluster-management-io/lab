@@ -1,0 +1,37 @@
+{{- if .Values.klusterlet.create }}
+apiVersion: operator.open-cluster-management.io/v1
+kind: Klusterlet
+metadata:
+  name: "{{ template "klusterletName" . }}"
+spec:
+  deployOption:
+    mode: {{ .Values.klusterlet.mode | default "Singleton" }}
+  registrationImagePullSpec: "{{ template "registrationImage" . }}"
+  workImagePullSpec: "{{ template "workImage" . }}"
+  imagePullSpec: "{{ template "operatorImage" . }}"
+  clusterName: "{{ .Values.klusterlet.clusterName }}"
+  namespace: "{{ template "klusterletNamespace" . }}"
+  {{- with .Values.klusterlet.externalServerURLs }}
+  externalServerURLs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.klusterlet.resourceRequirement }}
+  resourceRequirement:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.klusterlet.nodePlacement }}
+  nodePlacement:
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.klusterlet.registrationConfiguration }}
+  registrationConfiguration:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.klusterlet.workConfiguration }}
+  workConfiguration:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if .Values.priorityClassName }}
+  priorityClassName: "{{ .Values.priorityClassName }}"
+  {{- end }}
+{{- end }}

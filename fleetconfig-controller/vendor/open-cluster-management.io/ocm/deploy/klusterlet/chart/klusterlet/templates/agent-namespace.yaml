@@ -1,0 +1,11 @@
+{{- $generatedNamespace := include "agentNamespace" . }}
+{{- if ne $generatedNamespace .Release.Namespace }}
+{{- if or .Values.bootstrapHubKubeConfig .Values.externalManagedKubeConfig .Values.multiHubBootstrapHubKubeConfigs }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    workload.openshift.io/allowed: "management"
+  name: "{{ template "agentNamespace" . }}"
+{{- end }}
+{{- end }}

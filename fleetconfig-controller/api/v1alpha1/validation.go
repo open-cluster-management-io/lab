@@ -24,7 +24,9 @@ import (
 //   - spec.registrationAuth.*
 //   - spec.hub.clusterManager.source.*
 //   - spec.spokes[*].addOns
+//   - spec.spokes[*].klusterlet.annotations
 //   - spec.spokes[*].klusterlet.source.*
+//   - spec.spokes[*].klusterlet.values
 //   - spec.spokes[*].kubeconfig
 func allowFleetConfigUpdate(newObject *FleetConfig, oldObject *FleetConfig) error {
 
@@ -58,9 +60,13 @@ func allowFleetConfigUpdate(newObject *FleetConfig, oldObject *FleetConfig) erro
 			if oldSpoke, exists := oldSpokes[newSpoke.Name]; exists {
 				oldSpokeCopy := oldSpoke
 				newSpokeCopy := newSpoke
+				newSpokeCopy.Klusterlet.Annotations = nil
+				oldSpokeCopy.Klusterlet.Annotations = nil
 				oldSpokeCopy.Klusterlet.Source = (OCMSource{})
 				newSpokeCopy.Klusterlet.Source = (OCMSource{})
-				oldSpokeCopy.Kubeconfig = Kubeconfig{}
+				oldSpokeCopy.Klusterlet.Values = nil
+				newSpokeCopy.Klusterlet.Values = nil
+        oldSpokeCopy.Kubeconfig = Kubeconfig{}
 				newSpokeCopy.Kubeconfig = Kubeconfig{}
 				newSpokeCopy.AddOns = []AddOn{}
 				oldSpokeCopy.AddOns = []AddOn{}
