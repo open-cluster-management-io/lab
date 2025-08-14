@@ -6,12 +6,12 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/instance: fleetconfig-controller-local
+      app.kubernetes.io/instance: fleetconfig-controller
       app.kubernetes.io/name: fleetconfig-controller
   template:
     metadata:
       labels:
-        app.kubernetes.io/instance: fleetconfig-controller-local
+        app.kubernetes.io/instance: fleetconfig-controller
         app.kubernetes.io/name: fleetconfig-controller
     spec:
       serviceAccountName: fleetconfig-controller-manager
