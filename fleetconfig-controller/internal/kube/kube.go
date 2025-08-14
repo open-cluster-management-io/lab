@@ -110,7 +110,7 @@ func KubeconfigFromSecret(ctx context.Context, kClient client.Client, kubeconfig
 	}
 	raw, ok := secret.Data[kubeconfigKey]
 	if !ok {
-		return nil, fmt.Errorf("failed to get kubeconfig for ref %s/%s using key %s", secretRef.Namespace, secretRef.Name, kubeconfigKey)
+		return nil, fmt.Errorf("kubeconfig key '%s' not found in %s/%s secret", kubeconfigKey, secretRef.Namespace, secretRef.Name)
 	}
 
 	return raw, nil
