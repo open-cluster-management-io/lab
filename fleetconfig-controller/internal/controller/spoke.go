@@ -650,7 +650,10 @@ func allOwnersAddOns(mws []workv1.ManifestWork) bool {
 
 // prepareKlusterletValuesFile creates a temporary file with klusterlet values and returns
 // args to append and a cleanup function. Returns empty slice if values are empty.
-func prepareKlusterletValuesFile(values v1alpha1.KlusterletChartConfig) ([]string, func(), error) {
+func prepareKlusterletValuesFile(values *v1alpha1.KlusterletChartConfig) ([]string, func(), error) {
+	if values == nil {
+		return nil, nil, nil
+	}
 	if values.IsEmpty() {
 		return nil, nil, nil
 	}

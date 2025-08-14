@@ -548,7 +548,7 @@ type Klusterlet struct {
 
 	// Values for the klusterlet Helm chart.
 	// +optional
-	Values KlusterletChartConfig `json:"values,omitempty"`
+	Values *KlusterletChartConfig `json:"values,omitempty"`
 }
 
 // KlusterletChartConfig is a wrapper around the external chart.KlusterletChartConfig
