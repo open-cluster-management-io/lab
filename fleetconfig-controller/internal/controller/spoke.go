@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -54,13 +53,14 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 	joinedSpokes := make([]v1alpha1.JoinedSpoke, 0)
 	for _, js := range fc.Status.JoinedSpokes {
 		if !slices.ContainsFunc(fc.Spec.Spokes, func(spoke v1alpha1.Spoke) bool {
-			return spoke.Name == js.Name && reflect.DeepEqual(spoke.Kubeconfig, js.Kubeconfig)
+			return spoke.Name == js.Name
 		}) {
 			err = deregisterSpoke(ctx, kClient, hubKubeconfig, fc, &js)
 			if err != nil {
 				fc.SetConditions(true, v1alpha1.NewCondition(
 					err.Error(), js.UnjoinType(), metav1.ConditionFalse, metav1.ConditionTrue,
 				))
+				// if deregistration fails, retain the joined spoke in the status
 				joinedSpokes = append(joinedSpokes, js)
 				continue
 			}
