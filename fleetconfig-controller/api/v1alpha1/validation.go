@@ -66,7 +66,7 @@ func allowFleetConfigUpdate(newObject *FleetConfig, oldObject *FleetConfig) erro
 				newSpokeCopy.Klusterlet.Source = (OCMSource{})
 				oldSpokeCopy.Klusterlet.Values = nil
 				newSpokeCopy.Klusterlet.Values = nil
-        oldSpokeCopy.Kubeconfig = Kubeconfig{}
+				oldSpokeCopy.Kubeconfig = Kubeconfig{}
 				newSpokeCopy.Kubeconfig = Kubeconfig{}
 				newSpokeCopy.AddOns = []AddOn{}
 				oldSpokeCopy.AddOns = []AddOn{}
