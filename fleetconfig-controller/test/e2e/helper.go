@@ -387,6 +387,12 @@ func ensureAddonCreated(tc *E2EContext, addonIdx int) {
 			utils.WarnError(err, "failed to get ManagedClusterAddOn %s in namespace %s", addon.name, spokeName)
 			return err
 		}
+		managedBy, ok := mcao.Labels[v1alpha1.LabelAddOnManagedBy]
+		if !ok || managedBy != "fleetconfig-controller" {
+			err := fmt.Errorf("did not find expected label %s on ManagedClusterAddOn", v1alpha1.LabelAddOnManagedBy)
+			utils.WarnError(err, "ManagedClusterAddOn not managed by fleetconfig-controller")
+			return err
+		}
 		ns := corev1.Namespace{}
 		if err := tc.kClientSpoke.Get(tc.ctx, ktypes.NamespacedName{Name: addon.namespace}, &ns); err != nil {
 			utils.WarnError(err, "failed to get namespace %s in spoke cluster", addon.namespace)

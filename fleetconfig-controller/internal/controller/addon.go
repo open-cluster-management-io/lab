@@ -2,7 +2,9 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"maps"
 	"net/url"
 	"os/exec"
 	"slices"
@@ -185,11 +187,14 @@ func labelConfigurationResources(ctx context.Context, addonC *addonapi.Clientset
 	if addonTemplate.Labels == nil {
 		addonTemplate.Labels = make(map[string]string)
 	}
-	for k, v := range v1alpha1.ManagedByLabels {
-		addonTemplate.Labels[k] = v
+	maps.Copy(addonTemplate.Labels, v1alpha1.ManagedByLabels)
+
+	patchBytes, err := json.Marshal(labelPatchData(addonTemplate.Labels))
+	if err != nil {
+		return fmt.Errorf("failed to marshal patch data for AddOnTemplate %s: %v", addonTemplateName, err)
 	}
 
-	_, err = addonC.AddonV1alpha1().AddOnTemplates().Update(ctx, addonTemplate, metav1.UpdateOptions{})
+	_, err = addonC.AddonV1alpha1().AddOnTemplates().Patch(ctx, addonTemplate.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update AddOnTemplate %s with labels: %v", addonTemplateName, err)
 	}
@@ -205,11 +210,14 @@ func labelConfigurationResources(ctx context.Context, addonC *addonapi.Clientset
 	if clusterMgmtAddOn.Labels == nil {
 		clusterMgmtAddOn.Labels = make(map[string]string)
 	}
-	for k, v := range v1alpha1.ManagedByLabels {
-		clusterMgmtAddOn.Labels[k] = v
+	maps.Copy(clusterMgmtAddOn.Labels, v1alpha1.ManagedByLabels)
+
+	patchBytes, err = json.Marshal(labelPatchData(clusterMgmtAddOn.Labels))
+	if err != nil {
+		return fmt.Errorf("failed to marshal patch data for ClusterManagementAddOn %s: %v", addon.Name, err)
 	}
 
-	_, err = addonC.AddonV1alpha1().ClusterManagementAddOns().Update(ctx, clusterMgmtAddOn, metav1.UpdateOptions{})
+	_, err = addonC.AddonV1alpha1().ClusterManagementAddOns().Patch(ctx, clusterMgmtAddOn.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update ClusterManagementAddOn %s with labels: %v", addon.Name, err)
 	}
@@ -426,11 +434,15 @@ func labelManagedClusterAddOn(ctx context.Context, addonC *addonapi.Clientset, s
 	if mcao.Labels == nil {
 		mcao.Labels = make(map[string]string)
 	}
-	for k, v := range v1alpha1.ManagedByLabels {
-		mcao.Labels[k] = v
+	maps.Copy(mcao.Labels, v1alpha1.ManagedByLabels)
+
+	// Marshal the patch data to JSON
+	patchBytes, err := json.Marshal(labelPatchData(mcao.Labels))
+	if err != nil {
+		return fmt.Errorf("failed to marshal patch data for ManagedClusterAddOn %s: %v", addonName, err)
 	}
 
-	_, err = addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).Update(ctx, mcao, metav1.UpdateOptions{})
+	_, err = addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).Patch(ctx, mcao.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update ManagedClusterAddOn %s for spoke %s with labels: %v", addonName, spokeName, err)
 	}
@@ -463,4 +475,12 @@ func handleAddonDisable(ctx context.Context, spokeName string, addons []string) 
 	}
 	logger.V(1).Info("disabled addons", "managedcluster", spokeName, "addons", addons, "output", string(stdout))
 	return nil
+}
+
+func labelPatchData(labels map[string]string) map[string]any {
+	return map[string]any{
+		"metadata": map[string]any{
+			"labels": labels,
+		},
+	}
 }
