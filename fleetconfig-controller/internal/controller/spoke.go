@@ -49,6 +49,10 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 	if err != nil {
 		return err
 	}
+	addonClient, err := common.AddOnClient(hubKubeconfig)
+	if err != nil {
+		return err
+	}
 
 	// clean up deregistered spokes
 	joinedSpokes := make([]v1alpha1.JoinedSpoke, 0)
@@ -165,7 +169,7 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 			}
 		}
 
-		enabledAddons, err := handleSpokeAddons(ctx, spoke, fc)
+		enabledAddons, err := handleSpokeAddons(ctx, addonClient, spoke, fc)
 		allEnabledAddons[i] = enabledAddons
 		if err != nil {
 			msg := fmt.Sprintf("failed to enable addons for spoke cluster %s: %s", spoke.Name, err.Error())

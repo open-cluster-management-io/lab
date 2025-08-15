@@ -184,7 +184,7 @@ func getManagedClusterAddOns(ctx context.Context) ([]addonv1alpha1.ManagedCluste
 	if err != nil {
 		return nil, fmt.Errorf("failed to create addon clientset: %w", err)
 	}
-	addonList, err := addonClientset.AddonV1alpha1().ManagedClusterAddOns(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+	addonList, err := addonClientset.AddonV1alpha1().ManagedClusterAddOns(metav1.NamespaceAll).List(ctx, metav1.ListOptions{LabelSelector: ManagedBySelector.String()})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list ManagedClusterAddOns: %w", err)
 	}

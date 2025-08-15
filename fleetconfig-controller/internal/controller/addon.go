@@ -8,9 +8,11 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/types"
 	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,7 +21,6 @@ import (
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -34,7 +35,7 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 	logger.V(0).Info("handleAddOnConfig", "fleetconfig", fc.Name)
 
 	// get existing addons
-	createdAddOns, err := addonC.AddonV1alpha1().AddOnTemplates().List(ctx, metav1.ListOptions{})
+	createdAddOns, err := addonC.AddonV1alpha1().AddOnTemplates().List(ctx, metav1.ListOptions{LabelSelector: v1alpha1.ManagedBySelector.String()})
 	if err != nil {
 		return err
 	}
@@ -80,7 +81,7 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 		return err
 	}
 
-	err = handleAddonCreate(ctx, kClient, fc, addonsToCreate)
+	err = handleAddonCreate(ctx, kClient, addonC, fc, addonsToCreate)
 	if err != nil {
 		return err
 	}
@@ -88,7 +89,7 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 	return nil
 }
 
-func handleAddonCreate(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetConfig, addons []v1alpha1.AddOnConfig) error {
+func handleAddonCreate(ctx context.Context, kClient client.Client, addonC *addonapi.Clientset, fc *v1alpha1.FleetConfig, addons []v1alpha1.AddOnConfig) error {
 	if len(addons) == 0 {
 		return nil
 	}
@@ -159,7 +160,61 @@ func handleAddonCreate(ctx context.Context, kClient client.Client, fc *v1alpha1.
 			return fmt.Errorf("failed to create addon: %v, output: %s", err, string(out))
 		}
 		logger.V(0).Info("created addon", "AddOnTemplate", a.Name, "output", string(stdout))
+
+		// label created resources
+		err = labelConfigurationResources(ctx, addonC, a)
+		if err != nil {
+			logger.V(0).Error(err, "failed to label addon resources", "addon", a.Name, "version", a.Version)
+		}
 	}
+	return nil
+}
+
+// labelConfigurationResources labels the AddOnTemplate and ClusterManagementAddOn resources created for an addon
+func labelConfigurationResources(ctx context.Context, addonC *addonapi.Clientset, addon v1alpha1.AddOnConfig) error {
+	logger := log.FromContext(ctx)
+
+	// Label AddOnTemplate with a.Name-a.Version
+	addonTemplateName := fmt.Sprintf("%s-%s", addon.Name, addon.Version)
+	addonTemplate, err := addonC.AddonV1alpha1().AddOnTemplates().Get(ctx, addonTemplateName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get AddOnTemplate %s: %v", addonTemplateName, err)
+	}
+
+	// Add managedBy label to AddOnTemplate
+	if addonTemplate.Labels == nil {
+		addonTemplate.Labels = make(map[string]string)
+	}
+	for k, v := range v1alpha1.ManagedByLabels {
+		addonTemplate.Labels[k] = v
+	}
+
+	_, err = addonC.AddonV1alpha1().AddOnTemplates().Update(ctx, addonTemplate, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update AddOnTemplate %s with labels: %v", addonTemplateName, err)
+	}
+	logger.V(2).Info("labeled AddOnTemplate", "name", addonTemplateName, "label", v1alpha1.LabelAddOnManagedBy)
+
+	// Label ClusterManagementAddOn with a.Name
+	clusterMgmtAddOn, err := addonC.AddonV1alpha1().ClusterManagementAddOns().Get(ctx, addon.Name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get ClusterManagementAddOn %s: %v", addon.Name, err)
+	}
+
+	// Add managedBy label to ClusterManagementAddOn
+	if clusterMgmtAddOn.Labels == nil {
+		clusterMgmtAddOn.Labels = make(map[string]string)
+	}
+	for k, v := range v1alpha1.ManagedByLabels {
+		clusterMgmtAddOn.Labels[k] = v
+	}
+
+	_, err = addonC.AddonV1alpha1().ClusterManagementAddOns().Update(ctx, clusterMgmtAddOn, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update ClusterManagementAddOn %s with labels: %v", addon.Name, err)
+	}
+	logger.V(2).Info("labeled ClusterManagementAddOn", "name", addon.Name, "label", v1alpha1.LabelAddOnManagedBy)
+
 	return nil
 }
 
@@ -198,6 +253,8 @@ func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, fc *v1al
 	}
 
 	// check if there are any remaining addon templates for the same addon names as what was just deleted (different versions of the same addon)
+	// dont use a label selector here - in case an addon with the same name was created out of band, and it is the last remaining version, we dont want
+	// to delete its ClusterManagementAddOn
 	allAddons, err := addonC.AddonV1alpha1().AddOnTemplates().List(ctx, metav1.ListOptions{})
 	if err != nil && !kerrs.IsNotFound(err) {
 		return fmt.Errorf("failed to clean up addons %v: %v", purgeList, err)
@@ -231,7 +288,7 @@ func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, fc *v1al
 	return nil
 }
 
-func handleSpokeAddons(ctx context.Context, spoke v1alpha1.Spoke, fc *v1alpha1.FleetConfig) ([]string, error) {
+func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke v1alpha1.Spoke, fc *v1alpha1.FleetConfig) ([]string, error) {
 	var enabledAddons []string
 
 	addons := spoke.AddOns
@@ -294,7 +351,7 @@ func handleSpokeAddons(ctx context.Context, spoke v1alpha1.Spoke, fc *v1alpha1.F
 	}
 
 	// Enable new addons and updated addons
-	newEnabledAddons, err := handleAddonEnable(ctx, spoke.Name, addonsToEnable)
+	newEnabledAddons, err := handleAddonEnable(ctx, addonC, spoke.Name, addonsToEnable)
 	// even if an error is returned, any addon which was successfully enabled is tracked, so append before returning
 	enabledAddons = append(enabledAddons, newEnabledAddons...)
 	if err != nil {
@@ -304,7 +361,7 @@ func handleSpokeAddons(ctx context.Context, spoke v1alpha1.Spoke, fc *v1alpha1.F
 	return enabledAddons, nil
 }
 
-func handleAddonEnable(ctx context.Context, spokeName string, addons []v1alpha1.AddOn) ([]string, error) {
+func handleAddonEnable(ctx context.Context, addonC *addonapi.Clientset, spokeName string, addons []v1alpha1.AddOn) ([]string, error) {
 	if len(addons) == 0 {
 		return nil, nil
 	}
@@ -343,6 +400,11 @@ func handleAddonEnable(ctx context.Context, spokeName string, addons []v1alpha1.
 			enableErrs = append(enableErrs, fmt.Errorf("failed to enable addon: %v, output: %s", err, string(out)))
 			continue
 		}
+		err = labelManagedClusterAddOn(ctx, addonC, spokeName, a.ConfigName)
+		if err != nil {
+			enableErrs = append(enableErrs, err)
+			continue
+		}
 		enabledAddons = append(enabledAddons, a.ConfigName)
 		logger.V(1).Info("enabled addon", "managedcluster", spokeName, "addon", a.ConfigName, "output", string(stdout))
 	}
@@ -351,6 +413,30 @@ func handleAddonEnable(ctx context.Context, spokeName string, addons []v1alpha1.
 		return enabledAddons, fmt.Errorf("one or more addons were not enabled: %v", enableErrs)
 	}
 	return enabledAddons, nil
+}
+
+func labelManagedClusterAddOn(ctx context.Context, addonC *addonapi.Clientset, spokeName, addonName string) error {
+	logger := log.FromContext(ctx)
+
+	mcao, err := addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).Get(ctx, addonName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get ManagedClusterAddOn %s for spoke %s: %v", addonName, spokeName, err)
+	}
+
+	if mcao.Labels == nil {
+		mcao.Labels = make(map[string]string)
+	}
+	for k, v := range v1alpha1.ManagedByLabels {
+		mcao.Labels[k] = v
+	}
+
+	_, err = addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).Update(ctx, mcao, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update ManagedClusterAddOn %s for spoke %s with labels: %v", addonName, spokeName, err)
+	}
+	logger.V(2).Info("labeled ManagedClusterAddOn", "name", addonName, "spoke", spokeName, "label", v1alpha1.LabelAddOnManagedBy)
+
+	return nil
 }
 
 func handleAddonDisable(ctx context.Context, spokeName string, addons []string) error {

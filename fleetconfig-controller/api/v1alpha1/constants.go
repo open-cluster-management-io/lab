@@ -1,5 +1,7 @@
 package v1alpha1
 
+import "k8s.io/apimachinery/pkg/labels"
+
 const (
 	// FleetConfigFinalizer is the finalizer for FleetConfig cleanup.
 	FleetConfigFinalizer = "fleetconfig.open-cluster-management.io/cleanup"
@@ -58,6 +60,9 @@ const (
 const (
 	// LabelManagedClusterType is the label key for the managed cluster type.
 	LabelManagedClusterType = "fleetconfig.open-cluster-management.io/managedClusterType"
+
+	// LabelAddOnManagedBy is the label key for the lifecycle manager of an add-on resource.
+	LabelAddOnManagedBy = "addon.open-cluster-management.io/managedBy"
 )
 
 // Registration driver types
@@ -83,3 +88,12 @@ const (
 
 // AllowedAddonURLSchemes are the URL schemes which can be used to provide manifests for configuring addons.
 var AllowedAddonURLSchemes = []string{"http", "https"}
+
+var (
+	// ManagedByLabels are labeles applies to resources to denote that fleetconfig-controller is managing the lifecycle.
+	ManagedByLabels = map[string]string{
+		LabelAddOnManagedBy: "fleetconfig-controller",
+	}
+	// ManagedBySelector is a label selector for filtering add-on resources managed fleetconfig-controller.
+	ManagedBySelector = labels.SelectorFromSet(labels.Set(ManagedByLabels))
+)
