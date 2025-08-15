@@ -231,6 +231,8 @@ fleetConfig:
         # # Options: [ Default | BestEffort | ResourceRequirement ].
         # qosClass: "Default"
       singleton: false
+      ## @param fleetConfig.spokes[0].klusterlet.values Values to pass to the klusterlet Helm chart.
+      values: {}
     # Add-on configuration for the spoke cluster.
     # ## @param fleetConfig.spokes[0].addOns[0].configName Name of the add-on to enable. Must match one of the configured add-on names in fleetConfig.addOnConfigs.
     # ## @param fleetConfig.spokes[0].addOns[0].installNamespace Namespace to install the add-on.
@@ -277,7 +279,7 @@ imageRegistry: ""
 ## @param image.pullPolicy Image pull policy
 image:
   repository: quay.io/open-cluster-management/fleetconfig-controller
-  tag: v0.0.9
+  tag: v0.0.10
   pullPolicy: IfNotPresent
 
 ## @param imagePullSecrets Image pull secrets
