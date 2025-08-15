@@ -71,7 +71,9 @@ spec:
         source:
           bundleVersion: {{ $.Values.fleetConfig.source.bundleVersion }}
           registry: {{ $.Values.fleetConfig.source.registry }}
+        {{- if .klusterlet.values }}
         values: {{- toYaml .klusterlet.values | nindent 10 }}
+        {{- end }}
       addOns: {{- toYaml .addOns | nindent 8 }}
     {{- end }}
   addOnConfigs: {{- toYaml .Values.fleetConfig.addOnConfigs | nindent 4 }}
