@@ -436,7 +436,6 @@ func labelManagedClusterAddOn(ctx context.Context, addonC *addonapi.Clientset, s
 	}
 	maps.Copy(mcao.Labels, v1alpha1.ManagedByLabels)
 
-	// Marshal the patch data to JSON
 	patchBytes, err := json.Marshal(labelPatchData(mcao.Labels))
 	if err != nil {
 		return fmt.Errorf("failed to marshal patch data for ManagedClusterAddOn %s: %v", addonName, err)
