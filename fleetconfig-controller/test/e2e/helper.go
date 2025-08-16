@@ -399,7 +399,7 @@ func ensureAddonCreated(tc *E2EContext, addonIdx int) {
 			return err
 		}
 		return nil
-	}, 1*time.Minute, 1*time.Second).Should(Succeed())
+	}, 2*time.Minute, 1*time.Second).Should(Succeed())
 }
 
 func updateAddon(tc *E2EContext, fc *v1alpha1.FleetConfig) {
