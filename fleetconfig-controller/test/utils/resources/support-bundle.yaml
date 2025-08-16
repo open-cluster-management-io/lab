@@ -39,7 +39,7 @@ spec:
       name: hub-kubeconfig-secret
   - logs:
       selector:
-      - app.kubernetes.io/name=fleetconfig
+      - app.kubernetes.io/name=fleetconfig-controller
       namespace: fleetconfig-system
       name: fleetconfig/fleetconfig
   - logs:
