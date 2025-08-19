@@ -58,7 +58,7 @@ spec:
         context: {{ .context | quote }}
         inCluster: {{ .inCluster }}
         {{- if .secretReference }}
-        secretReference: {{ toYaml .secretReference | nindent 8 }}
+        secretReference: {{ toYaml .secretReference | nindent 10 }}
         {{- end }}
       {{- end }}
       proxyCa: {{ .proxyCa | quote }}
