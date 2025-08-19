@@ -44,6 +44,9 @@ type FleetConfigSpec struct {
 	// +optional
 	AddOnConfigs []AddOnConfig `json:"addOnConfigs,omitempty"`
 
+	// +optional
+	HubAddOns []HubAddOn `json:"hubAddOn,omitempty"`
+
 	// Timeout is the timeout in seconds for all clusteradm operations, including init, accept, join, upgrade, etc.
 	// +kubebuilder:default:=300
 	// +optional
@@ -417,7 +420,7 @@ func (s *Spoke) conditionName(c int) string {
 
 // AddOn enables add-on installation on the cluster.
 type AddOn struct {
-	// The name of the add-on being enabled. Must match one of the default or manually configured add-on names.
+	// The name of the add-on being enabled. Must match one of the AddOnConfigs or HubAddOns names.
 	// +required
 	ConfigName string `json:"configName"`
 
@@ -766,4 +769,21 @@ func (m *FleetConfig) IsUnjoined(spoke Spoke, joinedSpoke JoinedSpoke) bool {
 	}
 	// if both exist and are true, compare timestamps
 	return unjoinedC.LastTransitionTime.After(joinedC.LastTransitionTime.Time)
+}
+
+// HubAddOn is the configuration for enabling a built-in AddOn.
+type HubAddOn struct {
+	// Name is the name of the HubAddOn.
+	// +kubebuilder:validation:Enum=argocd;governance-policy-framework
+	// +required
+	Name string `json:"name"`
+
+	// The namespace to install the add-on in. If left empty, installs into the "open-cluster-management-addon" namespace.
+	// +optional
+	InstallNamespace string `json:"installNamespace,omitempty"`
+
+	// Whether or not the selected namespace should be created. If left empty, defaults to false.'
+	// +kubebuilder:default:=false
+	// +optional
+	CreateNamespace bool `json:"createNamespace,omitempty"`
 }

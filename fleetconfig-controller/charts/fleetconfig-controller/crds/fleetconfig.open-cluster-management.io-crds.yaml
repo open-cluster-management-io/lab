@@ -273,6 +273,36 @@ spec:
                 required:
                 - kubeconfig
                 type: object
+              hubAddOn:
+                items:
+                  description: HubAddOn is the configuration for enabling a built-in
+                    AddOn.
+                  properties:
+                    bundleVersion:
+                      default: default
+                      description: |-
+                        The image version tag to use when deploying the hub add-on(s) (e.g. v0.6.0). Defaults to the latest released
+                        version. You can also set "latest" to install the latest development version.
+                      type: string
+                    createNamespace:
+                      default: false
+                      description: Whether or not the selected namespace should be
+                        created. If left empty, defaults to false.'
+                      type: boolean
+                    installNamespace:
+                      description: The namespace to install the add-on in. If left
+                        empty, installs into the "open-cluster-management-addon" namespace.
+                      type: string
+                    name:
+                      description: Name is the name of the HubAddOn.
+                      enum:
+                      - argocd
+                      - governance-policy-framework
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
               logVerbosity:
                 default: 0
                 description: LogVerbosity is the verbosity of the logs.
@@ -336,8 +366,7 @@ spec:
                             type: object
                           configName:
                             description: The name of the add-on being enabled. Must
-                              match one of the default or manually configured add-on
-                              names.
+                              match one of the AddOnConfigs or HubAddOns names.
                             type: string
                           installNamespace:
                             description: The namespace to install the add-on in. If
