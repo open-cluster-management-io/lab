@@ -105,3 +105,38 @@ This image has no additional binaries bundled, other than clusteradm.
 {{- $baseImage -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Recursively clean any dict/map by removing empty values, empty strings, and empty nested objects.
+Works with arbitrary depth and handles maps, slices, and scalar values.
+*/}}
+{{- define "deepClean" -}}
+{{- if and . (kindIs "map" .) -}}
+{{- $clean := dict -}}
+{{- range $key, $value := . -}}
+  {{- if $value -}}
+    {{- if kindIs "map" $value -}}
+      {{- $cleanedValue := include "deepClean" $value | fromYaml -}}
+      {{- if $cleanedValue -}}
+        {{- $clean = set $clean $key $cleanedValue -}}
+      {{- end -}}
+    {{- else if kindIs "slice" $value -}}
+      {{- $cleanArray := list -}}
+      {{- range $value -}}
+        {{- if and . (ne . "") -}}
+          {{- $cleanArray = append $cleanArray . -}}
+        {{- end -}}
+      {{- end -}}
+      {{- if $cleanArray -}}
+        {{- $clean = set $clean $key $cleanArray -}}
+      {{- end -}}
+    {{- else if ne $value "" -}}
+      {{- $clean = set $clean $key $value -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if $clean }}{{- $clean | toYaml }}{{- else }}{}{{- end -}}
+{{- else -}}
+{}
+{{- end -}}
+{{- end -}}

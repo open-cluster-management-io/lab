@@ -47,20 +47,20 @@ fleetConfig:
   ## Available fields:
   ## - **driver**: The authentication driver to use (default: "csr"). Set to "awsirsa" to use AWS IAM Roles for Service Accounts (IRSA) for EKS FleetConfigs.
   ## - **hubClusterARN**: The ARN of the hub cluster (required for EKS FleetConfigs).
-  ## - **autoApprovedARNPatterns**: Optional list of spoke cluster ARN patterns that the hub will auto approve.
+  ## - **autoApprovedARNPatterns**: Optional list of spoke cluster ARN patterns that the hub will auto-approve.
   ## @descriptionEnd
   ## @param fleetConfig.registrationAuth.driver The authentication driver to use (default: "csr"). Set to "awsirsa" to use AWS IAM Roles for Service Accounts (IRSA) for EKS FleetConfigs.
   registrationAuth:
     # The driver used for authentication. Default is "csr".
     # If configuring an EKS FleetConfig, ensure this is set to "awsirsa".
     driver: "csr"
-  #   # The ARN of the hub cluster. This is only required if configuring an EKS FleetConfig.
-  #   hubClusterARN: "arn:aws:eks:us-west-2:<HUB_AWS_ACCOUNT_ID>:cluster/<HUB_CLUSTER_NAME>"
-  #   # Optional list of spoke cluster name ARN patterns that the hub will auto approve
-  #   autoApprovedARNPatterns: []
+    ## @param fleetConfig.registrationAuth.hubClusterARN The ARN of the hub cluster. This is only required if configuring an EKS FleetConfig. Example: "arn:aws:eks:us-west-2:<HUB_AWS_ACCOUNT_ID>:cluster/<HUB_CLUSTER_NAME>".
+    hubClusterARN: ""
+    ## @param fleetConfig.registrationAuth.autoApprovedARNPatterns Optional list of spoke cluster name ARN patterns that the hub will auto-approve.
+    autoApprovedARNPatterns: []
   ## Configuration for the Hub cluster.
   hub:
-    ## Configuration for the Cluster Manager on the Hub cluster. Set to {} if using Singleton Control Plane.
+    ## Configuration for the Cluster Manager on the Hub cluster.
     clusterManager:
       ## @descriptionStart
       ## ### Hub Cluster Manager Feature Gates
@@ -78,6 +78,8 @@ fleetConfig:
       ## - **ResourceCleanup** (BETA - default=true) - Enables automatic resource cleanup
       ## - **V1beta1CSRAPICompatibility** (ALPHA - default=false) - Enables v1beta1 CSR API compatibility
       ## @descriptionEnd
+      ## @param fleetConfig.hub.clusterManager.enabled Whether to enable the cluster manager. Set to false if using Singleton Control Plane.
+      enabled: true
       featureGates:
         ## @param fleetConfig.hub.clusterManager.featureGates.DefaultClusterSet DefaultClusterSet feature gate.
         DefaultClusterSet: true
@@ -87,23 +89,22 @@ fleetConfig:
         ResourceCleanup: true
       ## @param fleetConfig.hub.clusterManager.purgeOperator If set, the cluster manager operator will be purged and the open-cluster-management namespace deleted when the FleetConfig CR is deleted.
       purgeOperator: true
-      ## @param fleetConfig.hub.clusterManager.resources Resource specifications for all clustermanager-managed containers.
-      resources: {}
-        # # The resource limits of all the containers managed by the Cluster Manager or Klusterlet operators.
-        # limits:
-        #   # The number of CPU units to request, e.g., '800m'.
-        #   cpu: ""
-        #   # The amount of memory to request, e.g., '8Gi'.
-        #   memory: ""
-        # # The resource requests of all the containers managed by the Cluster Manager or Klusterlet operators.
-        # requests:
-        #   # The number of CPU units to request, e.g., '800m'.
-        #   cpu: ""
-        #   # The amount of memory to request, e.g., '8Gi'.
-        #   memory: ""
-        # # The resource QoS class of all the containers managed by the Cluster Manager or Klusterlet operators.
-        # # Options: [ Default | BestEffort | ResourceRequirement ].
-        # qosClass: "Default"
+      ## @descriptionStart
+      ## Resource specifications for all clustermanager-managed containers.
+      ## @descriptionEnd
+      resources:
+        limits:
+          ## @param fleetConfig.hub.clusterManager.resources.limits.cpu The number of CPU units to request, e.g., '800m'.
+          cpu: ""
+          ## @param fleetConfig.hub.clusterManager.resources.limits.memory The amount of memory to request, e.g., '8Gi'.
+          memory: ""
+        requests:
+          ## @param fleetConfig.hub.clusterManager.resources.requests.cpu The number of CPU units to request, e.g., '800m'.
+          cpu: ""
+          ## @param fleetConfig.hub.clusterManager.resources.requests.memory The amount of memory to request, e.g., '8Gi'.
+          memory: ""
+        ## @param fleetConfig.hub.clusterManager.resources.qosClass The resource QoS class of all the containers managed by the Cluster Manager operator. Options: [ Default | BestEffort | ResourceRequirement ].
+        qosClass: "Default"
     ## @param fleetConfig.hub.createNamespace If true, create open-cluster-management namespace, otherwise use existing one.
     createNamespace: true
     ## @param fleetConfig.hub.force If set, the hub will be reinitialized.
@@ -118,14 +119,14 @@ fleetConfig:
       context: ""
       ## @param fleetConfig.hub.kubeconfig.inCluster If set, the kubeconfig will be read from the cluster. Only applicable for same-cluster operations.
       inCluster: true
-      # ## @param fleetConfig.hub.kubeconfig.secretReference A reference to an existing secret containing a kubeconfig. Must be provided for remote clusters. For same-cluster, must be provided unless InCluster is set to true.
-      # secretReference:
-      #   ## @param fleetConfig.hub.kubeconfig.secretReference.name The name of the secret.
-      #   name: ""
-      #   ## @param fleetConfig.hub.kubeconfig.secretReference.namespace The namespace the secret is in.
-      #   namespace: ""
-      #   ## @param fleetConfig.hub.kubeconfig.secretReference.kubeconfigKey The map key to access the kubeconfig.
-      #   kubeconfigKey: "kubeconfig"
+      # A reference to an existing secret containing a kubeconfig. Must be provided for remote clusters. For same-cluster, must be provided unless InCluster is set to true.
+      secretReference:
+        ## @param fleetConfig.hub.kubeconfig.secretReference.name The name of the secret.
+        name: ""
+        ## @param fleetConfig.hub.kubeconfig.secretReference.namespace The namespace the secret is in.
+        namespace: ""
+        ## @param fleetConfig.hub.kubeconfig.secretReference.kubeconfigKey The map key to access the kubeconfig.
+        kubeconfigKey: "kubeconfig"
     ## @descriptionStart
     ##
     ## ### Singleton Control Plane Configuration
@@ -141,55 +142,67 @@ fleetConfig:
     ##
     ## Refer to the [Multicluster Controlplane configuration](https://github.com/open-cluster-management-io/multicluster-controlplane/blob/main/charts/multicluster-controlplane/values.yaml) for more details.
     ## @descriptionEnd
-    # singletonControlPlane:
-      ## The name of the singleton control plane.
-      # name: "singleton-controlplane"
+    singletonControlPlane:
+      ## @param fleetConfig.hub.singletonControlPlane.enabled Whether to enable the singleton control plane. Set to false if using Cluster Manager.
+      enabled: false
+      ## @param fleetConfig.hub.singletonControlPlane.name The name of the singleton control plane.
+      name: "singleton-controlplane"
+      ## @descriptionStart
       ## Helm configuration for the multicluster-controlplane Helm chart.
-      # helm:
-        ## Raw, YAML-formatted Helm values.
-        # values: ""
-        ## List of comma-separated Helm values, e.g., key1=val1,key2=val2.
-        # set: []
-        ## List of comma-separated Helm JSON values, e.g., key1=jsonval1,key2=jsonval2.
-        # setJson: []
-        ## List of comma-separated Helm literal STRING values.
-        # setLiteral: []
-        ## List of comma-separated Helm STRING values, e.g., key1=val1,key2=val2.
-        # setString: []
+      ## @descriptionEnd
+      helm:
+        ## @param fleetConfig.hub.singletonControlPlane.helm.values Raw, YAML-formatted Helm values.
+        values: ""
+        ## @param fleetConfig.hub.singletonControlPlane.helm.set List of comma-separated Helm values, e.g., key1=val1,key2=val2.
+        set: []
+        ## @param fleetConfig.hub.singletonControlPlane.helm.setJson List of comma-separated Helm JSON values, e.g., key1=jsonval1,key2=jsonval2.
+        setJson: []
+        ## @param fleetConfig.hub.singletonControlPlane.helm.setLiteral List of comma-separated Helm literal STRING values.
+        setLiteral: []
+        ## @param fleetConfig.hub.singletonControlPlane.helm.setString List of comma-separated Helm STRING values, e.g., key1=val1,key2=val2.
+        setString: []
   ## Configuration for Spoke clusters.
   ## @param fleetConfig.spokes[0].name Name of the spoke cluster.
   ## @param fleetConfig.spokes[0].createNamespace If true, create open-cluster-management namespace and agent namespace (open-cluster-management-agent for Default mode, <klusterlet-name> for Hosted mode), otherwise use existing one. Do not edit this name if you are using the default hub-as-spoke mode.
   ## @param fleetConfig.spokes[0].syncLabels If true, sync the labels from klusterlet to all agent resources.
+  ## @param fleetConfig.spokes[0].clusterARN The ARN of the spoke cluster. This is only required if configuring an EKS FleetConfig. Example: "arn:aws:eks:us-west-2:<SPOKE_AWS_ACCOUNT_ID>:cluster/<SPOKE_CLUSTER_NAME>".
   ## @param fleetConfig.spokes[0].kubeconfig.context The context to use in the kubeconfig file. Leave empty to use the current context.
   ## @param fleetConfig.spokes[0].kubeconfig.inCluster If set, the kubeconfig will be read from the cluster. Only applicable for same-cluster operations.
+  ## @param fleetConfig.spokes[0].kubeconfig.secretReference.name The name of the secret.
+  ## @param fleetConfig.spokes[0].kubeconfig.secretReference.namespace The namespace the secret is in.
+  ## @param fleetConfig.spokes[0].kubeconfig.secretReference.kubeconfigKey The map key to access the kubeconfig.
   ## @param fleetConfig.spokes[0].proxyCa Proxy CA certificate, optional.
   ## @param fleetConfig.spokes[0].proxyUrl URL of a forward proxy server used by agents to connect to the Hub cluster, optional.
   ## @param fleetConfig.spokes[0].klusterlet.annotations Annotations to apply to the spoke cluster. If not present, the 'agent.open-cluster-management.io/' prefix is added to each key. Each annotation is added to klusterlet.spec.registrationConfiguration.clusterAnnotations on the spoke and subsequently to the ManagedCluster on the hub. These annotations take precedence over the global spoke annotations.
   ## @param fleetConfig.spokes[0].klusterlet.mode Deployment mode for klusterlet. Options: Default (agents run on spoke cluster) | Hosted (agents run on hub cluster).
   ## @param fleetConfig.spokes[0].klusterlet.purgeOperator If set, the klusterlet operator will be purged and all open-cluster-management namespaces deleted when the klusterlet is unjoined from its Hub cluster.
-  ## @param fleetConfig.spokes[0].klusterlet.forceInternalEndpointLookup If true, the klusterlet agent will start the cluster registration process by looking for the
-  ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig External managed cluster kubeconfig, required if using hosted mode.
+  ## @param fleetConfig.spokes[0].klusterlet.forceInternalEndpointLookup If true, the klusterlet agent will start the cluster registration process by looking for the internal endpoint from the cluster-info ConfigMap in the Hub cluster instead of using the Hub's public API server endpoint. Set to true when registering the hub cluster as a spoke.
+  ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig.context The context to use in the kubeconfig file.
+  ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig.inCluster If set, the kubeconfig will be read from the cluster. Only applicable for same-cluster operations.
+  ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig.secretReference.name The name of the secret.
+  ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig.secretReference.namespace The namespace the secret is in.
+  ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig.secretReference.kubeconfigKey The map key to access the kubeconfig.
   ## @param fleetConfig.spokes[0].klusterlet.forceInternalEndpointLookupManaged If true, the klusterlet accesses the managed cluster using the internal endpoint from the public cluster-info in the managed cluster instead of using managedClusterKubeconfig.
-  ## @param fleetConfig.spokes[0].klusterlet.resources Resource specifications for all klusterlet-managed containers.
+  ## @param fleetConfig.spokes[0].klusterlet.resources.limits.cpu The number of CPU units to request, e.g., '800m'.
+  ## @param fleetConfig.spokes[0].klusterlet.resources.limits.memory The amount of memory to request, e.g., '8Gi'.
+  ## @param fleetConfig.spokes[0].klusterlet.resources.requests.cpu The number of CPU units to request, e.g., '800m'.
+  ## @param fleetConfig.spokes[0].klusterlet.resources.requests.memory The amount of memory to request, e.g., '8Gi'.
+  ## @param fleetConfig.spokes[0].klusterlet.resources.qosClass The resource QoS class of all the containers managed by the Klusterlet operator. Options: [ Default | BestEffort | ResourceRequirement ].
   ## @param fleetConfig.spokes[0].klusterlet.singleton If true, deploy klusterlet in singleton mode, with registration and work agents running in a single pod. This is an alpha stage flag.
   spokes:
   - name: hub-as-spoke
     createNamespace: true
     syncLabels: false
-    ## The ARN of the spoke cluster. This is only required if configuring an EKS FleetConfig.
-    # clusterARN: "arn:aws:eks:us-west-2:<SPOKE_AWS_ACCOUNT_ID>:cluster/<SPOKE_CLUSTER_NAME>"
+    clusterARN: ""
     ## Kubeconfig details for the Spoke cluster.
     kubeconfig:
       context: ""
       inCluster: true
       ## A reference to an existing secret containing a kubeconfig. Must be provided for remote clusters. For same-cluster, must be provided unless InCluster is set to true.
-      # secretReference:
-      #   ## @param fleetConfig.spokes[0].kubeconfig.secretReference.name The name of the secret.
-      #   name: ""
-      #   ## @param fleetConfig.spokes[0].kubeconfig.secretReference.namespace The namespace the secret is in.
-      #   namespace: ""
-      #   ## @param fleetConfig.spokes[0].kubeconfig.secretReference.kubeconfigKey The map key to access the kubeconfig.
-      #   kubeconfigKey: "kubeconfig"
+      secretReference:
+        name: ""
+        namespace: ""
+        kubeconfigKey: "kubeconfig"
     proxyCa: ""
     proxyUrl: ""
     ## Configuration for the Klusterlet on the Spoke cluster.
@@ -197,65 +210,46 @@ fleetConfig:
       annotations: {}
       mode: "Default"
       purgeOperator: true
-      # Reference the internal endpoint from the cluster-info ConfigMap in the Hub cluster instead of using the Hub's
-      # public API server endpoint. Set to true when registering the hub cluster as a spoke.
       forceInternalEndpointLookup: true
-      managedClusterKubeconfig: {}
-        ## The context to use in the kubeconfig file.
-        # context: ""
-        ## If set, the kubeconfig will be read from the cluster. Only applicable for same-cluster operations.
-        # inCluster: false
-        ## A reference to an existing secret containing a kubeconfig. Must be provided for remote clusters. For same-cluster, must be provided unless InCluster is set to true.
-        # secretReference:
-        #   ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig.secretReference.name The name of the secret.
-        #   name: ""
-        #   ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig.secretReference.namespace The namespace the secret is in.
-        #   namespace: ""
-        #   ## @param fleetConfig.spokes[0].klusterlet.managedClusterKubeconfig.secretReference.kubeconfigKey The map key to access the kubeconfig.
-        #   kubeconfigKey: "kubeconfig"
+      ## @descriptionStart
+      ## External managed cluster kubeconfig, required if using hosted mode.
+      ## @descriptionEnd
+      managedClusterKubeconfig:
+        context: ""
+        inCluster: false
+        secretReference:
+          name: ""
+          namespace: ""
+          kubeconfigKey: "kubeconfig"
       forceInternalEndpointLookupManaged: false
-      resources: {}
-        # # The resource limits of all the containers managed by the Cluster Manager or Klusterlet operators.
-        # limits:
-        #   # The number of CPU units to request, e.g., '800m'.
-        #   cpu: ""
-        #   # The amount of memory to request, e.g., '8Gi'.
-        #   memory: ""
-        # # The resource requests of all the containers managed by the Cluster Manager or Klusterlet operators.
-        # requests:
-        #   # The number of CPU units to request, e.g., '800m'.
-        #   cpu: ""
-        #   # The amount of memory to request, e.g., '8Gi'.
-        #   memory: ""
-        # # The resource QoS class of all the containers managed by the Cluster Manager or Klusterlet operators.
-        # # Options: [ Default | BestEffort | ResourceRequirement ].
-        # qosClass: "Default"
+      ## @descriptionStart
+      ## Resource specifications for all klusterlet-managed containers.
+      ## @descriptionEnd
+      resources:
+        limits:
+          cpu: ""
+          memory: ""
+        requests:
+          cpu: ""
+          memory: ""
+        qosClass: "Default"
       singleton: false
       ## @param fleetConfig.spokes[0].klusterlet.values Values to pass to the klusterlet Helm chart.
       values: {}
-    # Add-on configuration for the spoke cluster.
-    # ## @param fleetConfig.spokes[0].addOns[0].configName Name of the add-on to enable. Must match one of the configured add-on names in fleetConfig.addOnConfigs.
-    # ## @param fleetConfig.spokes[0].addOns[0].installNamespace Namespace to install the add-on.
-    # ## @param fleetConfig.spokes[0].addOns[0].annotations Annotations to apply to the add-on.
-    # addOns:
-    # - configName: ""
-    #   installNamespace: ""
-    #   annotations: {}
+    ## @param fleetConfig.spokes[0].addOns Add-on configuration for the spoke clusters.
+    addOns: []
+    # - configName: ""       # Name of the add-on to enable. Must match one of the configured add-on names in fleetConfig.addOnConfigs.
+    #   installNamespace: "" # Namespace to install the add-on.
+    #   annotations: {}      # Annotations to apply to the add-on.
 
-  # Global add-on configuration for the hub cluster.
-  # ## @param fleetConfig.addOnConfigs[0].name Name of the add-on.
-  # ## @param fleetConfig.addOnConfigs[0].manifests Manifests to install. Can either be inline or a URL.
-  # ## @param fleetConfig.addOnConfigs[0].version Version of the add-on.
-  # ## @param fleetConfig.addOnConfigs[0].clusterRoleBinding Cluster role binding to apply to the add-on.
-  # ## @param fleetConfig.addOnConfigs[0].hubRegistration Enable the agent to register to the hub cluster.
-  # ## @param fleetConfig.addOnConfigs[0].overwrite Whether to overwrite the add-on if it already exists.
-  # addOnConfigs:
-  # - name: ""
-  #   manifests: ""
-  #   version: "v0.0.1"
-  #   clusterRoleBinding: ""
-  #   hubRegistration: false
-  #   overwrite: false
+  ## @param fleetConfig.addOnConfigs Global add-on configuration for the hub cluster.
+  addOnConfigs: []
+  # - name: ""                # Name of the add-on.
+  #   manifests: ""           # Manifests to install. Can either be inline or a URL.
+  #   version: "v0.0.1"       # Version of the add-on.
+  #   clusterRoleBinding: ""  # ClusterRoleBinding to apply to the add-on.
+  #   hubRegistration: false  # Enable the agent to register to the hub cluster.
+  #   overwrite: false        # Whether to overwrite the add-on if it already exists.
 
 ## @section Topology Resources
 

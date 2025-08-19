@@ -23,21 +23,28 @@ spec:
     {{- end }}
   {{- end }}
   hub:
-    {{- if .Values.fleetConfig.hub.clusterManager }}
+    {{- if (.Values.fleetConfig.hub.clusterManager | default dict).enabled }}
     clusterManager:
       featureGates: {{ include "featureGates" (dict "dict" .Values.fleetConfig.hub.clusterManager.featureGates) | quote }}
       purgeOperator: {{ .Values.fleetConfig.hub.clusterManager.purgeOperator }}
-      resources: {{- toYaml .Values.fleetConfig.hub.clusterManager.resources | nindent 8 }}
+      resources: {{- include "deepClean" .Values.fleetConfig.hub.clusterManager.resources | nindent 8 }}
       source:
         bundleVersion: {{ .Values.fleetConfig.source.bundleVersion }}
         registry: {{ .Values.fleetConfig.source.registry }}
     {{- end }}
-    {{- if .Values.fleetConfig.hub.singletonControlPlane }}
+    {{- if (.Values.fleetConfig.hub.singletonControlPlane | default dict).enabled }}
     singleton: {{- toYaml .Values.fleetConfig.hub.singletonControlPlane | nindent 6 }}
     {{- end }}
     createNamespace: {{ .Values.fleetConfig.hub.createNamespace }}
     force: {{ .Values.fleetConfig.hub.force }}
-    kubeconfig: {{- toYaml .Values.fleetConfig.hub.kubeconfig | nindent 6 }}
+    {{- with .Values.fleetConfig.hub.kubeconfig }}
+    kubeconfig:
+      context: {{ .context | quote }}
+      inCluster: {{ .inCluster }}
+      {{- if .secretReference }}
+      secretReference: {{ toYaml .secretReference | nindent 8 }}
+      {{- end }}
+    {{- end }}
     apiServer: {{ .Values.fleetConfig.hub.apiServer | quote }}
     ca: {{ .Values.fleetConfig.hub.ca | quote }}
   spokes:
@@ -46,7 +53,14 @@ spec:
     - name: {{ .name }}
       createNamespace: {{ .createNamespace }}
       syncLabels: {{ .syncLabels }}
-      kubeconfig: {{- toYaml .kubeconfig | nindent 8 }}
+      {{- with .kubeconfig }}
+      kubeconfig:
+        context: {{ .context | quote }}
+        inCluster: {{ .inCluster }}
+        {{- if .secretReference }}
+        secretReference: {{ toYaml .secretReference | nindent 8 }}
+        {{- end }}
+      {{- end }}
       proxyCa: {{ .proxyCa | quote }}
       proxyUrl: {{ .proxyUrl | quote }}
       {{- if .clusterARN }}
@@ -66,15 +80,26 @@ spec:
         forceInternalEndpointLookup: {{ .klusterlet.forceInternalEndpointLookup }}
         forceInternalEndpointLookupManaged: {{ .klusterlet.forceInternalEndpointLookupManaged }}
         singleton: {{ .klusterlet.singleton }}
-        managedClusterKubeconfig: {{- toYaml .klusterlet.managedClusterKubeconfig | nindent 10 }}
-        resources: {{- toYaml .klusterlet.resources | nindent 10 }}
+        {{- with .klusterlet.managedClusterKubeconfig }}
+        managedClusterKubeconfig:
+          context: {{ .context | quote }}
+          inCluster: {{ .inCluster }}
+          {{- if .secretReference }}
+          secretReference: {{ toYaml .secretReference | nindent 12 }}
+          {{- end }}
+        {{- end }}
+        resources: {{- include "deepClean" .klusterlet.resources | nindent 10 }}
         source:
           bundleVersion: {{ $.Values.fleetConfig.source.bundleVersion }}
           registry: {{ $.Values.fleetConfig.source.registry }}
         {{- if .klusterlet.values }}
         values: {{- toYaml .klusterlet.values | nindent 10 }}
         {{- end }}
-      addOns: {{- toYaml .addOns | nindent 8 }}
+      {{- if .addOns }}
+      addOns: {{- toYaml .addOns | nindent 10 }}
+      {{- end }}
     {{- end }}
+  {{- if .Values.fleetConfig.addOnConfigs }}
   addOnConfigs: {{- toYaml .Values.fleetConfig.addOnConfigs | nindent 4 }}
+  {{- end }}
 {{- end }}
