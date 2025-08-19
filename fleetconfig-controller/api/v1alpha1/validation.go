@@ -141,14 +141,17 @@ func validateAddonConfigs(ctx context.Context, client client.Client, oldObject, 
 			mcAddOns, err := getManagedClusterAddOns(ctx)
 			if err != nil {
 				errs = append(errs, field.InternalError(field.NewPath("addOnConfigs"), err))
-			} else {
-				// Check if any removed addon configs are still in use
-				for _, removedConfig := range removedAddOnConfigs {
-					if isAddondEnabled(mcAddOns, removedConfig) {
-						errs = append(errs, field.Invalid(field.NewPath("addOnConfigs"), removedConfig,
-							fmt.Sprintf("cannot remove addon config %s as it is still in use by managedclusteraddons", removedConfig)))
-					}
+				return errs
+			}
+			var inUseAddOnConfigs []string
+			for _, removedConfig := range removedAddOnConfigs {
+				if isAddondEnabled(mcAddOns, removedConfig) {
+					inUseAddOnConfigs = append(inUseAddOnConfigs, removedConfig)
 				}
+			}
+			if len(inUseAddOnConfigs) > 0 {
+				errs = append(errs, field.Invalid(field.NewPath("addOnConfigs"), inUseAddOnConfigs,
+					fmt.Sprintf("cannot remove addOnConfigs %v as they are still in use by managedclusteraddons", inUseAddOnConfigs)))
 			}
 		}
 	}
@@ -218,15 +221,19 @@ func validateHubAddons(ctx context.Context, oldObject, newObject *FleetConfig) f
 			mcAddOns, err := getManagedClusterAddOns(ctx)
 			if err != nil {
 				errs = append(errs, field.InternalError(field.NewPath("hubAddOn"), err))
-			} else {
-				// Check if any removed hub addons are still in use
-				for _, removedHubAddOn := range removedHubAddOns {
-					if isAddondEnabled(mcAddOns, removedHubAddOn) {
-						errs = append(errs, field.Invalid(field.NewPath("hubAddOn"), removedHubAddOn,
-							fmt.Sprintf("cannot remove hubAddOn %s as it is still in use by managedclusteraddons", removedHubAddOn)))
-					}
+				return errs
+			}
+			var inUseHubAddOns []string
+			for _, removedHubAddOn := range removedHubAddOns {
+				if isAddondEnabled(mcAddOns, removedHubAddOn) {
+					inUseHubAddOns = append(inUseHubAddOns, removedHubAddOn)
 				}
 			}
+			if len(inUseHubAddOns) > 0 {
+				errs = append(errs, field.Invalid(field.NewPath("hubAddOn"), inUseHubAddOns,
+					fmt.Sprintf("cannot remove hubAddOns %v as they are still in use by managedclusteraddons", inUseHubAddOns)))
+			}
+
 		}
 	}
 
