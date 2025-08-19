@@ -782,7 +782,7 @@ type HubAddOn struct {
 	// +optional
 	InstallNamespace string `json:"installNamespace,omitempty"`
 
-	// Whether or not the selected namespace should be created. If left empty, defaults to false.'
+	// Whether or not the selected namespace should be created. If left empty, defaults to false.
 	// +kubebuilder:default:=false
 	// +optional
 	CreateNamespace bool `json:"createNamespace,omitempty"`
