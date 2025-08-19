@@ -20,6 +20,7 @@ coverage.*
 profile.cov
 *hub-bundle*.tar.gz
 *spoke-bundle*.tar.gz
+*fleetconfig-support-bundle/
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
@@ -40,6 +41,7 @@ go.work.sum
 venv/
 *__pycache__/
 requirements.txt
+.DS_Store
 
 # Temp files
 tmp/
