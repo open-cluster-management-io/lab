@@ -474,11 +474,11 @@ func handleAddonDisable(ctx context.Context, spokeName string, addons []string) 
 
 		// Check if the error is due to addon not being found or cluster not found - these are success cases
 		if strings.Contains(outStr, "add-on not found") {
-			logger.V(1).Info("addon already disabled (not found)", "managedcluster", spokeName, "addons", addons, "output", outStr)
+			logger.V(5).Info("addon already disabled (not found)", "managedcluster", spokeName, "addons", addons, "output", outStr)
 			return nil
 		}
 		if strings.Contains(outStr, "managedclusters.cluster.open-cluster-management.io") && strings.Contains(outStr, "not found") {
-			logger.V(1).Info("addon disable skipped (cluster not found)", "managedcluster", spokeName, "addons", addons, "output", outStr)
+			logger.V(5).Info("addon disable skipped (cluster not found)", "managedcluster", spokeName, "addons", addons, "output", outStr)
 			return nil
 		}
 

@@ -580,10 +580,7 @@ func deregisterSpoke(ctx context.Context, kClient client.Client, hubKubeconfig [
 	if err != nil {
 		return err
 	}
-	addonC, err := common.AddOnClient(hubKubeconfig)
-	if err != nil {
-		return err
-	}
+
 	// skip clean up if the ManagedCluster resource is not found or if any manifestWorks exist
 	managedCluster, err := clusterC.ClusterV1().ManagedClusters().Get(ctx, spoke.Name, metav1.GetOptions{})
 	if kerrs.IsNotFound(err) {
@@ -605,25 +602,15 @@ func deregisterSpoke(ctx context.Context, kClient client.Client, hubKubeconfig [
 
 	}
 
-	// disable all addons installed on the spoke, and wait for associated resources to be cleaned up
-	mcao, err := addonC.AddonV1alpha1().ManagedClusterAddOns(spoke.Name).List(ctx, metav1.ListOptions{LabelSelector: v1alpha1.ManagedBySelector.String()})
-	if err != nil {
-		return fmt.Errorf("failed to list managedClusterAddOns for managedCluster %s: %w", managedCluster.Name, err)
+	// remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
+	if err := handleAddonDisable(ctx, spoke.Name, spoke.EnabledAddons); err != nil {
+		fc.SetConditions(true, v1alpha1.NewCondition(
+			err.Error(), spoke.AddonDisableType(), metav1.ConditionFalse, metav1.ConditionTrue,
+		))
+		return err
 	}
-	mcaoList := mcao.Items
-	if len(mcaoList) > 0 {
-		var addOnsToDisable []string
-		for _, m := range mcaoList {
-			addOnsToDisable = append(addOnsToDisable, m.Name)
-		}
-		// remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
-		if err := handleAddonDisable(ctx, spoke.Name, addOnsToDisable); err != nil {
-			fc.SetConditions(true, v1alpha1.NewCondition(
-				err.Error(), spoke.AddonDisableType(), metav1.ConditionFalse, metav1.ConditionTrue,
-			))
-			return err
-		}
 
+	if len(spoke.EnabledAddons) > 0 {
 		// Wait for addon manifestWorks to be fully cleaned up before proceeding with unjoin
 		if err := waitForAddonManifestWorksCleanup(ctx, workC, spoke.Name, addonCleanupTimeout); err != nil {
 			fc.SetConditions(true, v1alpha1.NewCondition(
@@ -656,14 +643,14 @@ func deregisterSpoke(ctx context.Context, kClient client.Client, hubKubeconfig [
 	}
 
 	// remove ManagedCluster
-	if err = clusterC.ClusterV1().ManagedClusters().Delete(ctx, spoke.Name, metav1.DeleteOptions{}); err != nil && !kerrs.IsNotFound(err) {
-		return err
+	if err = clusterC.ClusterV1().ManagedClusters().Delete(ctx, spoke.Name, metav1.DeleteOptions{}); err != nil {
+		return client.IgnoreNotFound(err)
 	}
 
 	// remove Namespace
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: spoke.Name}}
-	if err := kClient.Delete(ctx, ns); err != nil && !kerrs.IsNotFound(err) {
-		return err
+	if err := kClient.Delete(ctx, ns); err != nil {
+		return client.IgnoreNotFound(err)
 	}
 
 	return nil
