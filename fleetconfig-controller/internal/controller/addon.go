@@ -470,7 +470,19 @@ func handleAddonDisable(ctx context.Context, spokeName string, addons []string) 
 	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm addon disable' to complete...")
 	if err != nil {
 		out := append(stdout, stderr...)
-		return fmt.Errorf("failed to disable addons: %v, output: %s", err, string(out))
+		outStr := string(out)
+
+		// Check if the error is due to addon not being found or cluster not found - these are success cases
+		if strings.Contains(outStr, "add-on not found") {
+			logger.V(1).Info("addon already disabled (not found)", "managedcluster", spokeName, "addons", addons, "output", outStr)
+			return nil
+		}
+		if strings.Contains(outStr, "managedclusters.cluster.open-cluster-management.io") && strings.Contains(outStr, "not found") {
+			logger.V(1).Info("addon disable skipped (cluster not found)", "managedcluster", spokeName, "addons", addons, "output", outStr)
+			return nil
+		}
+
+		return fmt.Errorf("failed to disable addons: %v, output: %s", err, outStr)
 	}
 	logger.V(1).Info("disabled addons", "managedcluster", spokeName, "addons", addons, "output", string(stdout))
 	return nil
