@@ -45,7 +45,7 @@ type FleetConfigSpec struct {
 	AddOnConfigs []AddOnConfig `json:"addOnConfigs,omitempty"`
 
 	// +optional
-	HubAddOns []HubAddOn `json:"hubAddOn,omitempty"`
+	HubAddOns []HubAddOn `json:"hubAddOns,omitempty"`
 
 	// Timeout is the timeout in seconds for all clusteradm operations, including init, accept, join, upgrade, etc.
 	// +kubebuilder:default:=300
