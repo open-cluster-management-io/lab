@@ -1,20 +1,21 @@
 fleetConfig:
   timeout: 300
   logVerbosity: 5
-  addOnConfigs:
-  - name: test-addon
-    version: "v1.0.0"
-    manifests: |
-      apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: test-addon
-    clusterRoleBinding: ""
-    hubRegistration: false
-    overwrite: false
   spokeAnnotations:
     foo: "not-bar"
     baz: "quux"
+  hub:
+    addOnConfigs:
+    - name: test-addon
+      version: "v1.0.0"
+      manifests: |
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: test-addon
+      clusterRoleBinding: ""
+      hubRegistration: false
+      overwrite: false
   spokes:
   - name: hub-as-spoke
     createNamespace: true

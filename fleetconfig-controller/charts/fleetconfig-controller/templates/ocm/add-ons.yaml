@@ -1,8 +1,8 @@
-{{- if .Values.fleetConfig.addOnConfigs }}
+{{- if .Values.fleetConfig.hub.addOnConfigs }}
 {{- $namespace := .Release.Namespace }}
 {{- $labels := include "chart.labels" . }}
 {{- $annotations := include "chart.annotations" . }}
-{{- range .Values.fleetConfig.addOnConfigs }}
+{{- range .Values.fleetConfig.hub.addOnConfigs }}
 {{ $versionedName := printf "%s-%s" .name .version }}
 apiVersion: v1
 kind: ConfigMap
