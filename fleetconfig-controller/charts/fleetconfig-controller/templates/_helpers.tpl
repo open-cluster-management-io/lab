@@ -112,31 +112,46 @@ Works with arbitrary depth and handles maps, slices, and scalar values.
 */}}
 {{- define "deepClean" -}}
 {{- if and . (kindIs "map" .) -}}
-{{- $clean := dict -}}
-{{- range $key, $value := . -}}
-  {{- if $value -}}
+  {{- $clean := dict -}}
+  {{- range $key, $value := . -}}
     {{- if kindIs "map" $value -}}
-      {{- $cleanedValue := include "deepClean" $value | fromYaml -}}
-      {{- if $cleanedValue -}}
-        {{- $clean = set $clean $key $cleanedValue -}}
+      {{- $cleaned := include "deepClean" $value | fromYaml -}}
+      {{- if $cleaned -}}
+        {{- $clean = set $clean $key $cleaned -}}
       {{- end -}}
     {{- else if kindIs "slice" $value -}}
-      {{- $cleanArray := list -}}
+      {{- $arr := list -}}
       {{- range $value -}}
-        {{- if and . (ne . "") -}}
-          {{- $cleanArray = append $cleanArray . -}}
+        {{- if kindIs "map" . -}}
+          {{- $ec := include "deepClean" . | fromYaml -}}
+          {{- if $ec -}}
+            {{- $arr = append $arr $ec -}}
+          {{- end -}}
+        {{- else if kindIs "string" . -}}
+          {{- if ne (trim .) "" -}}
+            {{- $arr = append $arr . -}}
+          {{- end -}}
+        {{- else -}}
+          {{- $arr = append $arr . -}}
         {{- end -}}
       {{- end -}}
-      {{- if $cleanArray -}}
-        {{- $clean = set $clean $key $cleanArray -}}
+      {{- if $arr -}}
+        {{- $clean = set $clean $key $arr -}}
       {{- end -}}
-    {{- else if ne $value "" -}}
+    {{- else if kindIs "string" $value -}}
+      {{- if ne (trim $value) "" -}}
+        {{- $clean = set $clean $key $value -}}
+      {{- end -}}
+    {{- else -}}
       {{- $clean = set $clean $key $value -}}
     {{- end -}}
   {{- end -}}
-{{- end -}}
-{{- if $clean }}{{- $clean | toYaml }}{{- else }}{}{{- end -}}
+  {{- if $clean -}}
+    {{ $clean | toYaml -}}
+  {{- else -}}
+    {}
+  {{- end -}}
 {{- else -}}
-{}
+  {}
 {{- end -}}
 {{- end -}}
