@@ -101,7 +101,7 @@ spec:
       addOns: {{- toYaml .addOns | nindent 8 }}
       {{- end }}
     {{- end }}
-  {{- if .Values.fleetConfig.addOnConfigs }}
-  addOnConfigs: {{- toYaml .Values.fleetConfig.addOnConfigs | nindent 4 }}
+  {{- if .Values.fleetConfig.hub.addOnConfigs }}
+  addOnConfigs: {{- toYaml .Values.fleetConfig.hub.addOnConfigs | nindent 4 }}
   {{- end }}
 {{- end }}
