@@ -281,7 +281,7 @@ spec:
                     createNamespace:
                       default: false
                       description: Whether or not the selected namespace should be
-                        created. If left empty, defaults to false.'
+                        created. If left empty, defaults to false.
                       type: boolean
                     installNamespace:
                       description: The namespace to install the add-on in. If left
