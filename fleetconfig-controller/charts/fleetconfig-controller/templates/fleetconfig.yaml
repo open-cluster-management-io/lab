@@ -102,6 +102,13 @@ spec:
       {{- end }}
     {{- end }}
   {{- if .Values.fleetConfig.hub.addOnConfigs }}
-  addOnConfigs: {{- toYaml .Values.fleetConfig.hub.addOnConfigs | nindent 4 }}
+  addOnConfigs:
+  {{- range .Values.fleetConfig.hub.addOnConfigs }}
+  - name: {{ .name }}
+    version: {{ .version }}
+    clusterRoleBinding: {{ .clusterRoleBinding }}
+    hubRegistration: {{ .hubRegistration }}
+    overwrite: {{ .overwrite }}
+  {{- end }}
   {{- end }}
 {{- end }}
