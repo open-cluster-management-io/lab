@@ -60,6 +60,14 @@ fleetConfig:
     autoApprovedARNPatterns: []
   ## Configuration for the Hub cluster.
   hub:
+    ## @param fleetConfig.hub.addOnConfigs Global add-on configuration for the hub cluster.
+    addOnConfigs: []
+    # - name: ""                # Name of the add-on.
+    #   manifests: ""           # Manifests to install. Can either be inline or a URL.
+    #   version: "v0.0.1"       # Version of the add-on.
+    #   clusterRoleBinding: ""  # ClusterRoleBinding to apply to the add-on.
+    #   hubRegistration: false  # Enable the agent to register to the hub cluster.
+    #   overwrite: false        # Whether to overwrite the add-on if it already exists.
     ## Configuration for the Cluster Manager on the Hub cluster.
     clusterManager:
       ## @descriptionStart
@@ -241,15 +249,6 @@ fleetConfig:
     # - configName: ""       # Name of the add-on to enable. Must match one of the configured add-on names in fleetConfig.addOnConfigs.
     #   installNamespace: "" # Namespace to install the add-on.
     #   annotations: {}      # Annotations to apply to the add-on.
-
-  ## @param fleetConfig.addOnConfigs Global add-on configuration for the hub cluster.
-  addOnConfigs: []
-  # - name: ""                # Name of the add-on.
-  #   manifests: ""           # Manifests to install. Can either be inline or a URL.
-  #   version: "v0.0.1"       # Version of the add-on.
-  #   clusterRoleBinding: ""  # ClusterRoleBinding to apply to the add-on.
-  #   hubRegistration: false  # Enable the agent to register to the hub cluster.
-  #   overwrite: false        # Whether to overwrite the add-on if it already exists.
 
 ## @section Topology Resources
 

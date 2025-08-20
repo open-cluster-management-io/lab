@@ -33,7 +33,8 @@ spec:
         registry: {{ .Values.fleetConfig.source.registry }}
     {{- end }}
     {{- if (.Values.fleetConfig.hub.singletonControlPlane | default dict).enabled }}
-    singleton: {{- toYaml .Values.fleetConfig.hub.singletonControlPlane | nindent 6 }}
+    {{- $scp := omit .Values.fleetConfig.hub.singletonControlPlane "enabled" -}}
+    singleton: {{- toYaml $scp | nindent 6 }}
     {{- end }}
     createNamespace: {{ .Values.fleetConfig.hub.createNamespace }}
     force: {{ .Values.fleetConfig.hub.force }}
@@ -41,7 +42,7 @@ spec:
     kubeconfig:
       context: {{ .context | quote }}
       inCluster: {{ .inCluster }}
-      {{- if .secretReference }}
+      {{- if and .secretReference (not (empty .secretReference.name)) }}
       secretReference: {{ toYaml .secretReference | nindent 8 }}
       {{- end }}
     {{- end }}
@@ -57,7 +58,7 @@ spec:
       kubeconfig:
         context: {{ .context | quote }}
         inCluster: {{ .inCluster }}
-        {{- if .secretReference }}
+        {{- if and .secretReference (not (empty .secretReference.name)) }}
         secretReference: {{ toYaml .secretReference | nindent 10 }}
         {{- end }}
       {{- end }}
@@ -80,12 +81,13 @@ spec:
         forceInternalEndpointLookup: {{ .klusterlet.forceInternalEndpointLookup }}
         forceInternalEndpointLookupManaged: {{ .klusterlet.forceInternalEndpointLookupManaged }}
         singleton: {{ .klusterlet.singleton }}
-        {{- with .klusterlet.managedClusterKubeconfig }}
+        {{- $mck := .klusterlet.managedClusterKubeconfig -}}
+        {{- if or $mck.context $mck.inCluster (and $mck.secretReference (not (empty $mck.secretReference.name))) }}
         managedClusterKubeconfig:
-          context: {{ .context | quote }}
-          inCluster: {{ .inCluster }}
-          {{- if .secretReference }}
-          secretReference: {{ toYaml .secretReference | nindent 12 }}
+          context: {{ $mck.context | quote }}
+          inCluster: {{ $mck.inCluster }}
+          {{- if and $mck.secretReference (not (empty $mck.secretReference.name)) }}
+          secretReference: {{ toYaml $mck.secretReference | nindent 12 }}
           {{- end }}
         {{- end }}
         resources: {{- include "deepClean" .klusterlet.resources | nindent 10 }}
