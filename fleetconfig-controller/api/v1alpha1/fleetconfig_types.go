@@ -492,7 +492,7 @@ func (j *JoinedSpoke) conditionName(c int) string {
 // InstalledHubAddOn tracks metadata for each hubAddon that is successfully installed on the hub.
 type InstalledHubAddOn struct {
 	// BundleVersion is the bundle version used when installing the addon.
-	BundleVerion string `json:"bundleVersion"`
+	BundleVersion string `json:"bundleVersion"`
 	// Name is the name of the addon.
 	Name string `json:"name"`
 	// Namespace is the namespace that the addon was installed into.

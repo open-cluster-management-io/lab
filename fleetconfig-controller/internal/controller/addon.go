@@ -503,7 +503,7 @@ func handleAddonDisable(ctx context.Context, spokeName string, addons []string) 
 func isHubAddOnMatching(installed v1alpha1.InstalledHubAddOn, desired v1alpha1.HubAddOn, bundleVersion string) bool {
 	return installed.Name == desired.Name &&
 		installed.Namespace == desired.InstallNamespace &&
-		installed.BundleVerion == bundleVersion
+		installed.BundleVersion == bundleVersion
 }
 
 func handleHubAddons(ctx context.Context, kClient client.Client, addonC *addonapi.Clientset, fc *v1alpha1.FleetConfig) error {
@@ -557,9 +557,9 @@ func handleHubAddons(ctx context.Context, kClient client.Client, addonC *addonap
 	newInstalledAddOns := make([]v1alpha1.InstalledHubAddOn, 0, len(desiredAddOns))
 	for _, d := range desiredAddOns {
 		newInstalledAddOns = append(newInstalledAddOns, v1alpha1.InstalledHubAddOn{
-			Name:         d.Name,
-			Namespace:    d.InstallNamespace,
-			BundleVerion: bundleVersion,
+			Name:          d.Name,
+			Namespace:     d.InstallNamespace,
+			BundleVersion: bundleVersion,
 		})
 	}
 	fc.Status.InstalledHubAddOns = newInstalledAddOns
