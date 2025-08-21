@@ -648,6 +648,7 @@ func handleHubAddonInstall(ctx context.Context, kClient client.Client, addonC *a
 		if addon.InstallNamespace != "" {
 			args = append(args, fmt.Sprintf("--namespace=%s", addon.InstallNamespace))
 		}
+
 		cmd := exec.Command(clusteradm, args...)
 		stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm install hub-addon' to complete...")
 		if err != nil {
@@ -658,6 +659,7 @@ func handleHubAddonInstall(ctx context.Context, kClient client.Client, addonC *a
 		}
 		logger.V(1).Info("installed hubAddon", "name", addon.Name, "output", string(stdout))
 	}
+
 	if len(errs) > 0 {
 		return fmt.Errorf("one or more hub addons were not installed: %v", errs)
 	}

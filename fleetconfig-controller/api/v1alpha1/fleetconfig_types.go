@@ -493,8 +493,10 @@ func (j *JoinedSpoke) conditionName(c int) string {
 type InstalledHubAddOn struct {
 	// BundleVersion is the bundle version used when installing the addon.
 	BundleVersion string `json:"bundleVersion"`
+
 	// Name is the name of the addon.
 	Name string `json:"name"`
+
 	// Namespace is the namespace that the addon was installed into.
 	Namespace string `json:"namespace,omitempty"`
 }

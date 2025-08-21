@@ -70,7 +70,7 @@ fleetConfig:
     #   overwrite: false        # Whether to overwrite the add-on if it already exists.
     ## @param fleetConfig.hub.hubAddOns Built-in add-on configuration for the hub cluster.
     hubAddOns: []
-    # - name: ""                # Name of the add-on. Must be one of "argocd", "governance-policy-framework"
+    # - name: ""                  # Name of the add-on. Must be one of "argocd", "governance-policy-framework"
     #   installNamespace: ""      # Namespace to install the add-on. Not applicable for "argocd" add-on. For "governance-policy-framework" add-on, if not set, defaults to "open-cluster-management" namespace.
     #   createNamespace: false    # Whether to create the namespace for the add-on.
     ## Configuration for the Cluster Manager on the Hub cluster.
