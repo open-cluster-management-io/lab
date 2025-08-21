@@ -61,9 +61,10 @@ type FleetConfigSpec struct {
 
 // FleetConfigStatus defines the observed state of FleetConfig.
 type FleetConfigStatus struct {
-	Phase        string        `json:"phase,omitempty"`
-	Conditions   []Condition   `json:"conditions,omitempty"`
-	JoinedSpokes []JoinedSpoke `json:"joinedSpokes,omitempty"`
+	Phase              string              `json:"phase,omitempty"`
+	Conditions         []Condition         `json:"conditions,omitempty"`
+	JoinedSpokes       []JoinedSpoke       `json:"joinedSpokes,omitempty"`
+	InstalledHubAddOns []InstalledHubAddOn `json:"installedHubAddOns,omitempty"`
 }
 
 // ToComparable returns a deep copy of the FleetConfigStatus that's suitable for semantic comparison.
@@ -486,6 +487,16 @@ func (j *JoinedSpoke) conditionName(c int) string {
 		name = name[:c] // account for extra chars in the condition type (max. total of 63)
 	}
 	return name
+}
+
+// InstalledHubAddOn tracks metadata for each hubAddon that is successfully installed on the hub.
+type InstalledHubAddOn struct {
+	// BundleVersion is the bundle version used when installing the addon.
+	BundleVerion string `json:"bundleVersion"`
+	// Name is the name of the addon.
+	Name string `json:"name"`
+	// Namespace is the namespace that the addon was installed into.
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // Klusterlet is the configuration for a klusterlet.

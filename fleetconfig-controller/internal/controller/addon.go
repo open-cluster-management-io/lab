@@ -26,10 +26,21 @@ import (
 )
 
 const (
+	// commands
 	addon   = "addon"
 	create  = "create"
 	enable  = "enable"
 	disable = "disable"
+
+	install   = "install"
+	uninstall = "uninstall"
+	hubAddon  = "hub-addon"
+
+	// accepetd hub addon names
+	hubAddOnArgoCD = "argocd"
+	hubAddOnGPF    = "governance-policy-framework"
+
+	argocdNamespace = "argocd"
 )
 
 func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addonapi.Clientset, fc *v1alpha1.FleetConfig) error {
@@ -486,6 +497,182 @@ func handleAddonDisable(ctx context.Context, spokeName string, addons []string) 
 	}
 	logger.V(1).Info("disabled addons", "managedcluster", spokeName, "addons", addons, "output", string(stdout))
 	return nil
+}
+
+// isHubAddOnMatching checks if an installed addon matches a desired addon spec
+func isHubAddOnMatching(installed v1alpha1.InstalledHubAddOn, desired v1alpha1.HubAddOn, bundleVersion string) bool {
+	return installed.Name == desired.Name &&
+		installed.Namespace == desired.InstallNamespace &&
+		installed.BundleVerion == bundleVersion
+}
+
+func handleHubAddons(ctx context.Context, kClient client.Client, addonC *addonapi.Clientset, fc *v1alpha1.FleetConfig) error {
+	logger := log.FromContext(ctx)
+	logger.V(0).Info("handleHubAddons", "fleetconfig", fc.Name)
+
+	installedAddOns := fc.Status.DeepCopy().InstalledHubAddOns
+	desiredAddOns := fc.Spec.HubAddOns
+	bundleVersion := fc.Spec.Hub.ClusterManager.Source.BundleVersion
+
+	// nothing to do
+	if len(desiredAddOns) == 0 && len(installedAddOns) == 0 {
+		logger.V(5).Info("no hub addons to reconcile")
+		return nil
+	}
+
+	// Find addons that need to be uninstalled (present in installed, missing from desired or version mismatch)
+	addonsToUninstall := make([]v1alpha1.InstalledHubAddOn, 0)
+	for _, installed := range installedAddOns {
+		found := slices.ContainsFunc(desiredAddOns, func(desired v1alpha1.HubAddOn) bool {
+			return isHubAddOnMatching(installed, desired, bundleVersion)
+		})
+		if !found {
+			addonsToUninstall = append(addonsToUninstall, installed)
+		}
+	}
+
+	// Find addons that need to be installed (present in desired, missing from installed or version upgrade)
+	addonsToInstall := make([]v1alpha1.HubAddOn, 0)
+	for _, desired := range desiredAddOns {
+		found := slices.ContainsFunc(installedAddOns, func(installed v1alpha1.InstalledHubAddOn) bool {
+			return isHubAddOnMatching(installed, desired, bundleVersion)
+		})
+		if !found {
+			addonsToInstall = append(addonsToInstall, desired)
+		}
+	}
+
+	// do uninstalls first, then installs
+	err := handleHubAddonUninstall(ctx, addonsToUninstall)
+	if err != nil {
+		return err
+	}
+
+	err = handleHubAddonInstall(ctx, kClient, addonC, addonsToInstall, bundleVersion)
+	if err != nil {
+		return err
+	}
+
+	// build the new installed addons list
+	newInstalledAddOns := make([]v1alpha1.InstalledHubAddOn, 0, len(desiredAddOns))
+	for _, d := range desiredAddOns {
+		newInstalledAddOns = append(newInstalledAddOns, v1alpha1.InstalledHubAddOn{
+			Name:         d.Name,
+			Namespace:    d.InstallNamespace,
+			BundleVerion: bundleVersion,
+		})
+	}
+	fc.Status.InstalledHubAddOns = newInstalledAddOns
+	return nil
+}
+
+func handleHubAddonUninstall(ctx context.Context, addons []v1alpha1.InstalledHubAddOn) error {
+	if len(addons) == 0 {
+		return nil
+	}
+
+	logger := log.FromContext(ctx)
+	logger.V(0).Info("uninstalling hub addons", "count", len(addons))
+
+	var errs []error
+	for _, addon := range addons {
+		args := []string{
+			uninstall,
+			hubAddon,
+			fmt.Sprintf("--names=%s", addon.Name),
+		}
+		if addon.Namespace != "" {
+			args = append(args, fmt.Sprintf("--namespace=%s", addon.Namespace))
+		}
+
+		logger.V(7).Info("running", "command", clusteradm, "args", args)
+		cmd := exec.Command(clusteradm, args...)
+		stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm uninstall hub-addon' to complete...")
+		if err != nil {
+			out := append(stdout, stderr...)
+			outStr := string(out)
+			errs = append(errs, fmt.Errorf("failed to uninstall hubAddon %s: %v, output: %s", addon.Name, err, outStr))
+			continue
+		}
+		logger.V(1).Info("uninstalled hub addon", "name", addon.Name, "namespace", addon.Namespace, "output", string(stdout))
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("one or more hub addons were not uninstalled: %v", errs)
+	}
+	return nil
+}
+
+func handleHubAddonInstall(ctx context.Context, kClient client.Client, addonC *addonapi.Clientset, addons []v1alpha1.HubAddOn, bundleVersion string) error {
+	if len(addons) == 0 {
+		return nil
+	}
+
+	logger := log.FromContext(ctx)
+	logger.V(0).Info("installing hub addons", "count", len(addons))
+
+	var errs []error
+	for _, addon := range addons {
+		// Check if already installed (defensive check)
+		installed, err := isAddonInstalled(ctx, addonC, addon.Name)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to check if hubAddon %s is installed: %v", addon.Name, err))
+			continue
+		}
+		if installed {
+			logger.V(3).Info("hubAddon already installed, skipping", "name", addon.Name)
+			continue
+		}
+
+		// workaround until https://github.com/open-cluster-management-io/clusteradm/pull/510 is merged/released
+		if addon.Name == hubAddOnArgoCD && addon.CreateNamespace {
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: argocdNamespace,
+				},
+			}
+			err := kClient.Create(ctx, ns)
+			if err != nil && !kerrs.IsAlreadyExists(err) {
+				errs = append(errs, fmt.Errorf("failed to create namespace for hubAddon %s: %v", addon.Name, err))
+				continue
+			}
+		}
+
+		args := []string{
+			install,
+			hubAddon,
+			fmt.Sprintf("--names=%s", addon.Name),
+			fmt.Sprintf("--bundle-version=%s", bundleVersion),
+			fmt.Sprintf("--create-namespace=%t", addon.CreateNamespace),
+		}
+		if addon.InstallNamespace != "" {
+			args = append(args, fmt.Sprintf("--namespace=%s", addon.InstallNamespace))
+		}
+		cmd := exec.Command(clusteradm, args...)
+		stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm install hub-addon' to complete...")
+		if err != nil {
+			out := append(stdout, stderr...)
+			outStr := string(out)
+			errs = append(errs, fmt.Errorf("failed to install hubAddon %s: %v, output: %s", addon.Name, err, outStr))
+			continue
+		}
+		logger.V(1).Info("installed hubAddon", "name", addon.Name, "output", string(stdout))
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("one or more hub addons were not installed: %v", errs)
+	}
+	return nil
+}
+
+func isAddonInstalled(ctx context.Context, addonC *addonapi.Clientset, addonName string) (bool, error) {
+	if _, err := addonC.AddonV1alpha1().ClusterManagementAddOns().Get(ctx, addonName, metav1.GetOptions{}); err != nil {
+		return false, client.IgnoreNotFound(err)
+	}
+
+	// we enforce unique names between hubAddOns and addOnConfigs,
+	// and handle deleting addOnConfigs first
+	// so if the addon is found here, we can assume it was previously installed by `install hub-addon`
+	return true, nil
 }
 
 func labelPatchData(labels map[string]string) map[string]any {

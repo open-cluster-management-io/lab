@@ -84,6 +84,19 @@ func allowFleetConfigUpdate(newObject *FleetConfig, oldObject *FleetConfig) erro
 // checks that each addOnConfig specifies a valid source of manifests
 func validateAddonConfigs(ctx context.Context, client client.Client, oldObject, newObject *FleetConfig) field.ErrorList {
 	errs := field.ErrorList{}
+
+	// Validate that AddOnConfig names are unique within the AddOnConfigs list
+	addOnConfigNames := make(map[string]int)
+	for i, a := range newObject.Spec.AddOnConfigs {
+		key := fmt.Sprintf("%s-%s", a.Name, a.Version)
+		if existingIndex, found := addOnConfigNames[key]; found {
+			errs = append(errs, field.Invalid(field.NewPath("addOnConfigs").Index(i), key,
+				fmt.Sprintf("duplicate addOnConfig %s (name-version) found at indices %d and %d", key, existingIndex, i)))
+		} else {
+			addOnConfigNames[key] = i
+		}
+	}
+
 	for i, a := range newObject.Spec.AddOnConfigs {
 		cm := corev1.ConfigMap{}
 		cmName := fmt.Sprintf("%s-%s-%s", AddonConfigMapNamePrefix, a.Name, a.Version)
@@ -172,7 +185,7 @@ func validateAddons(newObject *FleetConfig) field.ErrorList {
 	for i, s := range newObject.Spec.Spokes {
 		for j, a := range s.AddOns {
 			if !configuredAddons[a.ConfigName] {
-				errs = append(errs, field.Invalid(field.NewPath("Spokes").Index(i).Child("AddOns").Index(j), a.ConfigName, fmt.Sprintf("cannot enable addon %s for spoke %s, no configuration found in spec.AddOnConfigs", a.ConfigName, s.Name)))
+				errs = append(errs, field.Invalid(field.NewPath("Spokes").Index(i).Child("AddOns").Index(j), a.ConfigName, fmt.Sprintf("cannot enable addon %s for spoke %s, no configuration found in spec.AddOnConfigs or spec.HubAddOns", a.ConfigName, s.Name)))
 			}
 		}
 	}
@@ -192,8 +205,19 @@ func validateHubAddons(ctx context.Context, oldObject, newObject *FleetConfig) f
 
 	for i, ha := range newObject.Spec.HubAddOns {
 		if _, found := addOnConfigNames[ha.Name]; found {
-			errs = append(errs, field.Invalid(field.NewPath("hubAddOn").Index(i), ha.Name,
-				fmt.Sprintf("hubAddOn name %s clashes with an existing addOnConfig name", ha.Name)))
+			errs = append(errs, field.Invalid(field.NewPath("hubAddOns").Index(i), ha.Name,
+				fmt.Sprintf("hubAddOn name %s clashes with an existing addOnConfig name.", ha.Name)))
+		}
+	}
+
+	// Validate that HubAddOn names are unique within the HubAddOns list
+	hubAddOnNames := make(map[string]int)
+	for i, ha := range newObject.Spec.HubAddOns {
+		if existingIndex, found := hubAddOnNames[ha.Name]; found {
+			errs = append(errs, field.Invalid(field.NewPath("hubAddOns").Index(i), ha.Name,
+				fmt.Sprintf("duplicate hubAddOn name %s found at indices %d and %d", ha.Name, existingIndex, i)))
+		} else {
+			hubAddOnNames[ha.Name] = i
 		}
 	}
 

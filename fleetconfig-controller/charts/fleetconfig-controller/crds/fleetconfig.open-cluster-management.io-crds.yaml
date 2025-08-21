@@ -2668,6 +2668,27 @@ spec:
                   - wantStatus
                   type: object
                 type: array
+              installedHubAddOns:
+                items:
+                  description: InstalledHubAddOn tracks metadata for each hubAddon
+                    that is successfully installed on the hub.
+                  properties:
+                    bundleVersion:
+                      description: BundleVersion is the bundle version used when installing
+                        the addon.
+                      type: string
+                    name:
+                      description: Name is the name of the addon.
+                      type: string
+                    namespace:
+                      description: Namespace is the namespace that the addon was installed
+                        into.
+                      type: string
+                  required:
+                  - bundleVersion
+                  - name
+                  type: object
+                type: array
               joinedSpokes:
                 items:
                   description: JoinedSpoke represents a spoke that has been joined

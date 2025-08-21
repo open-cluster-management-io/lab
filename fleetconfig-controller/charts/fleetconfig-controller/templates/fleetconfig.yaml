@@ -111,4 +111,5 @@ spec:
     overwrite: {{ .overwrite }}
   {{- end }}
   {{- end }}
+  hubAddOns: {{- toYaml .Values.fleetConfig.hub.hubAddOns | nindent 4 }}
 {{- end }}

@@ -94,7 +94,15 @@ func handleHub(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetCon
 		return err
 	}
 
-	if len(fc.Spec.AddOnConfigs) > 0 {
+	err = handleHubAddons(ctx, kClient, addonC, fc)
+	if err != nil {
+		fc.SetConditions(true, v1alpha1.NewCondition(
+			err.Error(), v1alpha1.FleetConfigAddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
+		))
+		return err
+	}
+
+	if len(fc.Spec.AddOnConfigs)+len(fc.Spec.HubAddOns) > 0 {
 		fc.SetConditions(true, v1alpha1.NewCondition(
 			v1alpha1.FleetConfigAddonsConfigured, v1alpha1.FleetConfigAddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
 		))
