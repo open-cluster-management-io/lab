@@ -37,10 +37,10 @@ rules:
 
 # Required for managing fleetconfig resources
 - apiGroups: ["fleetconfig.open-cluster-management.io"]
-  resources: ["fleetconfigs"]
+  resources: ["fleetconfigs", "hubs", "spokes"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: ["fleetconfig.open-cluster-management.io"]
-  resources: ["fleetconfigs/status"]
+  resources: ["fleetconfigs/status", "hubs/status", "spokes/status"]
   verbs: ["update", "patch"]
 
 # Required for handling OCM cluster API resources (ManagedClusters)

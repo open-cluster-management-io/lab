@@ -35,8 +35,11 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	v1alpha1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
-	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/controller"
+	apiv1alpha1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
+	apiv1beta1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
+	controllerv1alpha1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/controller/v1alpha1"
+	controllerv1beta1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/controller/v1beta1"
+	webhookv1beta1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/webhook/v1beta1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -48,7 +51,8 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(apiv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(apiv1beta1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -132,7 +136,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.FleetConfigReconciler{
+	if err = (&controllerv1alpha1.FleetConfigReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("FleetConfig"),
 		Scheme: mgr.GetScheme(),
@@ -141,8 +145,36 @@ func main() {
 		os.Exit(1)
 	}
 	if useWebhook {
-		if err = v1alpha1.SetupFleetConfigWebhookWithManager(mgr); err != nil {
+		if err = apiv1alpha1.SetupFleetConfigWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "FleetConfig")
+			os.Exit(1)
+		}
+	}
+	if err := (&controllerv1beta1.HubReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Hub")
+		os.Exit(1)
+	}
+	if err := (&controllerv1beta1.SpokeReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Spoke")
+		os.Exit(1)
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := webhookv1beta1.SetupSpokeWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Spoke")
+			os.Exit(1)
+		}
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := webhookv1beta1.SetupHubWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Hub")
 			os.Exit(1)
 		}
 	}

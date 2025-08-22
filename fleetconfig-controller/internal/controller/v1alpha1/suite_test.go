@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package v1alpha1
 
 import (
 	"os"
@@ -68,10 +68,14 @@ func TestControllers(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	var err error
+
+	root, err := test.GetProjectDir()
+	Expect(err).NotTo(HaveOccurred())
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths:     []string{filepath.Join(root, "config", "crd", "bases")},
 		ErrorIfCRDPathMissing: true,
 	}
 
@@ -81,7 +85,6 @@ var _ = BeforeSuite(func() {
 		testEnv.BinaryAssetsDirectory = kubebuilderAssets
 	}
 
-	var err error
 	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())

@@ -1,5 +1,7 @@
 resources:
 - bases/fleetconfig.open-cluster-management.io_fleetconfigs.yaml
+- bases/fleetconfig.open-cluster-management.io_hubs.yaml
+- bases/fleetconfig.open-cluster-management.io_spokes.yaml
 
 patches:
 - path: patches/webhook_in_fleetconfigs.yaml

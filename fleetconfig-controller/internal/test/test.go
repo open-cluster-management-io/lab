@@ -22,7 +22,11 @@ type Config struct {
 
 // LoadConfig centralized test config from disk.
 func LoadConfig() (*Config, error) {
-	data, err := os.ReadFile(filepath.Join("..", "..", "hack", "test-config.json"))
+	root, err := GetProjectDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load test config: %w", err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "hack", "test-config.json"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load test config: %w", err)
 	}
@@ -65,4 +69,28 @@ func FindEnvTestBinaryDir(c *Config) string {
 		}
 	}
 	return ""
+}
+
+// GetProjectDir returns the fleetconfig-controller project root directory.
+// It works by finding "fleetconfig-controller" in the current working directory path.
+func GetProjectDir() (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	// Find the fleetconfig-controller directory in the path
+	parts := strings.Split(wd, string(os.PathSeparator))
+	for i, part := range parts {
+		if part == "fleetconfig-controller" {
+			// Reconstruct path up to and including fleetconfig-controller
+			projectPath := strings.Join(parts[:i+1], string(os.PathSeparator))
+			if projectPath == "" {
+				projectPath = string(os.PathSeparator) // Handle root case
+			}
+			return projectPath, nil
+		}
+	}
+
+	return "", fmt.Errorf("fleetconfig-controller directory not found in path: %s", wd)
 }

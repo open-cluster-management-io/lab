@@ -24,6 +24,46 @@ webhooks:
     resources:
     - fleetconfigs
   sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-fleetconfig-open-cluster-management-io-v1beta1-hub
+  failurePolicy: Fail
+  name: mhub-v1beta1.kb.io
+  rules:
+  - apiGroups:
+    - fleetconfig.open-cluster-management.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - hubs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-fleetconfig-open-cluster-management-io-v1beta1-spoke
+  failurePolicy: Fail
+  name: mspoke-v1beta1.kb.io
+  rules:
+  - apiGroups:
+    - fleetconfig.open-cluster-management.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - spokes
+  sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -50,4 +90,44 @@ webhooks:
     - DELETE
     resources:
     - fleetconfigs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-fleetconfig-open-cluster-management-io-v1beta1-hub
+  failurePolicy: Fail
+  name: vhub-v1beta1.kb.io
+  rules:
+  - apiGroups:
+    - fleetconfig.open-cluster-management.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - hubs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-fleetconfig-open-cluster-management-io-v1beta1-spoke
+  failurePolicy: Fail
+  name: vspoke-v1beta1.kb.io
+  rules:
+  - apiGroups:
+    - fleetconfig.open-cluster-management.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - spokes
   sideEffects: None

@@ -168,6 +168,9 @@ func (c Condition) Equal(other Condition) bool {
 		c.Reason == other.Reason && c.Message == other.Message
 }
 
+// +kubebuilder:object:root=false
+// +kubebuilder:skipversion
+
 // Hub provides specifications for an OCM hub cluster.
 type Hub struct {
 	// APIServer is the API server URL for the Hub cluster. If provided, spokes clusters will
@@ -338,6 +341,9 @@ type ISpoke interface {
 
 var _ ISpoke = &Spoke{}
 var _ ISpoke = &JoinedSpoke{}
+
+// +kubebuilder:object:root=false
+// +kubebuilder:skipversion
 
 // Spoke provides specifications for joining and potentially upgrading spokes.
 type Spoke struct {

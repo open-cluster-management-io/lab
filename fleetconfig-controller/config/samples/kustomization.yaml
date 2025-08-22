@@ -1,0 +1,5 @@
+## Append samples of your project ##
+resources:
+- v1beta1_hub.yaml
+- v1beta1_spoke.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

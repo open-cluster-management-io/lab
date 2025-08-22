@@ -1,5 +1,5 @@
-// Package controller contains the main reconciliation logic of fleetconfig-controller
-package controller
+// Package v1alpha1 contains the main reconciliation logic for fleetconfig-controller's v1alpha1 resources.
+package v1alpha1
 
 import (
 	"context"
