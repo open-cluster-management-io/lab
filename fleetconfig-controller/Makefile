@@ -84,8 +84,7 @@ helm-doc-gen: helmdoc ## Generate helm chart README.md
 
 .PHONY: manifests
 manifests: kustomize controller-gen ## Generate CustomResourceDefinition and WebhookConfiguration objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	$(KUSTOMIZE) build config/crd -o charts/fleetconfig-controller/crds/fleetconfig.open-cluster-management.io-crds.yaml
+	$(CONTROLLER_GEN) crd paths="./..." output:crd:artifacts:config=charts/fleetconfig-controller/crds
 	./hack/install_crds.sh
 
 ##@ Testing Targets
