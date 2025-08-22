@@ -34,9 +34,9 @@ type HubReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=open-cluster-management.io,resources=hubs,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=open-cluster-management.io,resources=hubs/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=open-cluster-management.io,resources=hubs/finalizers,verbs=update
+// +kubebuilder:rbac:groups=fleetconfig.open-cluster-management.io,resources=hubs,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=fleetconfig.open-cluster-management.io,resources=hubs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=fleetconfig.open-cluster-management.io,resources=hubs/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
