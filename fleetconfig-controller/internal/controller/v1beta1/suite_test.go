@@ -67,9 +67,10 @@ var _ = BeforeSuite(func() {
 
 	root, err := test.GetProjectDir()
 	Expect(err).NotTo(HaveOccurred())
+
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join(root, "config", "crd", "bases")},
+		CRDDirectoryPaths:     []string{filepath.Join(root, "charts", "fleetconfig-controller", "crds")},
 		ErrorIfCRDPathMissing: true,
 	}
 

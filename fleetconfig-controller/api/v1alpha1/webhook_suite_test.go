@@ -74,9 +74,12 @@ var _ = BeforeSuite(func() {
 	err = AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
+	root, err := test.GetProjectDir()
+	Expect(err).NotTo(HaveOccurred())
+
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths:     []string{filepath.Join(root, "charts", "fleetconfig-controller", "crds")},
 		ErrorIfCRDPathMissing: false,
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
 			Paths: []string{filepath.Join("..", "..", "config", "webhook")},
