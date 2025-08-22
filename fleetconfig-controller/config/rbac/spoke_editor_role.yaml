@@ -14,7 +14,7 @@ metadata:
   name: spoke-editor-role
 rules:
 - apiGroups:
-  - open-cluster-management.io
+  - fleetconfig.open-cluster-management.io
   resources:
   - spokes
   verbs:
@@ -26,7 +26,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - open-cluster-management.io
+  - fleetconfig.open-cluster-management.io
   resources:
   - spokes/status
   verbs:

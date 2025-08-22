@@ -14,13 +14,13 @@ metadata:
   name: hub-admin-role
 rules:
 - apiGroups:
-  - open-cluster-management.io
+  - fleetconfig.open-cluster-management.io
   resources:
   - hubs
   verbs:
   - '*'
 - apiGroups:
-  - open-cluster-management.io
+  - fleetconfig.open-cluster-management.io
   resources:
   - hubs/status
   verbs:

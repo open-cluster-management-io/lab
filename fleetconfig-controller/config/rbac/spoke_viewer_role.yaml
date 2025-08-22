@@ -14,7 +14,7 @@ metadata:
   name: spoke-viewer-role
 rules:
 - apiGroups:
-  - open-cluster-management.io
+  - fleetconfig.open-cluster-management.io
   resources:
   - spokes
   verbs:
@@ -22,7 +22,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - open-cluster-management.io
+  - fleetconfig.open-cluster-management.io
   resources:
   - spokes/status
   verbs:

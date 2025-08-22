@@ -14,13 +14,13 @@ metadata:
   name: spoke-admin-role
 rules:
 - apiGroups:
-  - open-cluster-management.io
+  - fleetconfig.open-cluster-management.io
   resources:
   - spokes
   verbs:
   - '*'
 - apiGroups:
-  - open-cluster-management.io
+  - fleetconfig.open-cluster-management.io
   resources:
   - spokes/status
   verbs:
