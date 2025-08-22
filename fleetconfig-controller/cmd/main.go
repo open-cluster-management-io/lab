@@ -144,12 +144,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "FleetConfig")
 		os.Exit(1)
 	}
-	if useWebhook {
-		if err = apiv1alpha1.SetupFleetConfigWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "FleetConfig")
-			os.Exit(1)
-		}
-	}
+
 	if err := (&controllerv1beta1.HubReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -164,20 +159,23 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Spoke")
 		os.Exit(1)
 	}
+
 	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+	if useWebhook || os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err = apiv1alpha1.SetupFleetConfigWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "FleetConfig")
+			os.Exit(1)
+		}
 		if err := webhookv1beta1.SetupSpokeWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Spoke")
 			os.Exit(1)
 		}
-	}
-	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err := webhookv1beta1.SetupHubWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Hub")
 			os.Exit(1)
 		}
 	}
+
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
