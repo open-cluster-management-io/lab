@@ -459,7 +459,7 @@ type JoinedSpoke struct {
 	// +optional
 	EnabledAddons []string `json:"enabledAddons,omitempty"`
 
-	// KlusterletHash is a hash of spoke.klusterlet.values, if set
+	// KlusterletHash is a hash of spoke.klusterlet.values
 	// +kubebuilder:default:=""
 	// +optional
 	KlusterletHash string `json:"klusterletHash,omitempty"`

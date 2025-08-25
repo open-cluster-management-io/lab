@@ -2693,8 +2693,7 @@ spec:
                       type: array
                     klusterletHash:
                       default: ""
-                      description: KlusterletHash is a hash of spoke.klusterlet.values,
-                        if set
+                      description: KlusterletHash is a hash of spoke.klusterlet.values
                       type: string
                     kubeconfig:
                       description: Kubeconfig details for the Spoke cluster.
