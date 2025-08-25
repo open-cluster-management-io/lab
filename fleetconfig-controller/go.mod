@@ -5,6 +5,7 @@ go 1.24.4
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/go-logr/logr v1.4.3
+	github.com/mitchellh/hashstructure/v2 v2.0.2
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
 	github.com/openshift/build-machinery-go v0.0.0-20250602125535-1b6d00b8c37c

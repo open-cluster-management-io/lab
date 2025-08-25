@@ -42,5 +42,5 @@ func LowestBundleVersion(ctx context.Context, bundleSpecs []string) (string, err
 		return 0
 	})
 
-	return semvers[0].String(), nil
+	return fmt.Sprintf("v%s", semvers[0].String()), nil
 }

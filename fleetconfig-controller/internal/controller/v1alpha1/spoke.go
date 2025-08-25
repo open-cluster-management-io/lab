@@ -27,6 +27,7 @@ import (
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/hash"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/version"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/pkg/common"
@@ -149,6 +150,19 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 			"Joined", spoke.JoinType(), metav1.ConditionTrue, metav1.ConditionTrue,
 		))
 
+		currKlusterletHash, err := hash.ComputeHash(spoke.Klusterlet.Values)
+		if err != nil {
+			return fmt.Errorf("failed to compue hash of spoke %s klusterlet values: %w", spoke.Name, err)
+		}
+		js := v1alpha1.JoinedSpoke{
+			Name:                    spoke.Name,
+			Kubeconfig:              spoke.Kubeconfig,
+			PurgeKlusterletOperator: spoke.Klusterlet.PurgeOperator,
+			EnabledAddons:           allEnabledAddons[i],
+			KlusterletHash:          currKlusterletHash,
+		}
+		joinedSpokes = append(joinedSpokes, js)
+
 		// Label the spoke ManagedCluster corresponding to the hub if in hub-as-spoke mode.
 		// This allows the 'spoke' ManagedClusterSet to omit the hub-as-spoke cluster from its list
 		// of spoke clusters.
@@ -163,12 +177,17 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 			logger.V(0).Info("handleSpokes: labeled ManagedCluster as hub-as-spoke", "name", spoke.Name)
 		}
 
-		// attempt an upgrade whenever the klusterlet's bundleVersion changes
+		// attempt an upgrade whenever the klusterlet's bundleVersion or values change
 		upgrade, err := spokeNeedsUpgrade(ctx, kClient, spoke)
 		if err != nil {
 			return fmt.Errorf("failed to check if spoke cluster needs upgrade: %w", err)
 		}
-		if upgrade {
+		hashChanged := false
+		prevJs := getJoinedSpoke(fc.Status.JoinedSpokes, spoke.Name)
+		if prevJs != nil {
+			hashChanged = prevJs.KlusterletHash != currKlusterletHash
+		}
+		if upgrade || hashChanged {
 			if err := upgradeSpoke(ctx, kClient, fc, spoke); err != nil {
 				return fmt.Errorf("failed to upgrade spoke cluster %s: %w", spoke.Name, err)
 			}
@@ -189,25 +208,22 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 				"AddonsEnabled", spoke.AddonEnableType(), metav1.ConditionTrue, metav1.ConditionTrue,
 			))
 		}
+
 	}
 
-	// Only spokes which are joined, are eligible to be unjoined
-	for i, spoke := range fc.Spec.Spokes {
-		joinedCondition := fc.GetCondition(spoke.JoinType())
-		if joinedCondition == nil || joinedCondition.Status != metav1.ConditionTrue {
-			continue
-		}
-		js := v1alpha1.JoinedSpoke{
-			Name:                    spoke.Name,
-			Kubeconfig:              spoke.Kubeconfig,
-			PurgeKlusterletOperator: spoke.Klusterlet.PurgeOperator,
-			EnabledAddons:           allEnabledAddons[i],
-		}
-		joinedSpokes = append(joinedSpokes, js)
-	}
 	fc.Status.JoinedSpokes = joinedSpokes
 
 	return nil
+}
+
+func getJoinedSpoke(js []v1alpha1.JoinedSpoke, spokeName string) *v1alpha1.JoinedSpoke {
+	i := slices.IndexFunc(js, func(s v1alpha1.JoinedSpoke) bool {
+		return spokeName == s.Name
+	})
+	if i == -1 {
+		return nil
+	}
+	return &js[i]
 }
 
 func getJoinedCondition(managedCluster *clusterv1.ManagedCluster) *metav1.Condition {
@@ -468,7 +484,7 @@ func spokeNeedsUpgrade(ctx context.Context, kClient client.Client, spoke v1alpha
 		"activeBundleVersion", activeBundleVersion,
 		"desiredBundleVersion", spoke.Klusterlet.Source.BundleVersion,
 	)
-	return activeBundleVersion == spoke.Klusterlet.Source.BundleVersion, nil
+	return activeBundleVersion != spoke.Klusterlet.Source.BundleVersion, nil
 }
 
 // upgradeSpoke upgrades the Spoke cluster's klusterlet to the specified version

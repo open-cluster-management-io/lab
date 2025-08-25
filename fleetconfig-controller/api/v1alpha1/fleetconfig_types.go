@@ -458,6 +458,11 @@ type JoinedSpoke struct {
 	// +kubebuilder:default:={}
 	// +optional
 	EnabledAddons []string `json:"enabledAddons,omitempty"`
+
+	// KlusterletHash is a hash of spoke.klusterlet.values, if set
+	// +kubebuilder:default:=""
+	// +optional
+	KlusterletHash string `json:"klusterletHash,omitempty"`
 }
 
 // GetName returns the name of the joined spoke cluster.

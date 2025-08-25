@@ -248,7 +248,7 @@ func hubNeedsUpgrade(ctx context.Context, fc *v1alpha1.FleetConfig, operatorC *o
 		"activeBundleVersion", activeBundleVersion,
 		"desiredBundleVersion", fc.Spec.Hub.ClusterManager.Source.BundleVersion,
 	)
-	return activeBundleVersion == fc.Spec.Hub.ClusterManager.Source.BundleVersion, nil
+	return activeBundleVersion != fc.Spec.Hub.ClusterManager.Source.BundleVersion, nil
 }
 
 // getClusterManager retrieves the ClusterManager resource from the Hub cluster
