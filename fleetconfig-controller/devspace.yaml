@@ -89,8 +89,7 @@ deployments:
       values:
         devspaceEnabled: true
       valuesFiles:
-      # - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
-      - ${CONTEXT}/tmp/values-test.yaml
+      - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
 
   fleetconfig-controller-local:
     helm:
