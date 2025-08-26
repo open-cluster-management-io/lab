@@ -207,6 +207,7 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 			Name:                    spoke.Name,
 			Kubeconfig:              spoke.Kubeconfig,
 			PurgeKlusterletOperator: spoke.Klusterlet.PurgeOperator,
+			EnabledAddons:           enabledAddons,
 			KlusterletHash:          currKlusterletHash,
 		}
 		joinedSpokes = append(joinedSpokes, js)
