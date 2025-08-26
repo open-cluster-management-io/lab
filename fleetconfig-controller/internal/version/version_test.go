@@ -50,3 +50,43 @@ func TestLowestBundleVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalize(t *testing.T) {
+	tests := []struct {
+		name    string
+		version string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:    "valid version with v prefix",
+			version: "v1.2.3",
+			want:    "1.2.3",
+			wantErr: false,
+		},
+		{
+			name:    "valid version without v prefix",
+			version: "1.2.3",
+			want:    "1.2.3",
+			wantErr: false,
+		},
+		{
+			name:    "invalid version string",
+			version: "invalid-version",
+			want:    "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Normalize(tt.version)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Normalize(%v) error = %v, wantErr %v", tt.version, err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("Normalize(%v) = %v, want %v", tt.version, got, tt.want)
+			}
+		})
+	}
+}
