@@ -219,14 +219,14 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 	return nil
 }
 
-func getJoinedSpoke(js []v1alpha1.JoinedSpoke, spokeName string) (*v1alpha1.JoinedSpoke, bool) {
+func getJoinedSpoke(js []v1alpha1.JoinedSpoke, spokeName string) (v1alpha1.JoinedSpoke, bool) {
 	i := slices.IndexFunc(js, func(s v1alpha1.JoinedSpoke) bool {
 		return spokeName == s.Name
 	})
 	if i == -1 {
-		return nil, false
+		return v1alpha1.JoinedSpoke{}, false
 	}
-	return &js[i], true
+	return js[i], true
 }
 
 func getJoinedCondition(managedCluster *clusterv1.ManagedCluster) *metav1.Condition {
