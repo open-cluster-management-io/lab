@@ -173,8 +173,8 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 			return fmt.Errorf("failed to check if spoke cluster needs upgrade: %w", err)
 		}
 		hashChanged := false
-		prevJs := getJoinedSpoke(fc.Status.JoinedSpokes, spoke.Name)
-		if prevJs != nil {
+		prevJs, found := getJoinedSpoke(fc.Status.JoinedSpokes, spoke.Name)
+		if found {
 			hashChanged = prevJs.KlusterletHash != currKlusterletHash
 			logger.V(0).Info("comparing klusterlet values hash",
 				"spoke", spoke.Name,
@@ -218,14 +218,14 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 	return nil
 }
 
-func getJoinedSpoke(js []v1alpha1.JoinedSpoke, spokeName string) *v1alpha1.JoinedSpoke {
+func getJoinedSpoke(js []v1alpha1.JoinedSpoke, spokeName string) (*v1alpha1.JoinedSpoke, bool) {
 	i := slices.IndexFunc(js, func(s v1alpha1.JoinedSpoke) bool {
 		return spokeName == s.Name
 	})
 	if i == -1 {
-		return nil
+		return nil, false
 	}
-	return &js[i]
+	return &js[i], true
 }
 
 func getJoinedCondition(managedCluster *clusterv1.ManagedCluster) *metav1.Condition {
