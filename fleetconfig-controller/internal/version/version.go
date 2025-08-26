@@ -45,7 +45,7 @@ func LowestBundleVersion(ctx context.Context, bundleSpecs []string) (string, err
 	return semvers[0].String(), nil
 }
 
-// Normalize returns a semver string with the leading `v` prefix stipped off
+// Normalize returns a semver string with the leading `v` prefix stripped off
 func Normalize(v string) (string, error) {
 	sv, err := semver.NewVersion(v)
 	if err != nil {

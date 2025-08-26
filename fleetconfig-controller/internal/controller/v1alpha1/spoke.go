@@ -166,7 +166,7 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 		// attempt an upgrade whenever the klusterlet's bundleVersion or values change
 		currKlusterletHash, err := hash.ComputeHash(spoke.Klusterlet.Values)
 		if err != nil {
-			return fmt.Errorf("failed to compue hash of spoke %s klusterlet values: %w", spoke.Name, err)
+			return fmt.Errorf("failed to compute hash of spoke %s klusterlet values: %w", spoke.Name, err)
 		}
 		upgrade, err := spokeNeedsUpgrade(ctx, kClient, spoke)
 		if err != nil {
@@ -176,6 +176,11 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 		prevJs := getJoinedSpoke(fc.Status.JoinedSpokes, spoke.Name)
 		if prevJs != nil {
 			hashChanged = prevJs.KlusterletHash != currKlusterletHash
+			logger.V(0).Info("comparing klusterlet values hash",
+				"spoke", spoke.Name,
+				"prevHash", prevJs.KlusterletHash,
+				"currHash", currKlusterletHash,
+			)
 		}
 		if upgrade || hashChanged {
 			if err := upgradeSpoke(ctx, kClient, fc, spoke); err != nil {
@@ -476,16 +481,16 @@ func spokeNeedsUpgrade(ctx context.Context, kClient client.Client, spoke v1alpha
 	if err != nil {
 		return false, fmt.Errorf("failed to detect bundleVersion from klusterlet spec: %w", err)
 	}
-	requestedBundleVersion, err := version.Normalize(spoke.Klusterlet.Source.BundleVersion)
+	desiredBundleVersion, err := version.Normalize(spoke.Klusterlet.Source.BundleVersion)
 	if err != nil {
 		return false, err
 	}
 
 	logger.V(0).Info("found klusterlet bundleVersions",
 		"activeBundleVersion", activeBundleVersion,
-		"desiredBundleVersion", requestedBundleVersion,
+		"desiredBundleVersion", desiredBundleVersion,
 	)
-	return activeBundleVersion != requestedBundleVersion, nil
+	return activeBundleVersion != desiredBundleVersion, nil
 }
 
 // upgradeSpoke upgrades the Spoke cluster's klusterlet to the specified version

@@ -243,16 +243,16 @@ func hubNeedsUpgrade(ctx context.Context, fc *v1alpha1.FleetConfig, operatorC *o
 	if err != nil {
 		return false, fmt.Errorf("failed to detect bundleVersion from clustermanager spec: %w", err)
 	}
-	requestedBundleVersion, err := version.Normalize(fc.Spec.Hub.ClusterManager.Source.BundleVersion)
+	desiredBundleVersion, err := version.Normalize(fc.Spec.Hub.ClusterManager.Source.BundleVersion)
 	if err != nil {
 		return false, err
 	}
 
 	logger.V(0).Info("found clustermanager bundleVersions",
 		"activeBundleVersion", activeBundleVersion,
-		"desiredBundleVersion", requestedBundleVersion,
+		"desiredBundleVersion", desiredBundleVersion,
 	)
-	return activeBundleVersion != requestedBundleVersion, nil
+	return activeBundleVersion != desiredBundleVersion, nil
 }
 
 // getClusterManager retrieves the ClusterManager resource from the Hub cluster
