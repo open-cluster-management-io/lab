@@ -176,7 +176,7 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 		prevJs, found := getJoinedSpoke(fc.Status.JoinedSpokes, spoke.Name)
 		if found {
 			hashChanged = prevJs.KlusterletHash != currKlusterletHash
-			logger.V(0).Info("comparing klusterlet values hash",
+			logger.V(2).Info("comparing klusterlet values hash",
 				"spoke", spoke.Name,
 				"prevHash", prevJs.KlusterletHash,
 				"currHash", currKlusterletHash,
