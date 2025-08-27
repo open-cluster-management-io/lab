@@ -430,7 +430,9 @@ func joinSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetCon
 	return nil
 }
 
-// spokeNeedsUpgrade checks if the klusterlet on a Spoke cluster has the desired bundle version
+// spokeNeedsUpgrade checks if the klusterlet on a Spoke cluster requires an upgrade. Upgrades are required when any of the following are true:
+//   - The bundle version in the spec does not match the klusterlet's active bundle version
+//   - The hash of the klusterlet chart values in the spec does not match the hash of the last applied klusterlet chart values
 func spokeNeedsUpgrade(ctx context.Context, kClient client.Client, spoke v1alpha1.Spoke, joinedSpokes []v1alpha1.JoinedSpoke, currKlusterletHash string) (bool, error) {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("spokeNeedsUpgrade", "spokeClusterName", spoke.Name)
