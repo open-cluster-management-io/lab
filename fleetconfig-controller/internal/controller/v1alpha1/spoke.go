@@ -168,21 +168,12 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 		if err != nil {
 			return fmt.Errorf("failed to compute hash of spoke %s klusterlet values: %w", spoke.Name, err)
 		}
-		upgrade, err := spokeNeedsUpgrade(ctx, kClient, spoke)
+		upgrade, err := spokeNeedsUpgrade(ctx, kClient, spoke, fc.Status.JoinedSpokes, currKlusterletHash)
 		if err != nil {
 			return fmt.Errorf("failed to check if spoke cluster needs upgrade: %w", err)
 		}
-		hashChanged := false
-		prevJs, found := getJoinedSpoke(fc.Status.JoinedSpokes, spoke.Name)
-		if found {
-			hashChanged = prevJs.KlusterletHash != currKlusterletHash
-			logger.V(2).Info("comparing klusterlet values hash",
-				"spoke", spoke.Name,
-				"prevHash", prevJs.KlusterletHash,
-				"currHash", currKlusterletHash,
-			)
-		}
-		if upgrade || hashChanged {
+
+		if upgrade {
 			if err := upgradeSpoke(ctx, kClient, fc, spoke); err != nil {
 				return fmt.Errorf("failed to upgrade spoke cluster %s: %w", spoke.Name, err)
 			}
@@ -440,9 +431,23 @@ func joinSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetCon
 }
 
 // spokeNeedsUpgrade checks if the klusterlet on a Spoke cluster has the desired bundle version
-func spokeNeedsUpgrade(ctx context.Context, kClient client.Client, spoke v1alpha1.Spoke) (bool, error) {
+func spokeNeedsUpgrade(ctx context.Context, kClient client.Client, spoke v1alpha1.Spoke, joinedSpokes []v1alpha1.JoinedSpoke, currKlusterletHash string) (bool, error) {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("spokeNeedsUpgrade", "spokeClusterName", spoke.Name)
+
+	hashChanged := false
+	prevJs, found := getJoinedSpoke(joinedSpokes, spoke.Name)
+	if found {
+		hashChanged = prevJs.KlusterletHash != currKlusterletHash
+		logger.V(2).Info("comparing klusterlet values hash",
+			"spoke", spoke.Name,
+			"prevHash", prevJs.KlusterletHash,
+			"currHash", currKlusterletHash,
+		)
+	}
+	if hashChanged {
+		return true, nil
+	}
 
 	if spoke.Klusterlet.Source.BundleVersion == "default" {
 		logger.V(0).Info("klusterlet bundleVersion is default, skipping upgrade")
