@@ -55,10 +55,6 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 	if err != nil {
 		return err
 	}
-	addonClient, err := common.AddOnClient(hubKubeconfig)
-	if err != nil {
-		return err
-	}
 
 	// clean up deregistered spokes
 	joinedSpokes := make([]v1alpha1.JoinedSpoke, 0)
@@ -179,7 +175,7 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 			}
 		}
 
-		enabledAddons, err := handleSpokeAddons(ctx, addonClient, spoke, fc)
+		enabledAddons, err := handleSpokeAddons(ctx, spoke, fc)
 		if err != nil {
 			msg := fmt.Sprintf("failed to enable addons for spoke cluster %s: %s", spoke.Name, err.Error())
 			fc.SetConditions(true, v1alpha1.NewCondition(
@@ -633,7 +629,7 @@ func deregisterSpoke(ctx context.Context, kClient client.Client, hubKubeconfig [
 	}
 
 	// remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
-	if err := handleAddonDisable(ctx, spoke.Name, spoke.EnabledAddons); err != nil {
+	if err := handleAddonDisable(ctx, spoke.Name, spoke.EnabledAddons, fc); err != nil {
 		fc.SetConditions(true, v1alpha1.NewCondition(
 			err.Error(), spoke.AddonDisableType(), metav1.ConditionFalse, metav1.ConditionTrue,
 		))

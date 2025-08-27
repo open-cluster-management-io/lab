@@ -2,9 +2,7 @@ package v1alpha1
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"maps"
 	"net/url"
 	"os/exec"
 	"slices"
@@ -35,12 +33,6 @@ const (
 	install   = "install"
 	uninstall = "uninstall"
 	hubAddon  = "hub-addon"
-
-	// accepetd hub addon names
-	hubAddOnArgoCD = "argocd"
-	hubAddOnGPF    = "governance-policy-framework"
-
-	argocdNamespace = "argocd"
 )
 
 func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addonapi.Clientset, fc *v1alpha1.FleetConfig) error {
@@ -94,7 +86,7 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 		return err
 	}
 
-	err = handleAddonCreate(ctx, kClient, addonC, fc, addonsToCreate)
+	err = handleAddonCreate(ctx, kClient, fc, addonsToCreate)
 	if err != nil {
 		return err
 	}
@@ -102,7 +94,7 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 	return nil
 }
 
-func handleAddonCreate(ctx context.Context, kClient client.Client, addonC *addonapi.Clientset, fc *v1alpha1.FleetConfig, addons []v1alpha1.AddOnConfig) error {
+func handleAddonCreate(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetConfig, addons []v1alpha1.AddOnConfig) error {
 	if len(addons) == 0 {
 		return nil
 	}
@@ -125,6 +117,7 @@ func handleAddonCreate(ctx context.Context, kClient client.Client, addonC *addon
 			create,
 			a.Name,
 			fmt.Sprintf("--version=%s", a.Version),
+			fmt.Sprintf("--labels=%v", v1alpha1.ManagedBySelector.String()),
 		}, fc.BaseArgs()...)
 
 		// Extract manifest configuration from ConfigMap
@@ -173,67 +166,7 @@ func handleAddonCreate(ctx context.Context, kClient client.Client, addonC *addon
 			return fmt.Errorf("failed to create addon: %v, output: %s", err, string(out))
 		}
 		logger.V(0).Info("created addon", "AddOnTemplate", a.Name, "output", string(stdout))
-
-		// label created resources
-		err = labelConfigurationResources(ctx, addonC, a)
-		if err != nil {
-			logger.V(0).Error(err, "failed to label addon resources", "addon", a.Name, "version", a.Version)
-		}
 	}
-	return nil
-}
-
-// labelConfigurationResources labels the AddOnTemplate and ClusterManagementAddOn resources created for an addon
-func labelConfigurationResources(ctx context.Context, addonC *addonapi.Clientset, addon v1alpha1.AddOnConfig) error {
-	logger := log.FromContext(ctx)
-
-	// Label AddOnTemplate with a.Name-a.Version
-	addonTemplateName := fmt.Sprintf("%s-%s", addon.Name, addon.Version)
-	addonTemplate, err := addonC.AddonV1alpha1().AddOnTemplates().Get(ctx, addonTemplateName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get AddOnTemplate %s: %v", addonTemplateName, err)
-	}
-
-	// Add managedBy label to AddOnTemplate
-	if addonTemplate.Labels == nil {
-		addonTemplate.Labels = make(map[string]string)
-	}
-	maps.Copy(addonTemplate.Labels, v1alpha1.ManagedByLabels)
-
-	patchBytes, err := json.Marshal(labelPatchData(addonTemplate.Labels))
-	if err != nil {
-		return fmt.Errorf("failed to marshal patch data for AddOnTemplate %s: %v", addonTemplateName, err)
-	}
-
-	_, err = addonC.AddonV1alpha1().AddOnTemplates().Patch(ctx, addonTemplate.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to update AddOnTemplate %s with labels: %v", addonTemplateName, err)
-	}
-	logger.V(2).Info("labeled AddOnTemplate", "name", addonTemplateName, "label", v1alpha1.LabelAddOnManagedBy)
-
-	// Label ClusterManagementAddOn with a.Name
-	clusterMgmtAddOn, err := addonC.AddonV1alpha1().ClusterManagementAddOns().Get(ctx, addon.Name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get ClusterManagementAddOn %s: %v", addon.Name, err)
-	}
-
-	// Add managedBy label to ClusterManagementAddOn
-	if clusterMgmtAddOn.Labels == nil {
-		clusterMgmtAddOn.Labels = make(map[string]string)
-	}
-	maps.Copy(clusterMgmtAddOn.Labels, v1alpha1.ManagedByLabels)
-
-	patchBytes, err = json.Marshal(labelPatchData(clusterMgmtAddOn.Labels))
-	if err != nil {
-		return fmt.Errorf("failed to marshal patch data for ClusterManagementAddOn %s: %v", addon.Name, err)
-	}
-
-	_, err = addonC.AddonV1alpha1().ClusterManagementAddOns().Patch(ctx, clusterMgmtAddOn.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to update ClusterManagementAddOn %s with labels: %v", addon.Name, err)
-	}
-	logger.V(2).Info("labeled ClusterManagementAddOn", "name", addon.Name, "label", v1alpha1.LabelAddOnManagedBy)
-
 	return nil
 }
 
@@ -307,7 +240,7 @@ func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, fc *v1al
 	return nil
 }
 
-func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke v1alpha1.Spoke, fc *v1alpha1.FleetConfig) ([]string, error) {
+func handleSpokeAddons(ctx context.Context, spoke v1alpha1.Spoke, fc *v1alpha1.FleetConfig) ([]string, error) {
 	var enabledAddons []string
 
 	addons := spoke.AddOns
@@ -357,7 +290,7 @@ func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke v1
 	}
 
 	// do disables first, then enables/updates
-	err := handleAddonDisable(ctx, spoke.Name, addonsToDisable)
+	err := handleAddonDisable(ctx, spoke.Name, addonsToDisable, fc)
 	if err != nil {
 		return enabledAddons, err
 	}
@@ -370,7 +303,7 @@ func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke v1
 	}
 
 	// Enable new addons and updated addons
-	newEnabledAddons, err := handleAddonEnable(ctx, addonC, spoke.Name, addonsToEnable)
+	newEnabledAddons, err := handleAddonEnable(ctx, spoke.Name, addonsToEnable, fc)
 	// even if an error is returned, any addon which was successfully enabled is tracked, so append before returning
 	enabledAddons = append(enabledAddons, newEnabledAddons...)
 	if err != nil {
@@ -380,7 +313,7 @@ func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke v1
 	return enabledAddons, nil
 }
 
-func handleAddonEnable(ctx context.Context, addonC *addonapi.Clientset, spokeName string, addons []v1alpha1.AddOn) ([]string, error) {
+func handleAddonEnable(ctx context.Context, spokeName string, addons []v1alpha1.AddOn, fc *v1alpha1.FleetConfig) ([]string, error) {
 	if len(addons) == 0 {
 		return nil, nil
 	}
@@ -388,11 +321,12 @@ func handleAddonEnable(ctx context.Context, addonC *addonapi.Clientset, spokeNam
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("enableAddOns", "managedcluster", spokeName)
 
-	baseArgs := []string{
+	baseArgs := append([]string{
 		addon,
 		enable,
 		fmt.Sprintf("--cluster=%s", spokeName),
-	}
+		fmt.Sprintf("--labels=%v", v1alpha1.ManagedBySelector.String()),
+	}, fc.BaseArgs()...)
 
 	var enableErrs []error
 	enabledAddons := make([]string, 0)
@@ -419,11 +353,6 @@ func handleAddonEnable(ctx context.Context, addonC *addonapi.Clientset, spokeNam
 			enableErrs = append(enableErrs, fmt.Errorf("failed to enable addon: %v, output: %s", err, string(out)))
 			continue
 		}
-		err = labelManagedClusterAddOn(ctx, addonC, spokeName, a.ConfigName)
-		if err != nil {
-			enableErrs = append(enableErrs, err)
-			continue
-		}
 		enabledAddons = append(enabledAddons, a.ConfigName)
 		logger.V(1).Info("enabled addon", "managedcluster", spokeName, "addon", a.ConfigName, "output", string(stdout))
 	}
@@ -434,34 +363,7 @@ func handleAddonEnable(ctx context.Context, addonC *addonapi.Clientset, spokeNam
 	return enabledAddons, nil
 }
 
-func labelManagedClusterAddOn(ctx context.Context, addonC *addonapi.Clientset, spokeName, addonName string) error {
-	logger := log.FromContext(ctx)
-
-	mcao, err := addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).Get(ctx, addonName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get ManagedClusterAddOn %s for spoke %s: %v", addonName, spokeName, err)
-	}
-
-	if mcao.Labels == nil {
-		mcao.Labels = make(map[string]string)
-	}
-	maps.Copy(mcao.Labels, v1alpha1.ManagedByLabels)
-
-	patchBytes, err := json.Marshal(labelPatchData(mcao.Labels))
-	if err != nil {
-		return fmt.Errorf("failed to marshal patch data for ManagedClusterAddOn %s: %v", addonName, err)
-	}
-
-	_, err = addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).Patch(ctx, mcao.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to update ManagedClusterAddOn %s for spoke %s with labels: %v", addonName, spokeName, err)
-	}
-	logger.V(2).Info("labeled ManagedClusterAddOn", "name", addonName, "spoke", spokeName, "label", v1alpha1.LabelAddOnManagedBy)
-
-	return nil
-}
-
-func handleAddonDisable(ctx context.Context, spokeName string, addons []string) error {
+func handleAddonDisable(ctx context.Context, spokeName string, addons []string, fc *v1alpha1.FleetConfig) error {
 	if len(addons) == 0 {
 		return nil
 	}
@@ -469,12 +371,12 @@ func handleAddonDisable(ctx context.Context, spokeName string, addons []string) 
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("disableAddOns", "managedcluster", spokeName)
 
-	args := []string{
+	args := append([]string{
 		addon,
 		disable,
 		fmt.Sprintf("--names=%s", strings.Join(addons, ",")),
 		fmt.Sprintf("--clusters=%s", spokeName),
-	}
+	}, fc.BaseArgs()...)
 
 	logger.V(7).Info("running", "command", clusteradm, "args", args)
 	cmd := exec.Command(clusteradm, args...)
@@ -506,7 +408,7 @@ func isHubAddOnMatching(installed v1alpha1.InstalledHubAddOn, desired v1alpha1.H
 		installed.BundleVersion == bundleVersion
 }
 
-func handleHubAddons(ctx context.Context, kClient client.Client, addonC *addonapi.Clientset, fc *v1alpha1.FleetConfig) error {
+func handleHubAddons(ctx context.Context, addonC *addonapi.Clientset, fc *v1alpha1.FleetConfig) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("handleHubAddons", "fleetconfig", fc.Name)
 
@@ -543,12 +445,12 @@ func handleHubAddons(ctx context.Context, kClient client.Client, addonC *addonap
 	}
 
 	// do uninstalls first, then installs
-	err := handleHubAddonUninstall(ctx, addonsToUninstall)
+	err := handleHubAddonUninstall(ctx, addonsToUninstall, fc)
 	if err != nil {
 		return err
 	}
 
-	err = handleHubAddonInstall(ctx, kClient, addonC, addonsToInstall, bundleVersion)
+	err = handleHubAddonInstall(ctx, addonC, addonsToInstall, bundleVersion, fc)
 	if err != nil {
 		return err
 	}
@@ -566,7 +468,7 @@ func handleHubAddons(ctx context.Context, kClient client.Client, addonC *addonap
 	return nil
 }
 
-func handleHubAddonUninstall(ctx context.Context, addons []v1alpha1.InstalledHubAddOn) error {
+func handleHubAddonUninstall(ctx context.Context, addons []v1alpha1.InstalledHubAddOn, fc *v1alpha1.FleetConfig) error {
 	if len(addons) == 0 {
 		return nil
 	}
@@ -576,11 +478,11 @@ func handleHubAddonUninstall(ctx context.Context, addons []v1alpha1.InstalledHub
 
 	var errs []error
 	for _, addon := range addons {
-		args := []string{
+		args := append([]string{
 			uninstall,
 			hubAddon,
 			fmt.Sprintf("--names=%s", addon.Name),
-		}
+		}, fc.BaseArgs()...)
 		if addon.Namespace != "" {
 			args = append(args, fmt.Sprintf("--namespace=%s", addon.Namespace))
 		}
@@ -603,7 +505,7 @@ func handleHubAddonUninstall(ctx context.Context, addons []v1alpha1.InstalledHub
 	return nil
 }
 
-func handleHubAddonInstall(ctx context.Context, kClient client.Client, addonC *addonapi.Clientset, addons []v1alpha1.HubAddOn, bundleVersion string) error {
+func handleHubAddonInstall(ctx context.Context, addonC *addonapi.Clientset, addons []v1alpha1.HubAddOn, bundleVersion string, fc *v1alpha1.FleetConfig) error {
 	if len(addons) == 0 {
 		return nil
 	}
@@ -624,27 +526,13 @@ func handleHubAddonInstall(ctx context.Context, kClient client.Client, addonC *a
 			continue
 		}
 
-		// workaround until https://github.com/open-cluster-management-io/clusteradm/pull/510 is merged/released
-		if addon.Name == hubAddOnArgoCD && addon.CreateNamespace {
-			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: argocdNamespace,
-				},
-			}
-			err := kClient.Create(ctx, ns)
-			if err != nil && !kerrs.IsAlreadyExists(err) {
-				errs = append(errs, fmt.Errorf("failed to create namespace for hubAddon %s: %v", addon.Name, err))
-				continue
-			}
-		}
-
-		args := []string{
+		args := append([]string{
 			install,
 			hubAddon,
 			fmt.Sprintf("--names=%s", addon.Name),
 			fmt.Sprintf("--bundle-version=%s", bundleVersion),
 			fmt.Sprintf("--create-namespace=%t", addon.CreateNamespace),
-		}
+		}, fc.BaseArgs()...)
 		if addon.InstallNamespace != "" {
 			args = append(args, fmt.Sprintf("--namespace=%s", addon.InstallNamespace))
 		}
@@ -675,12 +563,4 @@ func isAddonInstalled(ctx context.Context, addonC *addonapi.Clientset, addonName
 	// and handle deleting addOnConfigs first
 	// so if the addon is found here, we can assume it was previously installed by `install hub-addon`
 	return true, nil
-}
-
-func labelPatchData(labels map[string]string) map[string]any {
-	return map[string]any{
-		"metadata": map[string]any{
-			"labels": labels,
-		},
-	}
 }
