@@ -16,7 +16,7 @@ RUN apk add --no-cache bash curl python3 py3-pip
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
 # Install clusteradm
-ARG CLUSTERADM_VERSION=1.0.1
+ARG CLUSTERADM_VERSION=1.0.2
 RUN curl -L https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/install.sh | bash -s -- ${CLUSTERADM_VERSION}
 
 # Install aws-iam-authenticator if building for EKS
