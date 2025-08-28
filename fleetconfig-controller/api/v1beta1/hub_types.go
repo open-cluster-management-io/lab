@@ -20,25 +20,138 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // HubSpec defines the desired state of Hub
 type HubSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	// The following markers will use OpenAPI v3 schema to validate the value
-	// More info: https://book.kubebuilder.io/reference/markers/crd-validation.html
-
-	// foo is an example field of Hub. Edit hub_types.go to remove/update
+	// APIServer is the API server URL for the Hub cluster. If provided, spokes clusters will
+	// join the hub using this API server instead of the one in the bootstrap kubeconfig.
+	// Spoke clusters with ForceInternalEndpointLookup set to true will ignore this field.
 	// +optional
-	Foo *string `json:"foo,omitempty"`
+	APIServer string `json:"apiServer,omitempty"`
+
+	// Hub cluster CA certificate, optional
+	// +optional
+	Ca string `json:"ca,omitempty"`
+
+	// ClusterManager configuration.
+	// +optional
+	ClusterManager *ClusterManager `json:"clusterManager,omitempty"`
+
+	// If true, create open-cluster-management namespace, otherwise use existing one.
+	// +kubebuilder:default:=true
+	// +optional
+	CreateNamespace bool `json:"createNamespace,omitempty"`
+
+	// If set, the hub will be reinitialized.
+	// +optional
+	Force bool `json:"force,omitempty"`
+
+	// Kubeconfig details for the Hub cluster.
+	// +required
+	Kubeconfig Kubeconfig `json:"kubeconfig"`
+
+	// Singleton control plane configuration. If provided, deploy a singleton control plane instead of clustermanager.
+	// This is an alpha stage flag.
+	// +optional
+	SingletonControlPlane *SingletonControlPlane `json:"singleton,omitempty"`
+}
+
+// SingletonControlPlane is the configuration for a singleton control plane
+type SingletonControlPlane struct {
+	// The name of the singleton control plane.
+	// +kubebuilder:default:="singleton-controlplane"
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Helm configuration for the multicluster-controlplane Helm chart.
+	// For now https://open-cluster-management.io/helm-charts/ocm/multicluster-controlplane is always used - no private registry support.
+	// See: https://github.com/open-cluster-management-io/multicluster-controlplane/blob/main/charts/multicluster-controlplane/values.yaml
+	// +optional
+	Helm *Helm `json:"helm,omitempty"`
+}
+
+// Helm is the configuration for helm.
+type Helm struct {
+	// Raw, YAML-formatted Helm values.
+	// +optional
+	Values string `json:"values,omitempty"`
+
+	// Comma-separated Helm values, e.g., key1=val1,key2=val2.
+	// +optional
+	Set []string `json:"set,omitempty"`
+
+	// Comma-separated Helm JSON values, e.g., key1=jsonval1,key2=jsonval2.
+	// +optional
+	SetJSON []string `json:"setJson,omitempty"`
+
+	// Comma-separated Helm literal STRING values.
+	// +optional
+	SetLiteral []string `json:"setLiteral,omitempty"`
+
+	// Comma-separated Helm STRING values, e.g., key1=val1,key2=val2.
+	// +optional
+	SetString []string `json:"setString,omitempty"`
+}
+
+// ClusterManager is the configuration for a cluster manager.
+type ClusterManager struct {
+	// A set of comma-separated pairs of the form 'key1=value1,key2=value2' that describe feature gates for alpha/experimental features.
+	// Options are:
+	//  - AddonManagement (ALPHA - default=true)
+	//  - AllAlpha (ALPHA - default=false)
+	//  - AllBeta (BETA - default=false)
+	//  - CloudEventsDrivers (ALPHA - default=false)
+	//  - DefaultClusterSet (ALPHA - default=false)
+	//  - ManagedClusterAutoApproval (ALPHA - default=false)
+	//  - ManifestWorkReplicaSet (ALPHA - default=false)
+	//  - NilExecutorValidating (ALPHA - default=false)
+	//  - ResourceCleanup (BETA - default=true)
+	//  - V1beta1CSRAPICompatibility (ALPHA - default=false)
+	// +kubebuilder:default:="AddonManagement=true"
+	// +optional
+	FeatureGates string `json:"featureGates,omitempty"`
+
+	// If set, the cluster manager operator will be purged and the open-cluster-management namespace deleted
+	// when the FleetConfig CR is deleted.
+	// +kubebuilder:default:=true
+	// +optional
+	PurgeOperator bool `json:"purgeOperator,omitempty"`
+
+	// Resource specifications for all clustermanager-managed containers.
+	// +kubebuilder:default:={}
+	// +optional
+	Resources ResourceSpec `json:"resources,omitzero"`
+
+	// Version and image registry details for the cluster manager.
+	// +kubebuilder:default:={}
+	// +optional
+	Source OCMSource `json:"source,omitzero"`
+
+	// If set, the bootstrap token will used instead of a service account token.
+	// +optional
+	UseBootstrapToken bool `json:"useBootstrapToken,omitempty"`
 }
 
 // HubStatus defines the observed state of Hub.
 type HubStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Phase is the current phase of the Hub reconcile.
+	Phase string `json:"phase,omitempty"`
+
+	// Conditions are the current conditions of the Hub.
+	Conditions []Condition `json:"conditions,omitempty"`
+
+	InstalledHubAddOns []InstalledHubAddOn `json:"installedHubAddOns,omitempty"`
+}
+
+// InstalledHubAddOn tracks metadata for each hubAddon that is successfully installed on the hub.
+type InstalledHubAddOn struct {
+	// BundleVersion is the bundle version used when installing the addon.
+	BundleVersion string `json:"bundleVersion"`
+
+	// Name is the name of the addon.
+	Name string `json:"name"`
+
+	// Namespace is the namespace that the addon was installed into.
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // +kubebuilder:object:root=true

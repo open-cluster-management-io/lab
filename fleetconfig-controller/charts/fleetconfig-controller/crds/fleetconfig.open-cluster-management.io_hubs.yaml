@@ -39,13 +39,273 @@ spec:
           spec:
             description: spec defines the desired state of Hub
             properties:
-              foo:
-                description: foo is an example field of Hub. Edit hub_types.go to
-                  remove/update
+              apiServer:
+                description: |-
+                  APIServer is the API server URL for the Hub cluster. If provided, spokes clusters will
+                  join the hub using this API server instead of the one in the bootstrap kubeconfig.
+                  Spoke clusters with ForceInternalEndpointLookup set to true will ignore this field.
                 type: string
+              ca:
+                description: Hub cluster CA certificate, optional
+                type: string
+              clusterManager:
+                description: ClusterManager configuration.
+                properties:
+                  featureGates:
+                    default: AddonManagement=true
+                    description: |-
+                      A set of comma-separated pairs of the form 'key1=value1,key2=value2' that describe feature gates for alpha/experimental features.
+                      Options are:
+                       - AddonManagement (ALPHA - default=true)
+                       - AllAlpha (ALPHA - default=false)
+                       - AllBeta (BETA - default=false)
+                       - CloudEventsDrivers (ALPHA - default=false)
+                       - DefaultClusterSet (ALPHA - default=false)
+                       - ManagedClusterAutoApproval (ALPHA - default=false)
+                       - ManifestWorkReplicaSet (ALPHA - default=false)
+                       - NilExecutorValidating (ALPHA - default=false)
+                       - ResourceCleanup (BETA - default=true)
+                       - V1beta1CSRAPICompatibility (ALPHA - default=false)
+                    type: string
+                  purgeOperator:
+                    default: true
+                    description: |-
+                      If set, the cluster manager operator will be purged and the open-cluster-management namespace deleted
+                      when the FleetConfig CR is deleted.
+                    type: boolean
+                  resources:
+                    default: {}
+                    description: Resource specifications for all clustermanager-managed
+                      containers.
+                    properties:
+                      limits:
+                        description: The resource limits of all the containers managed
+                          by the Cluster Manager or Klusterlet operators.
+                        properties:
+                          cpu:
+                            description: The number of CPU units to request, e.g.,
+                              '800m'.
+                            type: string
+                          memory:
+                            description: The amount of memory to request, e.g., '8Gi'.
+                            type: string
+                        type: object
+                      qosClass:
+                        default: Default
+                        description: |-
+                          The resource QoS class of all the containers managed by the Cluster Manager or Klusterlet operators.
+                          One of Default, BestEffort or ResourceRequirement.
+                        enum:
+                        - Default
+                        - BestEffort
+                        - ResourceRequirement
+                        type: string
+                      requests:
+                        description: The resource requests of all the containers managed
+                          by the Cluster Manager or Klusterlet operators.
+                        properties:
+                          cpu:
+                            description: The number of CPU units to request, e.g.,
+                              '800m'.
+                            type: string
+                          memory:
+                            description: The amount of memory to request, e.g., '8Gi'.
+                            type: string
+                        type: object
+                    type: object
+                  source:
+                    default: {}
+                    description: Version and image registry details for the cluster
+                      manager.
+                    properties:
+                      bundleVersion:
+                        default: default
+                        description: |-
+                          The version of predefined compatible image versions (e.g. v0.6.0). Defaults to the latest released version.
+                          You can also set "latest" to install the latest development version.
+                        type: string
+                      registry:
+                        default: quay.io/open-cluster-management
+                        description: The name of the image registry serving OCM images,
+                          which will be used for all OCM components."
+                        type: string
+                    type: object
+                  useBootstrapToken:
+                    description: If set, the bootstrap token will used instead of
+                      a service account token.
+                    type: boolean
+                type: object
+              createNamespace:
+                default: true
+                description: If true, create open-cluster-management namespace, otherwise
+                  use existing one.
+                type: boolean
+              force:
+                description: If set, the hub will be reinitialized.
+                type: boolean
+              kubeconfig:
+                description: Kubeconfig details for the Hub cluster.
+                properties:
+                  context:
+                    description: The context to use in the kubeconfig file.
+                    type: string
+                  inCluster:
+                    description: |-
+                      If set, the kubeconfig will be read from the cluster.
+                      Only applicable for same-cluster operations.
+                      Defaults to false.
+                    type: boolean
+                  secretReference:
+                    description: |-
+                      A reference to an existing secret containing a kubeconfig.
+                      Must be provided for remote clusters.
+                      For same-cluster, must be provided unless InCluster is set to true.
+                    properties:
+                      kubeconfigKey:
+                        default: kubeconfig
+                        description: The map key to access the kubeconfig. Defaults
+                          to 'kubeconfig'.
+                        type: string
+                      name:
+                        description: The name of the secret.
+                        type: string
+                      namespace:
+                        description: The namespace the secret is in.
+                        type: string
+                    required:
+                    - name
+                    - namespace
+                    type: object
+                type: object
+              singleton:
+                description: |-
+                  Singleton control plane configuration. If provided, deploy a singleton control plane instead of clustermanager.
+                  This is an alpha stage flag.
+                properties:
+                  helm:
+                    description: |-
+                      Helm configuration for the multicluster-controlplane Helm chart.
+                      For now https://open-cluster-management.io/helm-charts/ocm/multicluster-controlplane is always used - no private registry support.
+                      See: https://github.com/open-cluster-management-io/multicluster-controlplane/blob/main/charts/multicluster-controlplane/values.yaml
+                    properties:
+                      set:
+                        description: Comma-separated Helm values, e.g., key1=val1,key2=val2.
+                        items:
+                          type: string
+                        type: array
+                      setJson:
+                        description: Comma-separated Helm JSON values, e.g., key1=jsonval1,key2=jsonval2.
+                        items:
+                          type: string
+                        type: array
+                      setLiteral:
+                        description: Comma-separated Helm literal STRING values.
+                        items:
+                          type: string
+                        type: array
+                      setString:
+                        description: Comma-separated Helm STRING values, e.g., key1=val1,key2=val2.
+                        items:
+                          type: string
+                        type: array
+                      values:
+                        description: Raw, YAML-formatted Helm values.
+                        type: string
+                    type: object
+                  name:
+                    default: singleton-controlplane
+                    description: The name of the singleton control plane.
+                    type: string
+                type: object
+            required:
+            - kubeconfig
             type: object
           status:
             description: status defines the observed state of Hub
+            properties:
+              conditions:
+                description: Conditions are the current conditions of the Hub.
+                items:
+                  description: Condition describes the state of a FleetConfig.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                    wantStatus:
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  - wantStatus
+                  type: object
+                type: array
+              installedHubAddOns:
+                items:
+                  description: InstalledHubAddOn tracks metadata for each hubAddon
+                    that is successfully installed on the hub.
+                  properties:
+                    bundleVersion:
+                      description: BundleVersion is the bundle version used when installing
+                        the addon.
+                      type: string
+                    name:
+                      description: Name is the name of the addon.
+                      type: string
+                    namespace:
+                      description: Namespace is the namespace that the addon was installed
+                        into.
+                      type: string
+                  required:
+                  - bundleVersion
+                  - name
+                  type: object
+                type: array
+              phase:
+                description: Phase is the current phase of the Hub reconcile.
+                type: string
             type: object
         required:
         - spec
