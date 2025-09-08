@@ -86,27 +86,29 @@ func handleHub(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetCon
 		v1alpha1.FleetConfigHubInitialized, v1alpha1.FleetConfigHubInitialized, metav1.ConditionTrue, metav1.ConditionTrue,
 	))
 
-	err = handleAddonConfig(ctx, kClient, addonC, fc)
-	if err != nil {
+	addonConfigChanged, err := handleAddonConfig(ctx, kClient, addonC, fc)
+	if err != nil && addonConfigChanged {
 		fc.SetConditions(true, v1alpha1.NewCondition(
 			err.Error(), v1alpha1.FleetConfigAddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
 		))
 		return err
 	}
 
-	err = handleHubAddons(ctx, addonC, fc)
-	if err != nil {
+	hubAddonChanged, err := handleHubAddons(ctx, addonC, fc)
+	if err != nil && hubAddonChanged {
 		fc.SetConditions(true, v1alpha1.NewCondition(
 			err.Error(), v1alpha1.FleetConfigAddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
 		))
 		return err
 	}
 
-	if len(fc.Spec.AddOnConfigs)+len(fc.Spec.HubAddOns) > 0 {
+	// only set success condition if we actually managed any addons
+	if addonConfigChanged || hubAddonChanged {
 		fc.SetConditions(true, v1alpha1.NewCondition(
 			v1alpha1.FleetConfigAddonsConfigured, v1alpha1.FleetConfigAddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
 		))
 	}
+
 	// attempt an upgrade whenever the clustermanager's bundleVersion changes
 	upgrade, err := hubNeedsUpgrade(ctx, fc, operatorC)
 	if err != nil {
