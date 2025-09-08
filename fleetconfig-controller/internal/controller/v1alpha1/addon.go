@@ -44,6 +44,7 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 	// get existing addons
 	createdAddOns, err := addonC.AddonV1alpha1().AddOnTemplates().List(ctx, metav1.ListOptions{LabelSelector: v1alpha1.ManagedBySelector.String()})
 	if err != nil {
+		logger.V(1).Info("failed to list AddOnTemplates, ensure CRDs are installed.", "error", err)
 		return len(requestedAddOns) > 0, err
 	}
 
