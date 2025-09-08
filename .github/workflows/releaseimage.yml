@@ -57,7 +57,7 @@ jobs:
           path: go/src/open-cluster-management.io/lab
 
       - name: install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
 
