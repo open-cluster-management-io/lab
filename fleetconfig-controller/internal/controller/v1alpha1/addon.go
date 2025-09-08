@@ -39,13 +39,13 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("handleAddOnConfig", "fleetconfig", fc.Name)
 
+	requestedAddOns := fc.Spec.AddOnConfigs
+
 	// get existing addons
 	createdAddOns, err := addonC.AddonV1alpha1().AddOnTemplates().List(ctx, metav1.ListOptions{LabelSelector: v1alpha1.ManagedBySelector.String()})
 	if err != nil {
-		return false, err
+		return len(requestedAddOns) > 0, err
 	}
-
-	requestedAddOns := fc.Spec.AddOnConfigs
 
 	// nothing to do
 	if len(requestedAddOns) == 0 && len(createdAddOns.Items) == 0 {
