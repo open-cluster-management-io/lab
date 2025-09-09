@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -53,6 +55,27 @@ type HubSpec struct {
 	// This is an alpha stage flag.
 	// +optional
 	SingletonControlPlane *SingletonControlPlane `json:"singleton,omitempty"`
+
+	// +kubebuilder:default:={}
+	// +optional
+	RegistrationAuth RegistrationAuth `json:"registrationAuth,omitzero"`
+
+	// +optional
+	AddOnConfigs []AddOnConfig `json:"addOnConfigs,omitempty"`
+
+	// +optional
+	HubAddOns []HubAddOn `json:"hubAddOns,omitempty"`
+
+	// Timeout is the timeout in seconds for all clusteradm operations, including init, accept, join, upgrade, etc.
+	// +kubebuilder:default:=300
+	// +optional
+	Timeout int `json:"timeout,omitempty"`
+
+	// LogVerbosity is the verbosity of the logs.
+	// +kubebuilder:validation:Enum=0;1;2;3;4;5;6;7;8;9;10
+	// +kubebuilder:default:=0
+	// +optional
+	LogVerbosity int `json:"logVerbosity,omitempty"`
 }
 
 // SingletonControlPlane is the configuration for a singleton control plane
@@ -131,6 +154,71 @@ type ClusterManager struct {
 	UseBootstrapToken bool `json:"useBootstrapToken,omitempty"`
 }
 
+// RegistrationAuth provides specifications for registration authentication.
+type RegistrationAuth struct {
+	// The registration authentication driver to use.
+	// Options are:
+	//  - csr: Use the default CSR-based registration authentication.
+	//  - awsirsa: Use AWS IAM Role for Service Accounts (IRSA) registration authentication.
+	// The set of valid options is open for extension.
+	// +kubebuilder:validation:Enum=csr;awsirsa
+	// +kubebuilder:default:="csr"
+	// +optional
+	Driver string `json:"driver,omitempty"`
+
+	// The Hub cluster ARN for awsirsa registration authentication. Required when Type is awsirsa, otherwise ignored.
+	// +optional
+	HubClusterARN string `json:"hubClusterARN,omitempty"`
+
+	// List of AWS EKS ARN patterns so any EKS clusters with these patterns will be auto accepted to join with hub cluster.
+	// Example pattern: "arn:aws:eks:us-west-2:123456789013:cluster/.*"
+	// +optional
+	AutoApprovedARNPatterns []string `json:"autoApprovedARNPatterns,omitempty"`
+}
+
+// AddOnConfig is the configuration of a custom AddOn that can be installed on a cluster.
+type AddOnConfig struct {
+	// The name of the add-on.
+	// +required
+	Name string `json:"name"`
+
+	// The add-on version. Optional, defaults to "v0.0.1"
+	// +kubebuilder:default:="v0.0.1"
+	// +optional
+	Version string `json:"version,omitempty"`
+
+	// The rolebinding to the clusterrole in the cluster namespace for the addon agent
+	// +optional
+	ClusterRoleBinding string `json:"clusterRoleBinding,omitempty"`
+
+	// Enable the agent to register to the hub cluster. Optional, defaults to false.
+	// +kubebuilder:default:=false
+	// +optional
+	HubRegistration bool `json:"hubRegistration,omitempty"`
+
+	// Whether to overwrite the add-on if it already exists. Optional, defaults to false.
+	// +kubebuilder:default:=false
+	// +optional
+	Overwrite bool `json:"overwrite,omitempty"`
+}
+
+// HubAddOn is the configuration for enabling a built-in AddOn.
+type HubAddOn struct {
+	// Name is the name of the HubAddOn.
+	// +kubebuilder:validation:Enum=argocd;governance-policy-framework
+	// +required
+	Name string `json:"name"`
+
+	// The namespace to install the add-on in. If left empty, installs into the "open-cluster-management-addon" namespace.
+	// +optional
+	InstallNamespace string `json:"installNamespace,omitempty"`
+
+	// Whether or not the selected namespace should be created. If left empty, defaults to false.
+	// +kubebuilder:default:=false
+	// +optional
+	CreateNamespace bool `json:"createNamespace,omitempty"`
+}
+
 // HubStatus defines the observed state of Hub.
 type HubStatus struct {
 	// Phase is the current phase of the Hub reconcile.
@@ -157,6 +245,7 @@ type InstalledHubAddOn struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:validation:XValidation:rule="self.metadata.name == 'hub'",message="Hub is a cluster singleton; name must be 'hub'"
 
 // Hub is the Schema for the hubs API
 type Hub struct {
@@ -182,6 +271,60 @@ type HubList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Hub `json:"items"`
+}
+
+// BaseArgs returns the base arguments for all clusteradm commands.
+func (h *Hub) BaseArgs() []string {
+	return []string{
+		fmt.Sprintf("--timeout=%d", h.Spec.Timeout),
+		fmt.Sprintf("--v=%d", h.Spec.LogVerbosity),
+	}
+}
+
+// GetCondition returns the condition with the supplied type, if it exists.
+func (s *HubStatus) GetCondition(cType string) *Condition {
+	for _, c := range s.Conditions {
+		if c.Type == cType {
+			return &c
+		}
+	}
+	return nil
+}
+
+// SetConditions sets the supplied conditions, adding net-new conditions and
+// replacing any existing conditions of the same type. This is a no-op if all
+// supplied conditions are identical (ignoring the last transition time) to
+// those already set. If cover is false, existing conditions are not replaced.
+func (s *HubStatus) SetConditions(cover bool, c ...Condition) {
+	for _, new := range c {
+		exists := false
+		for i, existing := range s.Conditions {
+			if existing.Type != new.Type {
+				continue
+			}
+			if existing.Equal(new) {
+				exists = true
+				continue
+			}
+			exists = true
+			if cover {
+				s.Conditions[i] = new
+			}
+		}
+		if !exists {
+			s.Conditions = append(s.Conditions, new)
+		}
+	}
+}
+
+// GetCondition gets the condition with the supplied type, if it exists.
+func (h *Hub) GetCondition(cType string) *Condition {
+	return h.Status.GetCondition(cType)
+}
+
+// SetConditions sets the supplied conditions on a Hub, replacing any existing conditions.
+func (h *Hub) SetConditions(cover bool, c ...Condition) {
+	h.Status.SetConditions(cover, c...)
 }
 
 func init() {

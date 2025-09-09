@@ -54,6 +54,9 @@ const (
 
 	// ManagedClusterTypeHubAsSpoke is the type of managed cluster that is both a hub and a spoke.
 	ManagedClusterTypeHubAsSpoke = "hub-as-spoke"
+
+	// HubResourceName is the name of the Hub CR. This is enforced via kubebuilder validation.
+	HubResourceName = "hub"
 )
 
 // FleetConfig labels

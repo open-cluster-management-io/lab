@@ -4,6 +4,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,7 +16,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
 )
@@ -94,7 +94,7 @@ func UpdateManagedCluster(ctx context.Context, client *clusterapi.Clientset, man
 
 // PrepareKubeconfig parses a kubeconfig spec and returns updated clusteradm args.
 // The '--kubeconfig' flag is added and a cleanup function is returned to remove the temp kubeconfig file.
-func PrepareKubeconfig(ctx context.Context, kClient client.Client, kubeconfig v1alpha1.Kubeconfig, args []string) ([]string, func(), error) {
+func PrepareKubeconfig(ctx context.Context, kClient client.Client, kubeconfig kube.Kubeconfig, args []string) ([]string, func(), error) {
 	logger := log.FromContext(ctx)
 
 	raw, err := kube.KubeconfigFromSecretOrCluster(ctx, kClient, kubeconfig)
@@ -105,8 +105,8 @@ func PrepareKubeconfig(ctx context.Context, kClient client.Client, kubeconfig v1
 	if err != nil {
 		return args, cleanup, err
 	}
-	if kubeconfig.Context != "" {
-		args = append(args, "--context", kubeconfig.Context)
+	if kubeconfig.GetContext() != "" {
+		args = append(args, "--context", kubeconfig.GetContext())
 	}
 
 	logger.V(1).Info("Using kubeconfig", "path", kubeconfigPath)
@@ -115,21 +115,32 @@ func PrepareKubeconfig(ctx context.Context, kClient client.Client, kubeconfig v1
 }
 
 // PrepareResources returns resource-related flags
-func PrepareResources(resources v1alpha1.ResourceSpec) []string {
+func PrepareResources(resources ResourceSpec) []string {
 	flags := []string{
-		"--resource-qos-class", resources.QosClass,
+		"--resource-qos-class", resources.GetQosClass(),
 	}
-	if resources.Requests != nil {
-		requests := resources.Requests.String()
+
+	if req := resources.GetRequests(); req != nil && !reflect.ValueOf(req).IsNil() {
+		requests := resources.GetRequests().String()
 		if requests != "" {
 			flags = append(flags, "--resource-requests", requests)
 		}
 	}
-	if resources.Limits != nil {
-		limits := resources.Limits.String()
+	if lim := resources.GetLimits(); lim != nil && !reflect.ValueOf(lim).IsNil() {
+		limits := resources.GetLimits().String()
 		if limits != "" {
 			flags = append(flags, "--resource-limits", limits)
 		}
 	}
 	return flags
+}
+
+type ResourceSpec interface {
+	GetQosClass() string
+	GetRequests() ResourceValues
+	GetLimits() ResourceValues
+}
+
+type ResourceValues interface {
+	String() string
 }

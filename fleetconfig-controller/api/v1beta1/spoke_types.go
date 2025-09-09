@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
 	"maps"
 	"reflect"
 
@@ -27,12 +28,6 @@ import (
 
 // SpokeSpec defines the desired state of Spoke
 type SpokeSpec struct {
-	// The name of the spoke cluster.
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-	// +required
-	Name string `json:"name"`
-
 	// If true, create open-cluster-management namespace and agent namespace (open-cluster-management-agent for Default mode,
 	// <klusterlet-name> for Hosted mode), otherwise use existing one.
 	// +kubebuilder:default:=true
@@ -68,6 +63,21 @@ type SpokeSpec struct {
 	// AddOns are the add-ons to enable for the spoke cluster.
 	// +optional
 	AddOns []AddOn `json:"addOns,omitempty"`
+
+	// +kubebuilder:default:={}
+	// +optional
+	RegistrationAuth RegistrationAuth `json:"registrationAuth,omitzero"`
+
+	// Timeout is the timeout in seconds for all clusteradm operations, including init, accept, join, upgrade, etc.
+	// +kubebuilder:default:=300
+	// +optional
+	Timeout int `json:"timeout,omitempty"`
+
+	// LogVerbosity is the verbosity of the logs.
+	// +kubebuilder:validation:Enum=0;1;2;3;4;5;6;7;8;9;10
+	// +kubebuilder:default:=0
+	// +optional
+	LogVerbosity int `json:"logVerbosity,omitempty"`
 }
 
 // Klusterlet is the configuration for a klusterlet.
@@ -254,6 +264,70 @@ type SpokeList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Spoke `json:"items"`
+}
+
+// BaseArgs returns the base arguments for all clusteradm commands.
+func (s *Spoke) BaseArgs() []string {
+	return []string{
+		fmt.Sprintf("--timeout=%d", s.Spec.Timeout),
+		fmt.Sprintf("--v=%d", s.Spec.LogVerbosity),
+	}
+}
+
+// GetCondition returns the condition with the supplied type, if it exists.
+func (s *SpokeStatus) GetCondition(cType string) *Condition {
+	for _, c := range s.Conditions {
+		if c.Type == cType {
+			return &c
+		}
+	}
+	return nil
+}
+
+// SetConditions sets the supplied conditions, adding net-new conditions and
+// replacing any existing conditions of the same type. This is a no-op if all
+// supplied conditions are identical (ignoring the last transition time) to
+// those already set. If cover is false, existing conditions are not replaced.
+func (s *SpokeStatus) SetConditions(cover bool, c ...Condition) {
+	for _, new := range c {
+		exists := false
+		for i, existing := range s.Conditions {
+			if existing.Type != new.Type {
+				continue
+			}
+			if existing.Equal(new) {
+				exists = true
+				continue
+			}
+			exists = true
+			if cover {
+				s.Conditions[i] = new
+			}
+		}
+		if !exists {
+			s.Conditions = append(s.Conditions, new)
+		}
+	}
+}
+
+// GetCondition gets the condition with the supplied type, if it exists.
+func (s *Spoke) GetCondition(cType string) *Condition {
+	return s.Status.GetCondition(cType)
+}
+
+// SetConditions sets the supplied conditions on a Spoke, replacing any existing conditions.
+func (s *Spoke) SetConditions(cover bool, c ...Condition) {
+	s.Status.SetConditions(cover, c...)
+}
+
+// JoinType returns the condition type for spoke join operations
+func (s *Spoke) JoinType() string {
+	return fmt.Sprintf("%s-Join", s.Name)
+}
+
+// AddonEnableType returns the condition type for addon enable operations
+func (s *Spoke) AddonEnableType() string {
+	return fmt.Sprintf("%s-AddonsEnabled", s.Name)
 }
 
 func init() {

@@ -2239,11 +2239,22 @@ spec:
                     - namespace
                     type: object
                 type: object
-              name:
-                description: The name of the spoke cluster.
-                maxLength: 63
-                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                type: string
+              logVerbosity:
+                default: 0
+                description: LogVerbosity is the verbosity of the logs.
+                enum:
+                - 0
+                - 1
+                - 2
+                - 3
+                - 4
+                - 5
+                - 6
+                - 7
+                - 8
+                - 9
+                - 10
+                type: integer
               proxyCa:
                 description: Proxy CA certificate, optional
                 type: string
@@ -2251,13 +2262,46 @@ spec:
                 description: URL of a forward proxy server used by agents to connect
                   to the Hub cluster.
                 type: string
+              registrationAuth:
+                default: {}
+                description: RegistrationAuth provides specifications for registration
+                  authentication.
+                properties:
+                  autoApprovedARNPatterns:
+                    description: |-
+                      List of AWS EKS ARN patterns so any EKS clusters with these patterns will be auto accepted to join with hub cluster.
+                      Example pattern: "arn:aws:eks:us-west-2:123456789013:cluster/.*"
+                    items:
+                      type: string
+                    type: array
+                  driver:
+                    default: csr
+                    description: |-
+                      The registration authentication driver to use.
+                      Options are:
+                       - csr: Use the default CSR-based registration authentication.
+                       - awsirsa: Use AWS IAM Role for Service Accounts (IRSA) registration authentication.
+                      The set of valid options is open for extension.
+                    enum:
+                    - csr
+                    - awsirsa
+                    type: string
+                  hubClusterARN:
+                    description: The Hub cluster ARN for awsirsa registration authentication.
+                      Required when Type is awsirsa, otherwise ignored.
+                    type: string
+                type: object
               syncLabels:
                 description: If true, sync the labels from klusterlet to all agent
                   resources.
                 type: boolean
+              timeout:
+                default: 300
+                description: Timeout is the timeout in seconds for all clusteradm
+                  operations, including init, accept, join, upgrade, etc.
+                type: integer
             required:
             - kubeconfig
-            - name
             type: object
           status:
             description: status defines the observed state of Spoke

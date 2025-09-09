@@ -23,10 +23,13 @@ import (
 	"sort"
 	"time"
 
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/pkg/common"
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // FleetConfigSpec defines the desired state of FleetConfig.
@@ -315,6 +318,18 @@ type Kubeconfig struct {
 	Context string `json:"context,omitempty"`
 }
 
+func (k Kubeconfig) IsInCluster() bool {
+	return k.InCluster
+}
+
+func (k Kubeconfig) GetSecretReference() kube.SecretReference {
+	return k.SecretReference
+}
+
+func (k Kubeconfig) GetContext() string {
+	return k.Context
+}
+
 // SecretReference describes how to retrieve a kubeconfig stored as a secret
 type SecretReference struct {
 	// The name of the secret.
@@ -330,6 +345,20 @@ type SecretReference struct {
 	// +optional
 	KubeconfigKey string `json:"kubeconfigKey,omitempty"`
 }
+
+func (s *SecretReference) GetNamespacedName() types.NamespacedName {
+	return types.NamespacedName{
+		Name:      s.Name,
+		Namespace: s.Namespace,
+	}
+}
+
+func (s *SecretReference) GetKubeconfigKey() string {
+	return s.KubeconfigKey
+}
+
+var _ kube.Kubeconfig = &Kubeconfig{}
+var _ kube.SecretReference = &SecretReference{}
 
 // ISpoke is an interface that both Spoke and JoinedSpoke implement.
 // +kubebuilder:object:generate=false
@@ -652,6 +681,16 @@ type ResourceSpec struct {
 	QosClass string `json:"qosClass,omitempty"`
 }
 
+func (s ResourceSpec) GetQosClass() string {
+	return s.QosClass
+}
+func (s ResourceSpec) GetLimits() common.ResourceValues {
+	return s.Limits
+}
+func (s ResourceSpec) GetRequests() common.ResourceValues {
+	return s.Requests
+}
+
 // ResourceValues detail container resource constraints.
 type ResourceValues struct {
 	// The number of CPU units to request, e.g., '800m'.
@@ -674,6 +713,9 @@ func (r *ResourceValues) String() string {
 	}
 	return ""
 }
+
+var _ common.ResourceSpec = &ResourceSpec{}
+var _ common.ResourceValues = &ResourceValues{}
 
 // RegistrationAuth provides specifications for registration authentication.
 type RegistrationAuth struct {

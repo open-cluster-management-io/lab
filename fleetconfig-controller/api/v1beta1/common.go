@@ -5,6 +5,10 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/pkg/common"
 )
 
 // Kubeconfig is the configuration for a kubeconfig.
@@ -26,6 +30,18 @@ type Kubeconfig struct {
 	Context string `json:"context,omitempty"`
 }
 
+func (k Kubeconfig) IsInCluster() bool {
+	return k.InCluster
+}
+
+func (k Kubeconfig) GetSecretReference() kube.SecretReference {
+	return k.SecretReference
+}
+
+func (k Kubeconfig) GetContext() string {
+	return k.Context
+}
+
 // SecretReference describes how to retrieve a kubeconfig stored as a secret
 type SecretReference struct {
 	// The name of the secret.
@@ -41,6 +57,20 @@ type SecretReference struct {
 	// +optional
 	KubeconfigKey string `json:"kubeconfigKey,omitempty"`
 }
+
+func (s *SecretReference) GetNamespacedName() types.NamespacedName {
+	return types.NamespacedName{
+		Name:      s.Name,
+		Namespace: s.Namespace,
+	}
+}
+
+func (s *SecretReference) GetKubeconfigKey() string {
+	return s.KubeconfigKey
+}
+
+var _ kube.Kubeconfig = &Kubeconfig{}
+var _ kube.SecretReference = &SecretReference{}
 
 // OCMSource is the configuration for an OCM source.
 type OCMSource struct {
@@ -74,6 +104,16 @@ type ResourceSpec struct {
 	QosClass string `json:"qosClass,omitempty"`
 }
 
+func (s ResourceSpec) GetQosClass() string {
+	return s.QosClass
+}
+func (s ResourceSpec) GetLimits() common.ResourceValues {
+	return s.Limits
+}
+func (s ResourceSpec) GetRequests() common.ResourceValues {
+	return s.Requests
+}
+
 // ResourceValues detail container resource constraints.
 type ResourceValues struct {
 	// The number of CPU units to request, e.g., '800m'.
@@ -96,6 +136,9 @@ func (r *ResourceValues) String() string {
 	}
 	return ""
 }
+
+var _ common.ResourceSpec = &ResourceSpec{}
+var _ common.ResourceValues = &ResourceValues{}
 
 // NewCondition returns a new v1alpha1.Condition.
 func NewCondition(msg, cType string, status, wantStatus metav1.ConditionStatus) Condition {

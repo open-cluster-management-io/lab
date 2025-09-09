@@ -39,6 +39,36 @@ spec:
           spec:
             description: spec defines the desired state of Hub
             properties:
+              addOnConfigs:
+                items:
+                  description: AddOnConfig is the configuration of a custom AddOn
+                    that can be installed on a cluster.
+                  properties:
+                    clusterRoleBinding:
+                      description: The rolebinding to the clusterrole in the cluster
+                        namespace for the addon agent
+                      type: string
+                    hubRegistration:
+                      default: false
+                      description: Enable the agent to register to the hub cluster.
+                        Optional, defaults to false.
+                      type: boolean
+                    name:
+                      description: The name of the add-on.
+                      type: string
+                    overwrite:
+                      default: false
+                      description: Whether to overwrite the add-on if it already exists.
+                        Optional, defaults to false.
+                      type: boolean
+                    version:
+                      default: v0.0.1
+                      description: The add-on version. Optional, defaults to "v0.0.1"
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
               apiServer:
                 description: |-
                   APIServer is the API server URL for the Hub cluster. If provided, spokes clusters will
@@ -143,6 +173,30 @@ spec:
               force:
                 description: If set, the hub will be reinitialized.
                 type: boolean
+              hubAddOns:
+                items:
+                  description: HubAddOn is the configuration for enabling a built-in
+                    AddOn.
+                  properties:
+                    createNamespace:
+                      default: false
+                      description: Whether or not the selected namespace should be
+                        created. If left empty, defaults to false.
+                      type: boolean
+                    installNamespace:
+                      description: The namespace to install the add-on in. If left
+                        empty, installs into the "open-cluster-management-addon" namespace.
+                      type: string
+                    name:
+                      description: Name is the name of the HubAddOn.
+                      enum:
+                      - argocd
+                      - governance-policy-framework
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
               kubeconfig:
                 description: Kubeconfig details for the Hub cluster.
                 properties:
@@ -176,6 +230,51 @@ spec:
                     - name
                     - namespace
                     type: object
+                type: object
+              logVerbosity:
+                default: 0
+                description: LogVerbosity is the verbosity of the logs.
+                enum:
+                - 0
+                - 1
+                - 2
+                - 3
+                - 4
+                - 5
+                - 6
+                - 7
+                - 8
+                - 9
+                - 10
+                type: integer
+              registrationAuth:
+                default: {}
+                description: RegistrationAuth provides specifications for registration
+                  authentication.
+                properties:
+                  autoApprovedARNPatterns:
+                    description: |-
+                      List of AWS EKS ARN patterns so any EKS clusters with these patterns will be auto accepted to join with hub cluster.
+                      Example pattern: "arn:aws:eks:us-west-2:123456789013:cluster/.*"
+                    items:
+                      type: string
+                    type: array
+                  driver:
+                    default: csr
+                    description: |-
+                      The registration authentication driver to use.
+                      Options are:
+                       - csr: Use the default CSR-based registration authentication.
+                       - awsirsa: Use AWS IAM Role for Service Accounts (IRSA) registration authentication.
+                      The set of valid options is open for extension.
+                    enum:
+                    - csr
+                    - awsirsa
+                    type: string
+                  hubClusterARN:
+                    description: The Hub cluster ARN for awsirsa registration authentication.
+                      Required when Type is awsirsa, otherwise ignored.
+                    type: string
                 type: object
               singleton:
                 description: |-
@@ -217,6 +316,11 @@ spec:
                     description: The name of the singleton control plane.
                     type: string
                 type: object
+              timeout:
+                default: 300
+                description: Timeout is the timeout in seconds for all clusteradm
+                  operations, including init, accept, join, upgrade, etc.
+                type: integer
             required:
             - kubeconfig
             type: object
@@ -310,6 +414,9 @@ spec:
         required:
         - spec
         type: object
+        x-kubernetes-validations:
+        - message: Hub is a cluster singleton; name must be 'hub'
+          rule: self.metadata.name == 'hub'
     served: true
     storage: true
     subresources:

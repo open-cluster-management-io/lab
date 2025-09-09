@@ -12,8 +12,6 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
 )
 
 var (
@@ -84,34 +82,45 @@ func RawFromInClusterRestConfig() ([]byte, error) {
 }
 
 // KubeconfigFromSecretOrCluster loads a kubeconfig from a secret or generates one from inCluster
-func KubeconfigFromSecretOrCluster(ctx context.Context, kClient client.Client, kubeconfig v1alpha1.Kubeconfig) (raw []byte, err error) {
+func KubeconfigFromSecretOrCluster(ctx context.Context, kClient client.Client, kubeconfig Kubeconfig) (raw []byte, err error) {
 	// exactly 1 of these 2 cases is always true
-	switch {
-	case kubeconfig.InCluster:
-		raw, err = RawFromInClusterRestConfig()
-	case kubeconfig.SecretReference != nil:
-		raw, err = KubeconfigFromSecret(ctx, kClient, kubeconfig)
+	if kubeconfig.IsInCluster() {
+		return RawFromInClusterRestConfig()
+
+	} else {
+		return KubeconfigFromSecret(ctx, kClient, kubeconfig)
 	}
-	return raw, err
+
 }
 
 // KubeconfigFromSecret loads a kubeconfig from a secret in the cluster
-func KubeconfigFromSecret(ctx context.Context, kClient client.Client, kubeconfig v1alpha1.Kubeconfig) ([]byte, error) {
-	secretRef := kubeconfig.SecretReference
+func KubeconfigFromSecret(ctx context.Context, kClient client.Client, kubeconfig Kubeconfig) ([]byte, error) {
+	secretRef := kubeconfig.GetSecretReference()
+
 	secret := corev1.Secret{}
-	nn := types.NamespacedName{Name: secretRef.Name, Namespace: secretRef.Namespace}
+	nn := secretRef.GetNamespacedName()
 	if err := kClient.Get(ctx, nn, &secret); err != nil {
 		return nil, err
 	}
 
-	kubeconfigKey := defaultKubeconfigKey
-	if secretRef.KubeconfigKey != "" {
-		kubeconfigKey = secretRef.KubeconfigKey
-	}
+	kubeconfigKey := secretRef.GetKubeconfigKey()
 	raw, ok := secret.Data[kubeconfigKey]
 	if !ok {
-		return nil, fmt.Errorf("kubeconfig key '%s' not found in %s/%s secret", kubeconfigKey, secretRef.Namespace, secretRef.Name)
+		return nil, fmt.Errorf("kubeconfig key '%s' not found in %v secret", kubeconfigKey, secretRef)
 	}
 
 	return raw, nil
+}
+
+// Kubeconfig is an interface that a Kubeconfig struct from any API version implements.
+type Kubeconfig interface {
+	IsInCluster() bool
+	GetContext() string
+	GetSecretReference() SecretReference
+}
+
+// SecretReference is an interface that a SecretReference struct from any API version implements.
+type SecretReference interface {
+	GetNamespacedName() types.NamespacedName
+	GetKubeconfigKey() string
 }
