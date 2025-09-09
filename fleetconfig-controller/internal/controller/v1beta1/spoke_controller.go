@@ -25,12 +25,14 @@ import (
 	"slices"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
+	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -165,11 +167,79 @@ func withOriginalSpoke(ctx context.Context, spoke *v1beta1.Spoke) context.Contex
 
 // cleanup cleans up a Spoke and its associated resources.
 func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) error {
-	// For spoke cleanup, we need to unjoin from hub and clean up local resources
-	if err := r.unjoinSpoke(ctx, spoke); err != nil {
+	logger := log.FromContext(ctx)
+
+	hubKubeconfig, err := r.getHubKubeconfig(ctx)
+	if err != nil {
+		return err
+	}
+	clusterC, err := common.ClusterClient(hubKubeconfig)
+	if err != nil {
+		return err
+	}
+	workC, err := common.WorkClient(hubKubeconfig)
+	if err != nil {
 		return err
 	}
 
+	// skip clean up if the ManagedCluster resource is not found or if any manifestWorks exist
+	managedCluster, err := clusterC.ClusterV1().ManagedClusters().Get(ctx, spoke.Name, metav1.GetOptions{})
+	if kerrs.IsNotFound(err) {
+		logger.Info("ManagedCluster resource not found; nothing to do")
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("unexpected error listing managedClusters: %w", err)
+	}
+	manifestWorks, err := workC.WorkV1().ManifestWorks(managedCluster.Name).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to list manifestWorks for managedCluster %s: %w", managedCluster.Name, err)
+	}
+
+	// check that the number of manifestWorks is the same as the number of addons enabled for that spoke
+	if len(manifestWorks.Items) > 0 && !allOwnersAddOns(manifestWorks.Items) {
+		msg := fmt.Sprintf("Found manifestWorks for ManagedCluster %s; cannot unjoin spoke cluster while it has active ManifestWorks", managedCluster.Name)
+		logger.Info(msg)
+		return errors.New(msg)
+
+	}
+
+	// // remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
+	// if err := handleAddonDisable(ctx, spoke.Name, spoke.EnabledAddons, fc); err != nil {
+	// 	fc.SetConditions(true, v1alpha1.NewCondition(
+	// 		err.Error(), spoke.AddonDisableType(), metav1.ConditionFalse, metav1.ConditionTrue,
+	// 	))
+	// 	return err
+	// }
+
+	// if len(spoke.EnabledAddons) > 0 {
+	// 	// Wait for addon manifestWorks to be fully cleaned up before proceeding with unjoin
+	// 	if err := waitForAddonManifestWorksCleanup(ctx, workC, spoke.Name, addonCleanupTimeout); err != nil {
+	// 		fc.SetConditions(true, v1alpha1.NewCondition(
+	// 			err.Error(), spoke.AddonDisableType(), metav1.ConditionFalse, metav1.ConditionTrue,
+	// 		))
+	// 		return fmt.Errorf("addon manifestWorks cleanup failed: %w", err)
+	// 	}
+	// 	fc.SetConditions(true, v1alpha1.NewCondition(
+	// 		"AddonsDisabled", spoke.AddonDisableType(), metav1.ConditionTrue, metav1.ConditionTrue,
+	// 	))
+	// }
+
+	// working
+	if err := r.unjoinSpoke(ctx, spoke); err != nil {
+		return err
+	}
+	// working
+
+	// remove ManagedCluster
+	if err = clusterC.ClusterV1().ManagedClusters().Delete(ctx, spoke.Name, metav1.DeleteOptions{}); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	// remove Namespace
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: spoke.Name}}
+	if err := r.Client.Delete(ctx, ns); err != nil {
+		return client.IgnoreNotFound(err)
+	}
 	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
 		return s == v1beta1.FleetConfigFinalizer
 	})
@@ -181,10 +251,7 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("handleSpoke", "spoke", spoke.Name)
 
-	kconf := v1beta1.Kubeconfig{
-		InCluster: true,
-	}
-	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, kconf)
+	hubKubeconfig, err := r.getHubKubeconfig(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get hub kubeconfig: %w", err)
 	}
@@ -320,6 +387,11 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke) e
 	hub, err := r.getHub(ctx)
 	if err != nil {
 		logger.V(1).Error(err, "failed to get Hub, cannot proceed with join", "spoke", spoke.Name)
+	}
+
+	hubInitCond := hub.GetCondition(v1beta1.HubInitialized)
+	if hubInitCond == nil || hubInitCond.Status != metav1.ConditionTrue {
+		return errors.New("hub does not have initialized condition")
 	}
 	tokenMeta, err := getToken(ctx, r.Client, hub)
 	if err != nil {
@@ -693,6 +765,15 @@ func (r *SpokeReconciler) getHub(ctx context.Context) (*v1beta1.Hub, error) {
 	return hub, nil
 }
 
+// getHubKubeconfig loads a hub kubeconfig
+func (r *SpokeReconciler) getHubKubeconfig(ctx context.Context) ([]byte, error) {
+	hub, err := r.getHub(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig)
+}
+
 // prepareKlusterletValuesFile creates a temporary file with klusterlet values and returns
 // args to append and a cleanup function. Returns empty slice if values are empty.
 func prepareKlusterletValuesFile(values *v1beta1.KlusterletChartConfig) ([]string, func(), error) {
@@ -713,6 +794,17 @@ func prepareKlusterletValuesFile(values *v1beta1.KlusterletChartConfig) ([]strin
 		return nil, nil, fmt.Errorf("failed to write klusterlet values to disk: %w", err)
 	}
 	return []string{"--klusterlet-values-file", valuesFile}, valuesCleanup, nil
+}
+
+func allOwnersAddOns(mws []workv1.ManifestWork) bool {
+	for _, m := range mws {
+		if !slices.ContainsFunc(m.OwnerReferences, func(or metav1.OwnerReference) bool {
+			return or.Kind == managedClusterAddOn
+		}) {
+			return false
+		}
+	}
+	return true
 }
 
 // SetupWithManager sets up the controller with the Manager.
