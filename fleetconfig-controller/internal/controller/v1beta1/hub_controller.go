@@ -96,15 +96,15 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	// Handle deletion logic with finalizer
 	if !hub.DeletionTimestamp.IsZero() {
-		if hub.Status.Phase != v1beta1.FleetConfigDeleting {
-			hub.Status.Phase = v1beta1.FleetConfigDeleting
+		if hub.Status.Phase != v1beta1.Deleting {
+			hub.Status.Phase = v1beta1.Deleting
 			return ret(ctx, ctrl.Result{Requeue: true}, nil)
 		}
 
 		if slices.Contains(hub.Finalizers, v1beta1.FleetConfigFinalizer) {
 			if err := r.cleanup(ctx, hub); err != nil {
 				hub.SetConditions(true, v1beta1.NewCondition(
-					err.Error(), v1beta1.FleetConfigCleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
+					err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
 				))
 				return ret(ctx, ctrl.Result{}, err)
 			}
@@ -115,13 +115,13 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	// Initialize phase & conditions
 	previousPhase := hub.Status.Phase
-	hub.Status.Phase = v1beta1.FleetConfigStarting
+	hub.Status.Phase = v1beta1.HubStarting
 	initConditions := []v1beta1.Condition{
 		v1beta1.NewCondition(
-			v1beta1.FleetConfigHubInitialized, v1beta1.FleetConfigHubInitialized, metav1.ConditionFalse, metav1.ConditionTrue,
+			v1beta1.HubInitialized, v1beta1.HubInitialized, metav1.ConditionFalse, metav1.ConditionTrue,
 		),
 		v1beta1.NewCondition(
-			v1beta1.FleetConfigCleanupFailed, v1beta1.FleetConfigCleanupFailed, metav1.ConditionFalse, metav1.ConditionFalse,
+			v1beta1.CleanupFailed, v1beta1.CleanupFailed, metav1.ConditionFalse, metav1.ConditionFalse,
 		),
 	}
 	hub.SetConditions(false, initConditions...)
@@ -134,9 +134,9 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	// Handle Hub cluster: initialization and/or upgrade
 	if err := r.handleHub(ctx, hub); err != nil {
 		logger.Error(err, "Failed to handle hub operations")
-		hub.Status.Phase = v1beta1.FleetConfigUnhealthy
+		hub.Status.Phase = v1beta1.Unhealthy
 	}
-	hubInitializedCond := hub.GetCondition(v1beta1.FleetConfigHubInitialized)
+	hubInitializedCond := hub.GetCondition(v1beta1.HubInitialized)
 	if hubInitializedCond == nil || hubInitializedCond.Status == metav1.ConditionFalse {
 		return ret(ctx, ctrl.Result{Requeue: true}, nil)
 	}
@@ -145,12 +145,12 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	for _, c := range hub.Status.Conditions {
 		if c.Status != c.WantStatus {
 			logger.Info("WARNING: condition does not have the desired status", "type", c.Type, "reason", c.Reason, "message", c.Message, "status", c.Status, "wantStatus", c.WantStatus)
-			hub.Status.Phase = v1beta1.FleetConfigUnhealthy
+			hub.Status.Phase = v1beta1.Unhealthy
 			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 		}
 	}
-	if hub.Status.Phase == v1beta1.FleetConfigStarting {
-		hub.Status.Phase = v1beta1.FleetConfigRunning
+	if hub.Status.Phase == v1beta1.HubStarting {
+		hub.Status.Phase = v1beta1.HubRunning
 	}
 
 	return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
@@ -355,7 +355,7 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub) error {
 			msg := strings.TrimSuffix(strings.Join(msgs, "; "), "; ")
 			msg = fmt.Sprintf("hub pending/degraded: %s", msg)
 			hub.SetConditions(true, v1beta1.NewCondition(
-				msg, v1beta1.FleetConfigHubInitialized, metav1.ConditionFalse, metav1.ConditionTrue,
+				msg, v1beta1.HubInitialized, metav1.ConditionFalse, metav1.ConditionTrue,
 			))
 			return errors.New(msg)
 		}
@@ -366,7 +366,7 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub) error {
 	}
 
 	hub.SetConditions(true, v1beta1.NewCondition(
-		v1beta1.FleetConfigHubInitialized, v1beta1.FleetConfigHubInitialized, metav1.ConditionTrue, metav1.ConditionTrue,
+		v1beta1.HubInitialized, v1beta1.HubInitialized, metav1.ConditionTrue, metav1.ConditionTrue,
 	))
 
 	// TODO - implement addons

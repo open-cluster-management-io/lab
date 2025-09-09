@@ -3,43 +3,52 @@ package v1beta1
 import "k8s.io/apimachinery/pkg/labels"
 
 const (
-	// FleetConfigFinalizer is the finalizer for FleetConfig cleanup.
+	// FleetConfigFinalizer is the finalizer for Hub and Spoke cleanup.
 	FleetConfigFinalizer = "fleetconfig.open-cluster-management.io/cleanup"
 )
 
-// FleetConfig condition types
+// Hub and Spoke condition types
 const (
-	// FleetConfigHubInitialized means that the Hub has been initialized.
-	FleetConfigHubInitialized = "HubInitialized"
+	// HubInitialized means that the Hub has been initialized.
+	HubInitialized = "HubInitialized"
 
-	// FleetConfigAddonsConfigured means that all addons have been configured on the Hub.
-	FleetConfigAddonsConfigured = "AddonsConfigured"
+	// HubAddonsConfigured means that all addons have been configured on the Hub.
+	HubAddonsConfigured = "AddonsConfigured"
 
-	// FleetConfigCleanupFailed means that a failure occurred during cleanup.
-	FleetConfigCleanupFailed = "CleanupFailed"
+	// CleanupFailed means that a failure occurred during cleanup.
+	CleanupFailed = "CleanupFailed"
 
-	// FleetConfigAddonsEnabled means that all addons have been enabled for a particular Spoke.
-	FleetConfigAddonsEnabled = "AddonsEnabled"
+	// SpokeJoined means that the spoke has successfully joined the Hub.
+	SpokeJoined = "SpokeJoined"
+
+	// SpokeAddonsEnabled means that all addons have been enabled for a particular Spoke.
+	SpokeAddonsEnabled = "AddonsEnabled"
 )
 
-// FleetConfig condition reasons
+// Hub and Spoke condition reasons
 const (
 	ReconcileSuccess = "ReconcileSuccess"
 )
 
-// FleetConfig phases
+// Hub and Spoke phases
 const (
-	// FleetConfigStarting means that the Hub and Spoke(s) are being initialized / joined.
-	FleetConfigStarting = "Initializing"
+	// HubStarting means that the Hub is being initialized.
+	HubStarting = "Initializing"
 
-	// FleetConfigRunning means that the Hub is initialized and all Spoke(s) have joined successfully.
-	FleetConfigRunning = "Running"
+	// HubRunning means that the Hub is initialized successfully.
+	HubRunning = "Running"
 
-	// FleetConfigUnhealthy means that a failure occurred during Hub initialization and/or Spoke join attempt.
-	FleetConfigUnhealthy = "Unhealthy"
+	// SpokeJoining means that the Spoke is being joined to the Hub.
+	SpokeJoining = "Joining"
 
-	// FleetConfigDeleting means that the FleetConfig is being deleted.
-	FleetConfigDeleting = "Deleting"
+	// SpokeRunning means that the Spoke has successfully joined the Hub.
+	SpokeRunning = "Running"
+
+	// Unhealthy means that a failure occurred during Hub initialization and/or Spoke join attempt.
+	Unhealthy = "Unhealthy"
+
+	// Deleting means that the Hub or Spoke is being deleted.
+	Deleting = "Deleting"
 )
 
 // ManagedClusterType is the type of a managed cluster.

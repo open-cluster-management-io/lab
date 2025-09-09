@@ -96,15 +96,15 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	// Handle deletion logic with finalizer
 	if !spoke.DeletionTimestamp.IsZero() {
-		if spoke.Status.Phase != v1beta1.FleetConfigDeleting {
-			spoke.Status.Phase = v1beta1.FleetConfigDeleting
+		if spoke.Status.Phase != v1beta1.Deleting {
+			spoke.Status.Phase = v1beta1.Deleting
 			return ret(ctx, ctrl.Result{Requeue: true}, nil)
 		}
 
 		if slices.Contains(spoke.Finalizers, v1beta1.FleetConfigFinalizer) {
 			if err := r.cleanup(ctx, spoke); err != nil {
 				spoke.SetConditions(true, v1beta1.NewCondition(
-					err.Error(), v1beta1.FleetConfigCleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
+					err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
 				))
 				return ret(ctx, ctrl.Result{}, err)
 			}
@@ -115,13 +115,13 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	// Initialize phase & conditions
 	previousPhase := spoke.Status.Phase
-	spoke.Status.Phase = v1beta1.FleetConfigStarting
+	spoke.Status.Phase = v1beta1.SpokeJoining
 	initConditions := []v1beta1.Condition{
 		v1beta1.NewCondition(
-			spoke.JoinType(), spoke.JoinType(), metav1.ConditionFalse, metav1.ConditionTrue,
+			v1beta1.SpokeJoined, v1beta1.SpokeJoined, metav1.ConditionFalse, metav1.ConditionTrue,
 		),
 		v1beta1.NewCondition(
-			v1beta1.FleetConfigCleanupFailed, v1beta1.FleetConfigCleanupFailed, metav1.ConditionFalse, metav1.ConditionFalse,
+			v1beta1.CleanupFailed, v1beta1.CleanupFailed, metav1.ConditionFalse, metav1.ConditionFalse,
 		),
 	}
 	spoke.SetConditions(false, initConditions...)
@@ -134,19 +134,19 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	// Handle Spoke cluster: join and/or upgrade
 	if err := r.handleSpoke(ctx, spoke); err != nil {
 		logger.Error(err, "Failed to handle spoke operations")
-		spoke.Status.Phase = v1beta1.FleetConfigUnhealthy
+		spoke.Status.Phase = v1beta1.Unhealthy
 	}
 
 	// Finalize phase
 	for _, c := range spoke.Status.Conditions {
 		if c.Status != c.WantStatus {
 			logger.Info("WARNING: condition does not have the desired status", "type", c.Type, "reason", c.Reason, "message", c.Message, "status", c.Status, "wantStatus", c.WantStatus)
-			spoke.Status.Phase = v1beta1.FleetConfigUnhealthy
+			spoke.Status.Phase = v1beta1.Unhealthy
 			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 		}
 	}
-	if spoke.Status.Phase == v1beta1.FleetConfigStarting {
-		spoke.Status.Phase = v1beta1.FleetConfigRunning
+	if spoke.Status.Phase == v1beta1.SpokeJoining {
+		spoke.Status.Phase = v1beta1.SpokeRunning
 	}
 
 	return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
@@ -205,7 +205,7 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 	if managedCluster == nil {
 		if err := r.joinSpoke(ctx, spoke); err != nil {
 			spoke.SetConditions(true, v1beta1.NewCondition(
-				err.Error(), spoke.JoinType(), metav1.ConditionFalse, metav1.ConditionTrue,
+				err.Error(), v1beta1.SpokeJoined, metav1.ConditionFalse, metav1.ConditionTrue,
 			))
 			return err
 		}
@@ -213,7 +213,7 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 		// Accept the cluster join request
 		if err := acceptCluster(ctx, spoke, false); err != nil {
 			spoke.SetConditions(true, v1beta1.NewCondition(
-				err.Error(), spoke.JoinType(), metav1.ConditionFalse, metav1.ConditionTrue,
+				err.Error(), v1beta1.SpokeJoined, metav1.ConditionFalse, metav1.ConditionTrue,
 			))
 			return err
 		}
@@ -231,7 +231,7 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 		logger.V(0).Info("waiting for spoke cluster to join", "name", spoke.Name)
 		msg := fmt.Sprintf("ManagedClusterJoined condition not found in ManagedCluster for spoke cluster %s", spoke.Name)
 		spoke.SetConditions(true, v1beta1.NewCondition(
-			msg, spoke.JoinType(), metav1.ConditionFalse, metav1.ConditionTrue,
+			msg, v1beta1.SpokeJoined, metav1.ConditionFalse, metav1.ConditionTrue,
 		))
 		// Re-accept all join requests for the spoke cluster
 		if err := acceptCluster(ctx, spoke, true); err != nil {
@@ -244,14 +244,14 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 	if jc.Status != metav1.ConditionTrue {
 		msg := fmt.Sprintf("failed to join spoke cluster %s: %s", spoke.Name, jc.Message)
 		spoke.SetConditions(true, v1beta1.NewCondition(
-			msg, spoke.JoinType(), metav1.ConditionFalse, metav1.ConditionTrue,
+			msg, v1beta1.SpokeJoined, metav1.ConditionFalse, metav1.ConditionTrue,
 		))
 		return errors.New(msg)
 	}
 
 	// spoke cluster has joined successfully
 	spoke.SetConditions(true, v1beta1.NewCondition(
-		"Joined", spoke.JoinType(), metav1.ConditionTrue, metav1.ConditionTrue,
+		"Joined", v1beta1.SpokeJoined, metav1.ConditionTrue, metav1.ConditionTrue,
 	))
 
 	// Label the spoke ManagedCluster if in hub-as-spoke mode.
@@ -289,14 +289,14 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 	if err != nil {
 		msg := fmt.Sprintf("failed to enable addons for spoke cluster %s: %s", spoke.Name, err.Error())
 		spoke.SetConditions(true, v1beta1.NewCondition(
-			msg, spoke.AddonEnableType(), metav1.ConditionFalse, metav1.ConditionTrue,
+			msg, v1beta1.SpokeAddonsEnabled, metav1.ConditionFalse, metav1.ConditionTrue,
 		))
 		return err
 	}
 
 	if len(enabledAddons) > 0 {
 		spoke.SetConditions(true, v1beta1.NewCondition(
-			"AddonsEnabled", spoke.AddonEnableType(), metav1.ConditionTrue, metav1.ConditionTrue,
+			v1beta1.SpokeAddonsEnabled, v1beta1.SpokeAddonsEnabled, metav1.ConditionTrue, metav1.ConditionTrue,
 		))
 	}
 

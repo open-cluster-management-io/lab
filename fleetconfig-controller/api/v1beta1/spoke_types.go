@@ -320,16 +320,6 @@ func (s *Spoke) SetConditions(cover bool, c ...Condition) {
 	s.Status.SetConditions(cover, c...)
 }
 
-// JoinType returns the condition type for spoke join operations
-func (s *Spoke) JoinType() string {
-	return fmt.Sprintf("%s-Join", s.Name)
-}
-
-// AddonEnableType returns the condition type for addon enable operations
-func (s *Spoke) AddonEnableType() string {
-	return fmt.Sprintf("%s-AddonsEnabled", s.Name)
-}
-
 func init() {
 	SchemeBuilder.Register(&Spoke{}, &SpokeList{})
 }
