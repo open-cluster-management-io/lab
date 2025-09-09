@@ -59,6 +59,7 @@ type HubReconciler struct {
 // +kubebuilder:rbac:groups=fleetconfig.open-cluster-management.io,resources=hubs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=fleetconfig.open-cluster-management.io,resources=hubs/finalizers,verbs=update
 
+// Reconcile is the main reconcile loop for the Hub resource.
 func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Log.WithValues("request", req)
 	ctx = log.IntoContext(ctx, logger)

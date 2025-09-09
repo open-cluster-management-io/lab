@@ -135,12 +135,14 @@ func PrepareResources(resources ResourceSpec) []string {
 	return flags
 }
 
+// ResourceSpec defines an interface for specifying resource requirements for managed clusters.
 type ResourceSpec interface {
 	GetQosClass() string
 	GetRequests() ResourceValues
 	GetLimits() ResourceValues
 }
 
+// ResourceValues defines an interface for representing resource values such as CPU and memory.
 type ResourceValues interface {
 	String() string
 }

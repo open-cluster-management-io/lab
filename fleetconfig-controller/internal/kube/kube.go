@@ -14,10 +14,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
-	defaultKubeconfigKey = "kubeconfig"
-)
-
 // RestConfigFromKubeconfig either creates a rest.Config from a v1alpha1.Kubeconfig or
 // returns an in-cluster config if the kubeconfig is nil.
 func RestConfigFromKubeconfig(kubeconfig []byte) (*rest.Config, error) {
@@ -86,11 +82,8 @@ func KubeconfigFromSecretOrCluster(ctx context.Context, kClient client.Client, k
 	// exactly 1 of these 2 cases is always true
 	if kubeconfig.IsInCluster() {
 		return RawFromInClusterRestConfig()
-
-	} else {
-		return KubeconfigFromSecret(ctx, kClient, kubeconfig)
 	}
-
+	return KubeconfigFromSecret(ctx, kClient, kubeconfig)
 }
 
 // KubeconfigFromSecret loads a kubeconfig from a secret in the cluster

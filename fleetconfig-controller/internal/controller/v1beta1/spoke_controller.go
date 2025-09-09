@@ -59,6 +59,7 @@ type SpokeReconciler struct {
 // +kubebuilder:rbac:groups=fleetconfig.open-cluster-management.io,resources=spokes/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=fleetconfig.open-cluster-management.io,resources=spokes/finalizers,verbs=update
 
+// Reconcile is the main reconcile loop for the Spoke resource.
 func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := r.Log.WithValues("request", req)
 	ctx = log.IntoContext(ctx, logger)

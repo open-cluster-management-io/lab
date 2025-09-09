@@ -30,14 +30,17 @@ type Kubeconfig struct {
 	Context string `json:"context,omitempty"`
 }
 
+// IsInCluster returns true if the kubeconfig should be loaded from the in-cluster configuration.
 func (k Kubeconfig) IsInCluster() bool {
 	return k.InCluster
 }
 
+// GetSecretReference returns the SecretReference used to locate the kubeconfig secret.
 func (k Kubeconfig) GetSecretReference() kube.SecretReference {
 	return k.SecretReference
 }
 
+// GetContext returns the context to use from the kubeconfig file.
 func (k Kubeconfig) GetContext() string {
 	return k.Context
 }
@@ -58,6 +61,7 @@ type SecretReference struct {
 	KubeconfigKey string `json:"kubeconfigKey,omitempty"`
 }
 
+// GetNamespacedName returns the NamespacedName for the SecretReference.
 func (s *SecretReference) GetNamespacedName() types.NamespacedName {
 	return types.NamespacedName{
 		Name:      s.Name,
@@ -65,6 +69,7 @@ func (s *SecretReference) GetNamespacedName() types.NamespacedName {
 	}
 }
 
+// GetKubeconfigKey returns the key used to access the kubeconfig in the secret.
 func (s *SecretReference) GetKubeconfigKey() string {
 	return s.KubeconfigKey
 }
@@ -104,12 +109,17 @@ type ResourceSpec struct {
 	QosClass string `json:"qosClass,omitempty"`
 }
 
+// GetQosClass returns the resource QoS class for all containers managed by the Cluster Manager or Klusterlet operators.
 func (s ResourceSpec) GetQosClass() string {
 	return s.QosClass
 }
+
+// GetLimits returns the resource limits for all containers managed by the Cluster Manager or Klusterlet operators.
 func (s ResourceSpec) GetLimits() common.ResourceValues {
 	return s.Limits
 }
+
+// GetRequests returns the resource requests for all containers managed by the Cluster Manager or Klusterlet operators.
 func (s ResourceSpec) GetRequests() common.ResourceValues {
 	return s.Requests
 }
