@@ -32,13 +32,12 @@ import (
 
 var _ = Describe("Hub Controller", func() {
 	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+		const resourceName = "hub"
 
 		ctx := context.Background()
 
 		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Name: resourceName,
 		}
 		hub := &v1beta1.Hub{}
 
@@ -48,8 +47,7 @@ var _ = Describe("Hub Controller", func() {
 			if err != nil && errors.IsNotFound(err) {
 				resource := &v1beta1.Hub{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
+						Name: resourceName,
 					},
 					// TODO(user): Specify other spec details if needed.
 				}

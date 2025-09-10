@@ -37,8 +37,7 @@ var _ = Describe("Spoke Controller", func() {
 		ctx := context.Background()
 
 		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Name: resourceName,
 		}
 		spoke := &v1beta1.Spoke{}
 
@@ -48,8 +47,7 @@ var _ = Describe("Spoke Controller", func() {
 			if err != nil && errors.IsNotFound(err) {
 				resource := &v1beta1.Spoke{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
+						Name: resourceName,
 					},
 					// TODO(user): Specify other spec details if needed.
 				}
