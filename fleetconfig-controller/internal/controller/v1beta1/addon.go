@@ -82,7 +82,7 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 	}
 
 	// do deletes first, then creates.
-	err = handleAddonDelete(ctx, addonC, hub, addonsToDelete)
+	err = handleAddonDelete(ctx, addonC, addonsToDelete)
 	if err != nil {
 		return true, err
 	}
@@ -171,7 +171,7 @@ func handleAddonCreate(ctx context.Context, kClient client.Client, hub *v1beta1.
 	return nil
 }
 
-func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, hub *v1beta1.Hub, addons []string) error {
+func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, addons []string) error {
 	if len(addons) == 0 {
 		return nil
 	}

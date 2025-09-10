@@ -234,13 +234,13 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) err
 
 	// remove CSR
 	csrList := &certificatesv1.CertificateSigningRequestList{}
-	if err := r.Client.List(ctx, csrList, client.HasLabels{"open-cluster-management.io/cluster-name"}); err != nil {
+	if err := r.List(ctx, csrList, client.HasLabels{"open-cluster-management.io/cluster-name"}); err != nil {
 		return err
 	}
 	for _, c := range csrList.Items {
 		trimmedName := csrSuffixPattern.ReplaceAllString(c.Name, "")
 		if trimmedName == spoke.Name {
-			if err := r.Client.Delete(ctx, &c); err != nil {
+			if err := r.Delete(ctx, &c); err != nil {
 				return err
 			}
 		}
@@ -253,7 +253,7 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) err
 
 	// remove Namespace
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: spoke.Name}}
-	if err := r.Client.Delete(ctx, ns); err != nil {
+	if err := r.Delete(ctx, ns); err != nil {
 		return client.IgnoreNotFound(err)
 	}
 	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
