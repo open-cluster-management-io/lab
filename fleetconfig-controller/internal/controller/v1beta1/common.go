@@ -4,25 +4,22 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"time"
 
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	operatorapi "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
+	workv1 "open-cluster-management.io/api/work/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
-	clusteradm = "clusteradm"
-	requeue    = 30 * time.Second
-
-	cleanupInterval = 5 * time.Second
-
-	amwExistsError = "you should manually clean them, uninstall kluster will cause those works out of control."
-
-	// Constants for cleanup operations - currently unused but kept for future implementation
+	clusteradm               = "clusteradm"
+	requeue                  = 30 * time.Second
+	amwExistsError           = "you should manually clean them, uninstall kluster will cause those works out of control."
 	managedClusterAddOn      = "ManagedClusterAddOn"
 	addonCleanupTimeout      = 1 * time.Minute
 	addonCleanupPollInterval = 2 * time.Second
@@ -54,4 +51,15 @@ func getClusterManager(ctx context.Context, operatorC *operatorapi.Clientset) (*
 		return nil, fmt.Errorf("unexpected error getting cluster-manager: %w", err)
 	}
 	return cm, nil
+}
+
+func allOwnersAddOns(mws []workv1.ManifestWork) bool {
+	for _, m := range mws {
+		if !slices.ContainsFunc(m.OwnerReferences, func(or metav1.OwnerReference) bool {
+			return or.Kind == managedClusterAddOn
+		}) {
+			return false
+		}
+	}
+	return true
 }

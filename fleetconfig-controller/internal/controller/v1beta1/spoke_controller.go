@@ -24,15 +24,18 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+	"time"
 
+	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	workapi "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
-	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,7 +44,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
-	v1beta1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/hash"
@@ -91,19 +94,19 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	}()
 
 	// Add a finalizer and requeue if not already present
-	if !slices.Contains(spoke.Finalizers, v1beta1.FleetConfigFinalizer) {
-		spoke.Finalizers = append(spoke.Finalizers, v1beta1.FleetConfigFinalizer)
-		return ret(ctx, ctrl.Result{Requeue: true}, nil)
+	if !slices.Contains(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) {
+		spoke.Finalizers = append(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer)
+		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 	}
 
 	// Handle deletion logic with finalizer
 	if !spoke.DeletionTimestamp.IsZero() {
 		if spoke.Status.Phase != v1beta1.Deleting {
 			spoke.Status.Phase = v1beta1.Deleting
-			return ret(ctx, ctrl.Result{Requeue: true}, nil)
+			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 		}
 
-		if slices.Contains(spoke.Finalizers, v1beta1.FleetConfigFinalizer) {
+		if slices.Contains(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) {
 			if err := r.cleanup(ctx, spoke); err != nil {
 				spoke.SetConditions(true, v1beta1.NewCondition(
 					err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
@@ -130,7 +133,7 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	if previousPhase == "" {
 		// set initial phase/conditions and requeue
-		return ret(ctx, ctrl.Result{Requeue: true}, nil)
+		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 	}
 
 	// Handle Spoke cluster: join and/or upgrade
@@ -200,35 +203,48 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) err
 		msg := fmt.Sprintf("Found manifestWorks for ManagedCluster %s; cannot unjoin spoke cluster while it has active ManifestWorks", managedCluster.Name)
 		logger.Info(msg)
 		return errors.New(msg)
-
 	}
 
 	// // remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
-	// if err := handleAddonDisable(ctx, spoke.Name, spoke.EnabledAddons, fc); err != nil {
-	// 	fc.SetConditions(true, v1alpha1.NewCondition(
-	// 		err.Error(), spoke.AddonDisableType(), metav1.ConditionFalse, metav1.ConditionTrue,
-	// 	))
-	// 	return err
-	// }
+	if err := handleAddonDisable(ctx, spoke, spoke.Status.EnabledAddons); err != nil {
+		spoke.SetConditions(true, v1beta1.NewCondition(
+			err.Error(), v1beta1.SpokeAddonsDisabled, metav1.ConditionFalse, metav1.ConditionTrue,
+		))
+		return err
+	}
 
-	// if len(spoke.EnabledAddons) > 0 {
-	// 	// Wait for addon manifestWorks to be fully cleaned up before proceeding with unjoin
-	// 	if err := waitForAddonManifestWorksCleanup(ctx, workC, spoke.Name, addonCleanupTimeout); err != nil {
-	// 		fc.SetConditions(true, v1alpha1.NewCondition(
-	// 			err.Error(), spoke.AddonDisableType(), metav1.ConditionFalse, metav1.ConditionTrue,
-	// 		))
-	// 		return fmt.Errorf("addon manifestWorks cleanup failed: %w", err)
-	// 	}
-	// 	fc.SetConditions(true, v1alpha1.NewCondition(
-	// 		"AddonsDisabled", spoke.AddonDisableType(), metav1.ConditionTrue, metav1.ConditionTrue,
-	// 	))
-	// }
+	if len(spoke.Status.EnabledAddons) > 0 {
+		// Wait for addon manifestWorks to be fully cleaned up before proceeding with unjoin
+		if err := waitForAddonManifestWorksCleanup(ctx, workC, spoke.Name, addonCleanupTimeout); err != nil {
+			spoke.SetConditions(true, v1beta1.NewCondition(
+				err.Error(), v1beta1.SpokeAddonsDisabled, metav1.ConditionFalse, metav1.ConditionTrue,
+			))
+			return fmt.Errorf("addon manifestWorks cleanup failed: %w", err)
+		}
+		spoke.SetConditions(true, v1beta1.NewCondition(
+			"AddonsDisabled", v1beta1.SpokeAddonsDisabled, metav1.ConditionTrue, metav1.ConditionTrue,
+		))
+	}
 
 	// working
 	if err := r.unjoinSpoke(ctx, spoke); err != nil {
 		return err
 	}
 	// working
+
+	// remove CSR
+	csrList := &certificatesv1.CertificateSigningRequestList{}
+	if err := r.Client.List(ctx, csrList, client.HasLabels{"open-cluster-management.io/cluster-name"}); err != nil {
+		return err
+	}
+	for _, c := range csrList.Items {
+		trimmedName := csrSuffixPattern.ReplaceAllString(c.Name, "")
+		if trimmedName == spoke.Name {
+			if err := r.Client.Delete(ctx, &c); err != nil {
+				return err
+			}
+		}
+	}
 
 	// remove ManagedCluster
 	if err = clusterC.ClusterV1().ManagedClusters().Delete(ctx, spoke.Name, metav1.DeleteOptions{}); err != nil {
@@ -241,7 +257,7 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) err
 		return client.IgnoreNotFound(err)
 	}
 	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
-		return s == v1beta1.FleetConfigFinalizer
+		return s == v1beta1.SpokeCleanupFinalizer
 	})
 	return nil
 }
@@ -352,7 +368,7 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 	}
 
 	// Handle spoke addons
-	enabledAddons, err := r.handleSpokeAddons(ctx, spoke)
+	enabledAddons, err := handleSpokeAddons(ctx, spoke)
 	if err != nil {
 		msg := fmt.Sprintf("failed to enable addons for spoke cluster %s: %s", spoke.Name, err.Error())
 		spoke.SetConditions(true, v1beta1.NewCondition(
@@ -387,12 +403,15 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke) e
 	hub, err := r.getHub(ctx)
 	if err != nil {
 		logger.V(1).Error(err, "failed to get Hub, cannot proceed with join", "spoke", spoke.Name)
+		return err
 	}
 
+	// dont start join until the hub is ready
 	hubInitCond := hub.GetCondition(v1beta1.HubInitialized)
 	if hubInitCond == nil || hubInitCond.Status != metav1.ConditionTrue {
 		return errors.New("hub does not have initialized condition")
 	}
+
 	tokenMeta, err := getToken(ctx, r.Client, hub)
 	if err != nil {
 		return fmt.Errorf("failed to get join token: %w", err)
@@ -672,21 +691,6 @@ func (r *SpokeReconciler) upgradeSpoke(ctx context.Context, spoke *v1beta1.Spoke
 	return nil
 }
 
-// handleSpokeAddons handles addon operations for the spoke
-func (r *SpokeReconciler) handleSpokeAddons(ctx context.Context, spoke *v1beta1.Spoke) ([]string, error) {
-	logger := log.FromContext(ctx)
-	logger.V(0).Info("handleSpokeAddons", "spoke", spoke.Name)
-
-	// Implementation would handle addon enable/disable operations
-	// For now, just return the configured addons
-	enabledAddons := make([]string, len(spoke.Spec.AddOns))
-	for i, addon := range spoke.Spec.AddOns {
-		enabledAddons[i] = addon.ConfigName
-	}
-
-	return enabledAddons, nil
-}
-
 // unjoinSpoke unjoins a spoke from the hub
 func (r *SpokeReconciler) unjoinSpoke(ctx context.Context, spoke *v1beta1.Spoke) error {
 	logger := log.FromContext(ctx)
@@ -796,15 +800,39 @@ func prepareKlusterletValuesFile(values *v1beta1.KlusterletChartConfig) ([]strin
 	return []string{"--klusterlet-values-file", valuesFile}, valuesCleanup, nil
 }
 
-func allOwnersAddOns(mws []workv1.ManifestWork) bool {
-	for _, m := range mws {
-		if !slices.ContainsFunc(m.OwnerReferences, func(or metav1.OwnerReference) bool {
-			return or.Kind == managedClusterAddOn
-		}) {
-			return false
+// waitForAddonManifestWorksCleanup polls for addon-related manifestWorks to be removed
+// after addon disable operation to avoid race conditions during spoke unjoin
+func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Clientset, spokeName string, timeout time.Duration) error {
+	logger := log.FromContext(ctx)
+	logger.V(1).Info("waiting for addon manifestWorks cleanup", "spokeName", spokeName, "timeout", timeout)
+
+	err := wait.PollUntilContextTimeout(ctx, addonCleanupPollInterval, timeout, true, func(ctx context.Context) (bool, error) {
+		manifestWorks, err := workC.WorkV1().ManifestWorks(spokeName).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			logger.V(3).Info("failed to list manifestWorks during cleanup wait", "error", err)
+			// Return false to continue polling on transient errors
+			return false, nil
 		}
+
+		// Success condition: no manifestWorks remaining
+		if len(manifestWorks.Items) == 0 {
+			logger.V(1).Info("addon manifestWorks cleanup completed", "spokeName", spokeName, "remainingManifestWorks", len(manifestWorks.Items))
+			return true, nil
+		}
+
+		logger.V(3).Info("waiting for addon manifestWorks cleanup",
+			"spokeName", spokeName,
+			"addonManifestWorks", len(manifestWorks.Items))
+
+		// Continue polling
+		return false, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("timeout waiting for addon manifestWorks cleanup for spoke %s: %w", spokeName, err)
 	}
-	return true
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -29,9 +29,6 @@ import (
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/utils/ptr"
-	clusterapi "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	operatorapi "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -39,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
@@ -89,19 +85,19 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}()
 
 	// Add a finalizer and requeue if not already present
-	if !slices.Contains(hub.Finalizers, v1beta1.FleetConfigFinalizer) {
-		hub.Finalizers = append(hub.Finalizers, v1beta1.FleetConfigFinalizer)
-		return ret(ctx, ctrl.Result{Requeue: true}, nil)
+	if !slices.Contains(hub.Finalizers, v1beta1.HubCleanupFinalizer) {
+		hub.Finalizers = append(hub.Finalizers, v1beta1.HubCleanupFinalizer)
+		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 	}
 
 	// Handle deletion logic with finalizer
 	if !hub.DeletionTimestamp.IsZero() {
 		if hub.Status.Phase != v1beta1.Deleting {
 			hub.Status.Phase = v1beta1.Deleting
-			return ret(ctx, ctrl.Result{Requeue: true}, nil)
+			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 		}
 
-		if slices.Contains(hub.Finalizers, v1beta1.FleetConfigFinalizer) {
+		if slices.Contains(hub.Finalizers, v1beta1.HubCleanupFinalizer) {
 			if err := r.cleanup(ctx, hub); err != nil {
 				hub.SetConditions(true, v1beta1.NewCondition(
 					err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
@@ -128,7 +124,7 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	if previousPhase == "" {
 		// set initial phase/conditions and requeue
-		return ret(ctx, ctrl.Result{Requeue: true}, nil)
+		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 	}
 
 	// Handle Hub cluster: initialization and/or upgrade
@@ -138,7 +134,7 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 	hubInitializedCond := hub.GetCondition(v1beta1.HubInitialized)
 	if hubInitializedCond == nil || hubInitializedCond.Status == metav1.ConditionFalse {
-		return ret(ctx, ctrl.Result{Requeue: true}, nil)
+		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 	}
 
 	// Finalize phase
@@ -179,12 +175,12 @@ func (r *HubReconciler) cleanup(ctx context.Context, hub *v1beta1.Hub) error {
 		return err
 	}
 	if doCleanup {
-		if err := r.cleanHub(ctx, hubKubeconfig, hub); err != nil {
+		if err := r.cleanHub(ctx, hub); err != nil {
 			return err
 		}
 	}
 	hub.Finalizers = slices.DeleteFunc(hub.Finalizers, func(s string) bool {
-		return s == v1beta1.FleetConfigFinalizer
+		return s == v1beta1.HubCleanupFinalizer
 	})
 	return nil
 }
@@ -215,9 +211,9 @@ func (r *HubReconciler) cleanupPreflight(ctx context.Context, hubKubeconfig []by
 		if err != nil {
 			return false, fmt.Errorf("failed to list manifestWorks for managedCluster %s: %w", managedCluster.Name, err)
 		}
-		// If resourceCleanup is not enabled and there are manifestWorks, return false with an error message
-		if len(manifestWorks.Items) > 0 {
-			msg := fmt.Sprintf("Found manifestWorks for ManagedCluster %s; cannot clean hub while any ManagedClusters have active ManifestWorks", managedCluster.Name)
+		// check that the number of manifestWorks is the same as the number of addons enabled for that spoke
+		if len(manifestWorks.Items) > 0 && !allOwnersAddOns(manifestWorks.Items) {
+			msg := fmt.Sprintf("Found manifestWorks for ManagedCluster %s; cannot unjoin spoke cluster while it has active ManifestWorks", managedCluster.Name)
 			logger.Info(msg)
 			return false, errors.New(msg)
 		}
@@ -227,87 +223,40 @@ func (r *HubReconciler) cleanupPreflight(ctx context.Context, hubKubeconfig []by
 }
 
 // cleanHub uninstalls OCM components from the Hub cluster via 'clusteradm clean'
-func (r *HubReconciler) cleanHub(ctx context.Context, hubKubeconfig []byte, hub *v1beta1.Hub) error {
+func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("cleanHub", "hub", hub.Name)
 
-	clusterC, err := common.ClusterClient(hubKubeconfig)
+	spokeList := &v1beta1.SpokeList{}
+	err := r.List(ctx, spokeList)
 	if err != nil {
 		return err
 	}
 
-	// TODO - instead of this shenanigans, Hub should delete all spokes as part of its cleanup
-	// OR use a webhook to enforce that 0 Spokes remain before the Hub can be deleted
-	// delete all ManagedClusters before cleaning the hub
-	if err := r.cleanManagedClusters(ctx, hub, clusterC); err != nil {
-		return err
-	}
+	spokes := spokeList.Items
+	if len(spokes) > 0 {
+		err := r.DeleteAllOf(ctx, &v1beta1.Spoke{})
+		if err != nil {
+			return err
+		}
 
-	// manually clean all managed cluster namespaces
-	// TODO - find a way to do this
-
-	// For singleton control plane, we don't have a standard cleanup process yet
-	if hub.Spec.SingletonControlPlane != nil {
-		logger.Info("TODO: singleton control plane cleanup not yet implemented")
 		return nil
 	}
 
-	// Standard cluster manager cleanup
-	if hub.Spec.ClusterManager != nil {
-		cleanArgs := []string{
-			clusteradm,
-			"clean",
-			// name is omitted, as the default name, 'cluster-manager', is always used
-			fmt.Sprintf("--purge-operator=%t", hub.Spec.ClusterManager.PurgeOperator),
-		}
-		cleanArgs = append(cleanArgs, hub.BaseArgs()...)
-
-		logger.V(1).Info("clusteradm clean", "args", cleanArgs)
-
-		// Execute cleanup command (implementation would need exec utils from v1alpha1)
-		// For now, just log the intent
-		logger.Info("hub cleanup completed")
+	cleanArgs := []string{
+		clusteradm,
+		"clean",
+		// name is omitted, as the default name, 'cluster-manager', is always used
+		fmt.Sprintf("--purge-operator=%t", hub.Spec.ClusterManager.PurgeOperator),
 	}
+	cleanArgs = append(cleanArgs, hub.BaseArgs()...)
 
-	return nil
-}
+	logger.V(1).Info("clusteradm clean", "args", cleanArgs)
 
-// cleanManagedClusters deletes all ManagedClusters from the Hub cluster.
-func (r *HubReconciler) cleanManagedClusters(ctx context.Context, hub *v1beta1.Hub, clusterClient *clusterapi.Clientset) error {
-	logger := log.FromContext(ctx)
-	logger.V(0).Info("cleanManagedClusters", "hub", hub.Name)
+	// Execute cleanup command (implementation would need exec utils from v1beta1)
+	// For now, just log the intent
+	logger.Info("hub cleanup completed")
 
-	deleteOpts := metav1.DeleteOptions{
-		PropagationPolicy: ptr.To(metav1.DeletePropagationForeground),
-	}
-	if err := clusterClient.ClusterV1().ManagedClusters().DeleteCollection(ctx, deleteOpts, metav1.ListOptions{}); err != nil {
-		if !kerrs.IsNotFound(err) {
-			return fmt.Errorf("failed to delete managedClusters: %w", err)
-		}
-	}
-
-	// Poll until all ManagedClusters are deleted
-	logger.Info("waiting for all ManagedClusters to be deleted")
-
-	err := wait.PollUntilContextCancel(ctx, cleanupInterval, true, func(ctx context.Context) (bool, error) {
-		clusters, err := clusterClient.ClusterV1().ManagedClusters().List(ctx, metav1.ListOptions{})
-		if err != nil {
-			if kerrs.IsNotFound(err) {
-				return true, nil
-			}
-			return false, err
-		}
-		if len(clusters.Items) == 0 {
-			return true, nil
-		}
-		logger.V(1).Info("ManagedClusters still present", "count", len(clusters.Items))
-		return false, nil
-	})
-	if err != nil {
-		return fmt.Errorf("failed waiting for ManagedClusters to be deleted: %w", err)
-	}
-
-	logger.Info("confirmed all ManagedClusters are deleted")
 	return nil
 }
 
@@ -325,7 +274,7 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub) error {
 	if err != nil {
 		return err
 	}
-	_, err = common.AddOnClient(hubKubeconfig)
+	addonC, err := common.AddOnClient(hubKubeconfig)
 	if err != nil {
 		return err
 	}
@@ -369,29 +318,27 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub) error {
 		v1beta1.HubInitialized, v1beta1.HubInitialized, metav1.ConditionTrue, metav1.ConditionTrue,
 	))
 
-	// TODO - implement addons
+	addonConfigChanged, err := handleAddonConfig(ctx, r.Client, addonC, hub)
+	if err != nil && addonConfigChanged {
+		hub.SetConditions(true, v1beta1.NewCondition(
+			err.Error(), v1beta1.HubAddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
+		))
+		return err
+	}
 
-	// err = handleAddonConfig(ctx, kClient, addonC, fc)
-	// if err != nil {
-	// 	fc.SetConditions(true, v1alpha1.NewCondition(
-	// 		err.Error(), v1alpha1.FleetConfigAddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
-	// 	))
-	// 	return err
-	// }
+	hubAddonChanged, err := handleHubAddons(ctx, addonC, hub)
+	if err != nil && hubAddonChanged {
+		hub.SetConditions(true, v1beta1.NewCondition(
+			err.Error(), v1beta1.HubAddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
+		))
+		return err
+	}
 
-	// err = handleHubAddons(ctx, addonC, fc)
-	// if err != nil {
-	// 	fc.SetConditions(true, v1alpha1.NewCondition(
-	// 		err.Error(), v1alpha1.FleetConfigAddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
-	// 	))
-	// 	return err
-	// }
-
-	// if len(fc.Spec.AddOnConfigs)+len(fc.Spec.HubAddOns) > 0 {
-	// 	fc.SetConditions(true, v1alpha1.NewCondition(
-	// 		v1alpha1.FleetConfigAddonsConfigured, v1alpha1.FleetConfigAddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
-	// 	))
-	// }
+	if addonConfigChanged || hubAddonChanged {
+		hub.SetConditions(true, v1beta1.NewCondition(
+			v1beta1.HubAddonsConfigured, v1beta1.HubAddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
+		))
+	}
 
 	// attempt an upgrade whenever the clustermanager's bundleVersion changes
 	if hub.Spec.ClusterManager != nil {
@@ -419,7 +366,7 @@ func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub) err
 		"--wait=true",
 	}, hub.BaseArgs()...)
 
-	if hub.Spec.RegistrationAuth.Driver == v1alpha1.AWSIRSARegistrationDriver {
+	if hub.Spec.RegistrationAuth.Driver == v1beta1.AWSIRSARegistrationDriver {
 		raArgs := []string{
 			fmt.Sprintf("--registration-drivers=%s", hub.Spec.RegistrationAuth.Driver),
 		}

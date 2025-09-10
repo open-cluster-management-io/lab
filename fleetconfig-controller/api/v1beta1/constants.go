@@ -3,8 +3,11 @@ package v1beta1
 import "k8s.io/apimachinery/pkg/labels"
 
 const (
-	// FleetConfigFinalizer is the finalizer for Hub and Spoke cleanup.
-	FleetConfigFinalizer = "fleetconfig.open-cluster-management.io/cleanup"
+	// HubCleanupFinalizer is the finalizer for Hub cleanup.
+	HubCleanupFinalizer = "fleetconfig.open-cluster-management.io/hub-cleanup"
+
+	// SpokeCleanupFinalizer is the finalizer for Spoke cleanup.
+	SpokeCleanupFinalizer = "fleetconfig.open-cluster-management.io/spoke-cleanup"
 )
 
 // Hub and Spoke condition types
@@ -23,6 +26,9 @@ const (
 
 	// SpokeAddonsEnabled means that all addons have been enabled for a particular Spoke.
 	SpokeAddonsEnabled = "AddonsEnabled"
+
+	// SpokeAddonsDisabled means that all addons have been disabled for a particular Spoke.
+	SpokeAddonsDisabled = "AddonsDisabled"
 )
 
 // Hub and Spoke condition reasons

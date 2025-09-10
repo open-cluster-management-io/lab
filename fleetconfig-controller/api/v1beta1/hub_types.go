@@ -246,6 +246,8 @@ type InstalledHubAddOn struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:validation:XValidation:rule="self.metadata.name == 'hub'",message="Hub is a cluster singleton; name must be 'hub'"
+// +kubebuilder:printcolumn:name="PHASE",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=".metadata.creationTimestamp"
 
 // Hub is the Schema for the hubs API
 type Hub struct {
