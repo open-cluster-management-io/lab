@@ -275,6 +275,9 @@ func handleSpokeAddons(ctx context.Context, spoke *v1beta1.Spoke) ([]string, err
 	// do disables first, then enables/updates
 	err := handleAddonDisable(ctx, spoke, addonsToDisable)
 	if err != nil {
+		spoke.SetConditions(true, v1beta1.NewCondition(
+			err.Error(), v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
+		))
 		return enabledAddons, err
 	}
 
@@ -290,8 +293,14 @@ func handleSpokeAddons(ctx context.Context, spoke *v1beta1.Spoke) ([]string, err
 	// even if an error is returned, any addon which was successfully enabled is tracked, so append before returning
 	enabledAddons = append(enabledAddons, newEnabledAddons...)
 	if err != nil {
+		spoke.SetConditions(true, v1beta1.NewCondition(
+			err.Error(), v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
+		))
 		return enabledAddons, err
 	}
+	spoke.SetConditions(true, v1beta1.NewCondition(
+		v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
+	))
 
 	return enabledAddons, nil
 }

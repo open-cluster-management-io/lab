@@ -150,7 +150,7 @@ func (r *ResourceValues) String() string {
 var _ common.ResourceSpec = &ResourceSpec{}
 var _ common.ResourceValues = &ResourceValues{}
 
-// NewCondition returns a new v1alpha1.Condition.
+// NewCondition returns a new v1beta1.Condition.
 func NewCondition(msg, cType string, status, wantStatus metav1.ConditionStatus) Condition {
 	return Condition{
 		Condition: metav1.Condition{

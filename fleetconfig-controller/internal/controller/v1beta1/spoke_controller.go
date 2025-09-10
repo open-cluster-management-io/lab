@@ -116,6 +116,9 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				return ret(ctx, ctrl.Result{}, err)
 			}
 		}
+		spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
+			return s == v1beta1.SpokeCleanupFinalizer
+		})
 		// end reconciliation
 		return ret(ctx, ctrl.Result{}, nil)
 	}
@@ -129,6 +132,9 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		),
 		v1beta1.NewCondition(
 			v1beta1.CleanupFailed, v1beta1.CleanupFailed, metav1.ConditionFalse, metav1.ConditionFalse,
+		),
+		v1beta1.NewCondition(
+			v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionFalse,
 		),
 	}
 	spoke.SetConditions(false, initConditions...)
@@ -174,8 +180,14 @@ func withOriginalSpoke(ctx context.Context, spoke *v1beta1.Spoke) context.Contex
 func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) error {
 	logger := log.FromContext(ctx)
 
-	hubKubeconfig, err := r.getHubKubeconfig(ctx)
+	hub, err := r.getHub(ctx)
 	if err != nil {
+		// TODO
+		return err
+	}
+	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig)
+	if err != nil {
+		// TODO
 		return err
 	}
 	clusterC, err := common.ClusterClient(hubKubeconfig)
@@ -210,7 +222,7 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) err
 	// // remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
 	if err := handleAddonDisable(ctx, spoke, spoke.Status.EnabledAddons); err != nil {
 		spoke.SetConditions(true, v1beta1.NewCondition(
-			err.Error(), v1beta1.SpokeAddonsDisabled, metav1.ConditionFalse, metav1.ConditionTrue,
+			err.Error(), v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionFalse,
 		))
 		return err
 	}
@@ -219,12 +231,12 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) err
 		// Wait for addon manifestWorks to be fully cleaned up before proceeding with unjoin
 		if err := waitForAddonManifestWorksCleanup(ctx, workC, spoke.Name, addonCleanupTimeout); err != nil {
 			spoke.SetConditions(true, v1beta1.NewCondition(
-				err.Error(), v1beta1.SpokeAddonsDisabled, metav1.ConditionFalse, metav1.ConditionTrue,
+				err.Error(), v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionFalse,
 			))
 			return fmt.Errorf("addon manifestWorks cleanup failed: %w", err)
 		}
 		spoke.SetConditions(true, v1beta1.NewCondition(
-			"AddonsDisabled", v1beta1.SpokeAddonsDisabled, metav1.ConditionTrue, metav1.ConditionTrue,
+			v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionFalse,
 		))
 	}
 
@@ -256,9 +268,7 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) err
 	if err := r.Delete(ctx, ns); err != nil {
 		return client.IgnoreNotFound(err)
 	}
-	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
-		return s == v1beta1.SpokeCleanupFinalizer
-	})
+
 	return nil
 }
 
@@ -267,9 +277,15 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("handleSpoke", "spoke", spoke.Name)
 
-	hubKubeconfig, err := r.getHubKubeconfig(ctx)
+	hub, err := r.getHub(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get hub kubeconfig: %w", err)
+		// TODO
+		return err
+	}
+	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig)
+	if err != nil {
+		// TODO
+		return err
 	}
 
 	clusterClient, err := common.ClusterClient(hubKubeconfig)
@@ -372,15 +388,9 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 	if err != nil {
 		msg := fmt.Sprintf("failed to enable addons for spoke cluster %s: %s", spoke.Name, err.Error())
 		spoke.SetConditions(true, v1beta1.NewCondition(
-			msg, v1beta1.SpokeAddonsEnabled, metav1.ConditionFalse, metav1.ConditionTrue,
+			msg, v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
 		))
 		return err
-	}
-
-	if len(enabledAddons) > 0 {
-		spoke.SetConditions(true, v1beta1.NewCondition(
-			v1beta1.SpokeAddonsEnabled, v1beta1.SpokeAddonsEnabled, metav1.ConditionTrue, metav1.ConditionTrue,
-		))
 	}
 
 	// Update status with enabled addons and klusterlet hash
@@ -767,15 +777,6 @@ func (r *SpokeReconciler) getHub(ctx context.Context) (*v1beta1.Hub, error) {
 		return nil, err
 	}
 	return hub, nil
-}
-
-// getHubKubeconfig loads a hub kubeconfig
-func (r *SpokeReconciler) getHubKubeconfig(ctx context.Context) ([]byte, error) {
-	hub, err := r.getHub(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig)
 }
 
 // prepareKlusterletValuesFile creates a temporary file with klusterlet values and returns

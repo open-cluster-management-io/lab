@@ -105,6 +105,9 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 				return ret(ctx, ctrl.Result{}, err)
 			}
 		}
+		hub.Finalizers = slices.DeleteFunc(hub.Finalizers, func(s string) bool {
+			return s == v1beta1.HubCleanupFinalizer
+		})
 		// end reconciliation
 		return ret(ctx, ctrl.Result{}, nil)
 	}
@@ -118,6 +121,9 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		),
 		v1beta1.NewCondition(
 			v1beta1.CleanupFailed, v1beta1.CleanupFailed, metav1.ConditionFalse, metav1.ConditionFalse,
+		),
+		v1beta1.NewCondition(
+			v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionFalse,
 		),
 	}
 	hub.SetConditions(false, initConditions...)
@@ -179,9 +185,7 @@ func (r *HubReconciler) cleanup(ctx context.Context, hub *v1beta1.Hub) error {
 			return err
 		}
 	}
-	hub.Finalizers = slices.DeleteFunc(hub.Finalizers, func(s string) bool {
-		return s == v1beta1.HubCleanupFinalizer
-	})
+
 	return nil
 }
 
@@ -254,6 +258,11 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub) error {
 	}
 
 	logger.Info("All Spokes have been deleted, proceeding with Hub cleanup")
+
+	err = handleHubAddonUninstall(ctx, hub.Status.InstalledHubAddOns, hub)
+	if err != nil {
+		return err
+	}
 
 	cleanArgs := []string{
 		"clean",
@@ -334,7 +343,7 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub) error {
 	addonConfigChanged, err := handleAddonConfig(ctx, r.Client, addonC, hub)
 	if err != nil && addonConfigChanged {
 		hub.SetConditions(true, v1beta1.NewCondition(
-			err.Error(), v1beta1.HubAddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
+			err.Error(), v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
 		))
 		return err
 	}
@@ -342,14 +351,14 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub) error {
 	hubAddonChanged, err := handleHubAddons(ctx, addonC, hub)
 	if err != nil && hubAddonChanged {
 		hub.SetConditions(true, v1beta1.NewCondition(
-			err.Error(), v1beta1.HubAddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
+			err.Error(), v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
 		))
 		return err
 	}
 
 	if addonConfigChanged || hubAddonChanged {
 		hub.SetConditions(true, v1beta1.NewCondition(
-			v1beta1.HubAddonsConfigured, v1beta1.HubAddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
+			v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
 		))
 	}
 

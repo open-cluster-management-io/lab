@@ -15,20 +15,14 @@ const (
 	// HubInitialized means that the Hub has been initialized.
 	HubInitialized = "HubInitialized"
 
-	// HubAddonsConfigured means that all addons have been configured on the Hub.
-	HubAddonsConfigured = "AddonsConfigured"
+	// AddonsConfigured means that all addons have been configured on the Hub, or enabled/disabled on a Spoke.
+	AddonsConfigured = "AddonsConfigured"
 
 	// CleanupFailed means that a failure occurred during cleanup.
 	CleanupFailed = "CleanupFailed"
 
 	// SpokeJoined means that the spoke has successfully joined the Hub.
 	SpokeJoined = "SpokeJoined"
-
-	// SpokeAddonsEnabled means that all addons have been enabled for a particular Spoke.
-	SpokeAddonsEnabled = "AddonsEnabled"
-
-	// SpokeAddonsDisabled means that all addons have been disabled for a particular Spoke.
-	SpokeAddonsDisabled = "AddonsDisabled"
 )
 
 // Hub and Spoke condition reasons
