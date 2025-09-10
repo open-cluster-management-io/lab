@@ -180,16 +180,12 @@ func withOriginalSpoke(ctx context.Context, spoke *v1beta1.Spoke) context.Contex
 func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) error {
 	logger := log.FromContext(ctx)
 
-	hub, err := r.getHub(ctx)
+	_, hubKubeconfig, err := r.getHubMeta(ctx)
 	if err != nil {
 		// TODO
 		return err
 	}
-	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig)
-	if err != nil {
-		// TODO
-		return err
-	}
+
 	clusterC, err := common.ClusterClient(hubKubeconfig)
 	if err != nil {
 		return err
@@ -277,14 +273,8 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("handleSpoke", "spoke", spoke.Name)
 
-	hub, err := r.getHub(ctx)
+	hub, hubKubeconfig, err := r.getHubMeta(ctx)
 	if err != nil {
-		// TODO
-		return err
-	}
-	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig)
-	if err != nil {
-		// TODO
 		return err
 	}
 
@@ -302,7 +292,7 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 
 	// attempt to join the spoke cluster if it hasn't already been joined
 	if managedCluster == nil {
-		if err := r.joinSpoke(ctx, spoke); err != nil {
+		if err := r.joinSpoke(ctx, spoke, hub); err != nil {
 			spoke.SetConditions(true, v1beta1.NewCondition(
 				err.Error(), v1beta1.SpokeJoined, metav1.ConditionFalse, metav1.ConditionTrue,
 			))
@@ -406,15 +396,9 @@ type tokenMeta struct {
 }
 
 // joinSpoke joins a Spoke cluster to the Hub cluster
-func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke) error {
+func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, hub *v1beta1.Hub) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("joinSpoke", "spoke", spoke.Name)
-
-	hub, err := r.getHub(ctx)
-	if err != nil {
-		logger.V(1).Error(err, "failed to get Hub, cannot proceed with join", "spoke", spoke.Name)
-		return err
-	}
 
 	// dont start join until the hub is ready
 	hubInitCond := hub.GetCondition(v1beta1.HubInitialized)
@@ -516,7 +500,7 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke) e
 		joinArgs = append(joinArgs, fmt.Sprintf("--proxy-url=%s", spoke.Spec.ProxyURL))
 	}
 
-	valuesArgs, valuesCleanup, err := prepareKlusterletValuesFile(spoke.Spec.Klusterlet.Values)
+	valuesArgs, valuesCleanup, err := r.prepareKlusterletValuesFile(spoke.Spec.Klusterlet.Values)
 	if valuesCleanup != nil {
 		defer valuesCleanup()
 	}
@@ -668,7 +652,7 @@ func (r *SpokeReconciler) upgradeSpoke(ctx context.Context, spoke *v1beta1.Spoke
 		"--wait=true",
 	}, spoke.BaseArgs()...)
 
-	valuesArgs, valuesCleanup, err := prepareKlusterletValuesFile(spoke.Spec.Klusterlet.Values)
+	valuesArgs, valuesCleanup, err := r.prepareKlusterletValuesFile(spoke.Spec.Klusterlet.Values)
 	if valuesCleanup != nil {
 		defer valuesCleanup()
 	}
@@ -770,20 +754,34 @@ func getToken(ctx context.Context, kClient client.Client, hub *v1beta1.Hub) (*to
 	return tokenMeta, nil
 }
 
-func (r *SpokeReconciler) getHub(ctx context.Context) (*v1beta1.Hub, error) {
+func (r *SpokeReconciler) getHubMeta(ctx context.Context) (*v1beta1.Hub, []byte, error) {
 	hub := &v1beta1.Hub{}
+	var hubKubeconfig []byte
+
 	err := r.Get(ctx, types.NamespacedName{Name: v1beta1.HubResourceName}, hub)
 	if err != nil {
-		return nil, err
+		if !kerrs.IsNotFound(err) {
+			return nil, nil, err
+		}
+		// TODO @arturshadnik - for now, load an inCluster hub kubeconfig. After the addon refactor, this will need be loaded from mount or secret
+		hubKubeconfig, err = kube.RawFromInClusterRestConfig()
+		if err != nil {
+			return nil, nil, err
+		}
+		return hub, hubKubeconfig, nil
 	}
-	return hub, nil
+	hubKubeconfig, err = kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig)
+	if err != nil {
+		return hub, nil, err
+	}
+	return hub, hubKubeconfig, nil
 }
 
 // prepareKlusterletValuesFile creates a temporary file with klusterlet values and returns
 // args to append and a cleanup function. Returns empty slice if values are empty.
-func prepareKlusterletValuesFile(values *v1beta1.KlusterletChartConfig) ([]string, func(), error) {
-	// TODO - add support for reading from configmap. This will include a change to the API
-	// TODO - DRY?? this and the v1alpha1 implementation, but maybe not
+func (r *SpokeReconciler) prepareKlusterletValuesFile(values *v1beta1.KlusterletChartConfig) ([]string, func(), error) {
+	// find configmap
+
 	if values == nil {
 		return nil, nil, nil
 	}
