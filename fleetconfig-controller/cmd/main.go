@@ -20,6 +20,7 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -58,14 +59,15 @@ func init() {
 
 func main() {
 	var (
-		metricsAddr          string
-		enableLeaderElection bool
-		probeAddr            string
-		secureMetrics        bool
-		enableHTTP2          bool
-		useWebhook           bool
-		certDir              string
-		webhookPort          int
+		metricsAddr               string
+		enableLeaderElection      bool
+		probeAddr                 string
+		secureMetrics             bool
+		enableHTTP2               bool
+		useWebhook                bool
+		certDir                   string
+		webhookPort               int
+		spokeConcurrentReconciles int
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metric endpoint binds to. Use the port :8080. If not set, it will be 0 to disable the metrics server.")
@@ -77,6 +79,8 @@ func main() {
 	flag.BoolVar(&useWebhook, "use-webhook", useWebhook, "Enable admission webhooks")
 	flag.StringVar(&certDir, "webhook-cert-dir", certDir, "Admission webhook cert/key dir")
 	flag.IntVar(&webhookPort, "webhook-port", webhookPort, "Admission webhook port")
+
+	flag.IntVar(&spokeConcurrentReconciles, "spoke-concurrent-recocniles", apiv1beta1.SpokeDefaultMaxConcurrentReconciles, fmt.Sprintf("Maximum number of Spoke resources that may be reconciled in parallel. Defaults to %d.", apiv1beta1.SpokeDefaultMaxConcurrentReconciles))
 
 	opts := zap.Options{
 		Development: true,
@@ -153,10 +157,12 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Hub")
 		os.Exit(1)
 	}
+
 	if err := (&controllerv1beta1.SpokeReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Spoke"),
-		Scheme: mgr.GetScheme(),
+		Client:               mgr.GetClient(),
+		Log:                  ctrl.Log.WithName("controllers").WithName("Spoke"),
+		ConcurrentReconciles: spokeConcurrentReconciles,
+		Scheme:               mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Spoke")
 		os.Exit(1)

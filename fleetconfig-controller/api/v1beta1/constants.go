@@ -104,6 +104,12 @@ const (
 	AddonConfigMapManifestURLKey = "manifestsURL"
 )
 
+// Reconcile parameters
+const (
+	// SpokeDefaultMaxConcurrentReconciles is the default maximum number of Spoke resources that may be reconciled in parallel.
+	SpokeDefaultMaxConcurrentReconciles = 5
+)
+
 // AllowedAddonURLSchemes are the URL schemes which can be used to provide manifests for configuring addons.
 var AllowedAddonURLSchemes = []string{"http", "https"}
 

@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
 
@@ -56,8 +57,9 @@ import (
 // SpokeReconciler reconciles a Spoke object
 type SpokeReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log                  logr.Logger
+	Scheme               *runtime.Scheme
+	ConcurrentReconciles int
 }
 
 // +kubebuilder:rbac:groups=fleetconfig.open-cluster-management.io,resources=spokes,verbs=get;list;watch;create;update;patch;delete
@@ -226,11 +228,9 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) err
 		))
 	}
 
-	// working
 	if err := r.unjoinSpoke(ctx, spoke); err != nil {
 		return err
 	}
-	// working
 
 	// remove CSR
 	csrList := &certificatesv1.CertificateSigningRequestList{}
@@ -839,6 +839,9 @@ func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Client
 func (r *SpokeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1beta1.Spoke{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: r.ConcurrentReconciles,
+		}).
 		Named("spoke").
 		Complete(r)
 }

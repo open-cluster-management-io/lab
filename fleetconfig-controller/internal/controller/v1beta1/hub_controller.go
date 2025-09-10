@@ -256,18 +256,19 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub) error {
 	logger.Info("All Spokes have been deleted, proceeding with Hub cleanup")
 
 	cleanArgs := []string{
-		clusteradm,
 		"clean",
 		// name is omitted, as the default name, 'cluster-manager', is always used
 		fmt.Sprintf("--purge-operator=%t", hub.Spec.ClusterManager.PurgeOperator),
 	}
 	cleanArgs = append(cleanArgs, hub.BaseArgs()...)
 
-	logger.V(1).Info("clusteradm clean", "args", cleanArgs)
-
-	// Execute cleanup command (implementation would need exec utils from v1beta1)
-	// For now, just log the intent
-	logger.Info("hub cleanup completed")
+	cmd := exec.Command(clusteradm, cleanArgs...)
+	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm clean' to complete...")
+	if err != nil {
+		out := append(stdout, stderr...)
+		return fmt.Errorf("failed to clean hub cluster: %v, output: %s", err, string(out))
+	}
+	logger.V(1).Info("hub cleaned", "output", string(stdout))
 
 	return nil
 }
