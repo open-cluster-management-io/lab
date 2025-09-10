@@ -227,6 +227,7 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("cleanHub", "hub", hub.Name)
 
+	// Check if there are any Spokes that need to be deleted
 	spokeList := &v1beta1.SpokeList{}
 	err := r.List(ctx, spokeList)
 	if err != nil {
@@ -235,13 +236,24 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub) error {
 
 	spokes := spokeList.Items
 	if len(spokes) > 0 {
-		err := r.DeleteAllOf(ctx, &v1beta1.Spoke{})
-		if err != nil {
-			return err
+		// Mark all Spokes for deletion if they haven't been deleted yet
+		for i := range spokes {
+			spoke := &spokes[i]
+			if spoke.DeletionTimestamp.IsZero() {
+				logger.Info("Marking Spoke for deletion", "spoke", spoke.Name)
+				if err := r.Delete(ctx, spoke); err != nil && !kerrs.IsNotFound(err) {
+					return fmt.Errorf("failed to delete spoke %s: %w", spoke.Name, err)
+				}
+			}
 		}
 
-		return nil
+		logger.V(1).Info("Waiting for all Spokes to be deleted before proceeding with Hub cleanup",
+			"remainingSpokes", len(spokes))
+		// Return a retriable error to requeue and check again later
+		return fmt.Errorf("waiting for background spoke deletion. Remaining: %d spokes", len(spokes))
 	}
+
+	logger.Info("All Spokes have been deleted, proceeding with Hub cleanup")
 
 	cleanArgs := []string{
 		clusteradm,
