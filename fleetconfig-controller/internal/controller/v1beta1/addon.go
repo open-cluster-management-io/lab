@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
 	workapi "open-cluster-management.io/api/client/work/clientset/versioned"
+	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -39,6 +40,8 @@ const (
 
 	addonArgoCD = "argocd"
 	addonGPF    = "governance-policy-framework"
+
+	managedClusterAddOn = "ManagedClusterAddOn"
 )
 
 var supportedHubAddons = []string{
@@ -665,4 +668,15 @@ func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Client
 	}
 
 	return nil
+}
+
+func allOwnersAddOns(mws []workv1.ManifestWork) bool {
+	for _, m := range mws {
+		if !slices.ContainsFunc(m.OwnerReferences, func(or metav1.OwnerReference) bool {
+			return or.Kind == managedClusterAddOn
+		}) {
+			return false
+		}
+	}
+	return true
 }

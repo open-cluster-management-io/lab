@@ -930,10 +930,10 @@ func (r *SpokeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&v1beta1.Hub{},
 			handler.EnqueueRequestsFromMapFunc(r.mapHubEventToSpoke),
 			builder.WithPredicates(predicate.Funcs{
-				DeleteFunc: func(e event.DeleteEvent) bool {
+				DeleteFunc: func(_ event.DeleteEvent) bool {
 					return false
 				},
-				CreateFunc: func(e event.CreateEvent) bool {
+				CreateFunc: func(_ event.CreateEvent) bool {
 					return false
 				},
 				// only return true if old and new hub specs are different
@@ -948,7 +948,7 @@ func (r *SpokeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					}
 					return !reflect.DeepEqual(oldHub.Spec, newHub.Spec)
 				},
-				GenericFunc: func(e event.GenericEvent) bool {
+				GenericFunc: func(_ event.GenericEvent) bool {
 					return false
 				},
 			}),
@@ -957,7 +957,7 @@ func (r *SpokeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *SpokeReconciler) mapHubEventToSpoke(ctx context.Context, obj client.Object) []reconcile.Request {
+func (r *SpokeReconciler) mapHubEventToSpoke(ctx context.Context, _ client.Object) []reconcile.Request {
 	spokeList := &v1beta1.SpokeList{}
 	err := r.List(ctx, spokeList)
 	if err != nil {
