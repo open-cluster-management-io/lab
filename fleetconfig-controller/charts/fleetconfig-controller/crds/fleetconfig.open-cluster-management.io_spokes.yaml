@@ -208,7 +208,10 @@ spec:
                     type: boolean
                   source:
                     default: {}
-                    description: Version and image registry details for the klusterlet.
+                    description: |-
+                      Version and image registry details for the klusterlet. The Spoke's Source is automatically managed by the controller. It will be inherited from the Hub's
+                      spec.clusterManager.source field
+                      and should not be set when creating a spoke.
                     properties:
                       bundleVersion:
                         default: default
@@ -2287,8 +2290,9 @@ spec:
                 type: string
               registrationAuth:
                 default: {}
-                description: RegistrationAuth provides specifications for registration
-                  authentication.
+                description: |-
+                  The Spoke's RegistrationAuth is automatically managed by the controller. It will be inherited from the Hub's spec.registrationAuth field
+                  and should not be set when creating a spoke.
                 properties:
                   autoApprovedARNPatterns:
                     description: |-

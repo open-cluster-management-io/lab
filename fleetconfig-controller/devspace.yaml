@@ -87,6 +87,8 @@ deployments:
       chart:
         name: ${CONTEXT}/charts/fleetconfig-controller
       values:
+        fleetConfig:
+          enabled: false
         devspaceEnabled: true
       valuesFiles:
       - ${CONTEXT}/charts/fleetconfig-controller/values.yaml

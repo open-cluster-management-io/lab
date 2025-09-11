@@ -310,14 +310,14 @@ func (in *Klusterlet) DeepCopyInto(out *Klusterlet) {
 	in.ManagedClusterKubeconfig.DeepCopyInto(&out.ManagedClusterKubeconfig)
 	in.Resources.DeepCopyInto(&out.Resources)
 	out.Source = in.Source
-	if in.Values != nil {
-		in, out := &in.Values, &out.Values
-		*out = (*in).DeepCopy()
-	}
 	if in.ValuesFrom != nil {
 		in, out := &in.ValuesFrom, &out.ValuesFrom
 		*out = new(ConfigMapRef)
 		**out = **in
+	}
+	if in.Values != nil {
+		in, out := &in.Values, &out.Values
+		*out = (*in).DeepCopy()
 	}
 }
 
