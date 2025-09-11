@@ -141,9 +141,24 @@ type Klusterlet struct {
 	// +optional
 	Source OCMSource `json:"source,omitzero"`
 
-	// Values for the klusterlet Helm chart.
+	// Values for the klusterlet Helm chart. Values defined here override values which are defined in ValuesFrom.
 	// +optional
 	Values *KlusterletChartConfig `json:"values,omitempty"`
+
+	// ValuesFrom is an optional reference to a ConfigMap containing values for the klusterlet Helm chart.
+	// optional
+	ValuesFrom *ConfigMapRef `json:"valuesFrom,omitempty"`
+}
+
+// ConfigMapRef is a reference to data inside a ConfigMap, in the same namespace as the controller pod.
+type ConfigMapRef struct {
+	// Name is the name of the ConfigMap
+	// +required
+	Name string `json:"name"`
+
+	// Key is the key under which the data is stored.
+	// +required
+	Key string `json:"key"`
 }
 
 // KlusterletChartConfig is a wrapper around the external chart.KlusterletChartConfig

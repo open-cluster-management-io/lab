@@ -21,10 +21,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os/exec"
 	"slices"
 	"strings"
-	"time"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -32,8 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
-	workapi "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -60,6 +58,7 @@ type SpokeReconciler struct {
 	Log                  logr.Logger
 	Scheme               *runtime.Scheme
 	ConcurrentReconciles int
+	PodNamespace         string
 }
 
 // +kubebuilder:rbac:groups=fleetconfig.open-cluster-management.io,resources=spokes,verbs=get;list;watch;create;update;patch;delete
@@ -290,9 +289,14 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 		return err
 	}
 
+	klusterletValues, err := r.mergeKlusterletValues(ctx, spoke)
+	if err != nil {
+		return err
+	}
+
 	// attempt to join the spoke cluster if it hasn't already been joined
 	if managedCluster == nil {
-		if err := r.joinSpoke(ctx, spoke, hub); err != nil {
+		if err := r.joinSpoke(ctx, spoke, hub, klusterletValues); err != nil {
 			spoke.SetConditions(true, v1beta1.NewCondition(
 				err.Error(), v1beta1.SpokeJoined, metav1.ConditionFalse, metav1.ConditionTrue,
 			))
@@ -358,7 +362,7 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 	}
 
 	// attempt an upgrade whenever the klusterlet's bundleVersion or values change
-	currKlusterletHash, err := hash.ComputeHash(spoke.Spec.Klusterlet.Values)
+	currKlusterletHash, err := hash.ComputeHash(klusterletValues)
 	if err != nil {
 		return fmt.Errorf("failed to compute hash of spoke %s klusterlet values: %w", spoke.Name, err)
 	}
@@ -368,7 +372,7 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 	}
 
 	if upgrade {
-		if err := r.upgradeSpoke(ctx, spoke); err != nil {
+		if err := r.upgradeSpoke(ctx, spoke, klusterletValues); err != nil {
 			return fmt.Errorf("failed to upgrade spoke cluster %s: %w", spoke.Name, err)
 		}
 	}
@@ -396,7 +400,7 @@ type tokenMeta struct {
 }
 
 // joinSpoke joins a Spoke cluster to the Hub cluster
-func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, hub *v1beta1.Hub) error {
+func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, hub *v1beta1.Hub, klusterletValues *v1beta1.KlusterletChartConfig) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("joinSpoke", "spoke", spoke.Name)
 
@@ -500,7 +504,7 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 		joinArgs = append(joinArgs, fmt.Sprintf("--proxy-url=%s", spoke.Spec.ProxyURL))
 	}
 
-	valuesArgs, valuesCleanup, err := r.prepareKlusterletValuesFile(spoke.Spec.Klusterlet.Values)
+	valuesArgs, valuesCleanup, err := prepareKlusterletValuesFile(klusterletValues)
 	if valuesCleanup != nil {
 		defer valuesCleanup()
 	}
@@ -641,7 +645,7 @@ func (r *SpokeReconciler) spokeNeedsUpgrade(ctx context.Context, spoke *v1beta1.
 }
 
 // upgradeSpoke upgrades the Spoke cluster's klusterlet
-func (r *SpokeReconciler) upgradeSpoke(ctx context.Context, spoke *v1beta1.Spoke) error {
+func (r *SpokeReconciler) upgradeSpoke(ctx context.Context, spoke *v1beta1.Spoke, klusterletValues *v1beta1.KlusterletChartConfig) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("upgradeSpoke", "spoke", spoke.Name)
 
@@ -652,7 +656,7 @@ func (r *SpokeReconciler) upgradeSpoke(ctx context.Context, spoke *v1beta1.Spoke
 		"--wait=true",
 	}, spoke.BaseArgs()...)
 
-	valuesArgs, valuesCleanup, err := r.prepareKlusterletValuesFile(spoke.Spec.Klusterlet.Values)
+	valuesArgs, valuesCleanup, err := prepareKlusterletValuesFile(klusterletValues)
 	if valuesCleanup != nil {
 		defer valuesCleanup()
 	}
@@ -777,14 +781,132 @@ func (r *SpokeReconciler) getHubMeta(ctx context.Context) (*v1beta1.Hub, []byte,
 	return hub, hubKubeconfig, nil
 }
 
+// deepMergeNonZero recursively merges src into dst, but only copies non-zero values from src.
+// This prevents zero values in the spec from overwriting actual values from the ConfigMap.
+// This does limit a users ability to manually override a non-zero value in the CM with a zero value in the spec.
+func deepMergeNonZero(dst, src map[string]any) {
+	for key, srcValue := range src {
+		if isZeroValue(srcValue) {
+			// Skip zero values - don't overwrite dst
+			continue
+		}
+
+		dstValue, exists := dst[key]
+		if !exists {
+			// Key doesn't exist in dst, safe to copy
+			dst[key] = srcValue
+			continue
+		}
+
+		// Both src and dst have this key
+		srcMap, srcIsMap := srcValue.(map[string]any)
+		dstMap, dstIsMap := dstValue.(map[string]any)
+
+		if srcIsMap && dstIsMap {
+			// Both are maps, recurse
+			deepMergeNonZero(dstMap, srcMap)
+		} else {
+			// Not both maps, src value takes precedence (since it's non-zero)
+			dst[key] = srcValue
+		}
+	}
+}
+
+// isZeroValue checks if a value is considered "zero" and should be ignored during merge.
+// Note: booleans are never considered zero values since both true and false are valid explicit choices.
+func isZeroValue(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	switch val := v.(type) {
+	case bool:
+		// Don't treat false as zero value - both true and false are valid explicit choices
+		return false
+	case int, int8, int16, int32, int64:
+		return val == 0
+	case uint, uint8, uint16, uint32, uint64:
+		return val == 0
+	case float32, float64:
+		return val == 0.0
+	case string:
+		return val == ""
+	case []any:
+		return len(val) == 0
+	case map[string]any:
+		return len(val) == 0
+	default:
+		// For other types, consider nil as zero
+		return false
+	}
+}
+
+// TODO @arturshadnik - after the addon refactor, this will need to use hubClient, not spokeClient, because the klusterlet values CM will be configured in the hub
+func (r *SpokeReconciler) mergeKlusterletValues(ctx context.Context, spoke *v1beta1.Spoke) (*v1beta1.KlusterletChartConfig, error) {
+	logger := log.FromContext(ctx)
+
+	cm := &corev1.ConfigMap{}
+	nn := types.NamespacedName{Name: spoke.Spec.Klusterlet.ValuesFrom.Name, Namespace: r.PodNamespace}
+	err := r.Get(ctx, nn, cm)
+	if err != nil {
+		if kerrs.IsNotFound(err) {
+			// cm not found, return spec's values
+			logger.V(1).Info("warning: Klusterlet values ConfigMap not found", "spoke", spoke.Name, "configMap", nn)
+			return spoke.Spec.Klusterlet.Values, nil
+		}
+		return nil, fmt.Errorf("failed to retrieve Klusterlet values ConfigMap %s: %w", nn, err)
+	}
+
+	fromValues, ok := cm.Data[spoke.Spec.Klusterlet.ValuesFrom.Key]
+	if !ok {
+		logger.V(1).Info("warning: Klusterlet values ConfigMap not found", "spoke", spoke.Name, "configMap", nn, "key", spoke.Spec.Klusterlet.ValuesFrom.Key)
+		return spoke.Spec.Klusterlet.Values, nil
+	}
+
+	fromBytes := []byte(fromValues)
+	var fromInterface = map[string]any{}
+	err = yaml.Unmarshal(fromBytes, &fromInterface)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal YAML values from ConfigMap %s key %s: %w", nn, spoke.Spec.Klusterlet.ValuesFrom.Key, err)
+	}
+	var specInterface = map[string]any{}
+	if spoke.Spec.Klusterlet.Values != nil {
+		specBytes, err := yaml.Marshal(spoke.Spec.Klusterlet.Values)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal Klusterlet values from spoke spec for spoke %s: %w", spoke.Name, err)
+		}
+		err = yaml.Unmarshal(specBytes, &specInterface)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal Klusterlet values from spoke spec for spoke %s: %w", spoke.Name, err)
+		}
+	}
+
+	mergedMap := map[string]any{}
+	maps.Copy(mergedMap, fromInterface)
+	// Only copy non-zero values from spec to avoid overwriting CM values with zero values
+	deepMergeNonZero(mergedMap, specInterface)
+
+	mergedBytes, err := yaml.Marshal(mergedMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal merged Klusterlet values for spoke %s: %w", spoke.Name, err)
+	}
+
+	merged := &v1beta1.KlusterletChartConfig{}
+	err = yaml.Unmarshal(mergedBytes, &merged)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal merged values into KlusterletChartConfig for spoke %s: %w", spoke.Name, err)
+	}
+
+	return merged, nil
+}
+
 // prepareKlusterletValuesFile creates a temporary file with klusterlet values and returns
 // args to append and a cleanup function. Returns empty slice if values are empty.
-func (r *SpokeReconciler) prepareKlusterletValuesFile(values *v1beta1.KlusterletChartConfig) ([]string, func(), error) {
-	// find configmap
-
+func prepareKlusterletValuesFile(values *v1beta1.KlusterletChartConfig) ([]string, func(), error) {
 	if values == nil {
 		return nil, nil, nil
 	}
+
 	if values.IsEmpty() {
 		return nil, nil, nil
 	}
@@ -797,41 +919,6 @@ func (r *SpokeReconciler) prepareKlusterletValuesFile(values *v1beta1.Klusterlet
 		return nil, nil, fmt.Errorf("failed to write klusterlet values to disk: %w", err)
 	}
 	return []string{"--klusterlet-values-file", valuesFile}, valuesCleanup, nil
-}
-
-// waitForAddonManifestWorksCleanup polls for addon-related manifestWorks to be removed
-// after addon disable operation to avoid race conditions during spoke unjoin
-func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Clientset, spokeName string, timeout time.Duration) error {
-	logger := log.FromContext(ctx)
-	logger.V(1).Info("waiting for addon manifestWorks cleanup", "spokeName", spokeName, "timeout", timeout)
-
-	err := wait.PollUntilContextTimeout(ctx, addonCleanupPollInterval, timeout, true, func(ctx context.Context) (bool, error) {
-		manifestWorks, err := workC.WorkV1().ManifestWorks(spokeName).List(ctx, metav1.ListOptions{})
-		if err != nil {
-			logger.V(3).Info("failed to list manifestWorks during cleanup wait", "error", err)
-			// Return false to continue polling on transient errors
-			return false, nil
-		}
-
-		// Success condition: no manifestWorks remaining
-		if len(manifestWorks.Items) == 0 {
-			logger.V(1).Info("addon manifestWorks cleanup completed", "spokeName", spokeName, "remainingManifestWorks", len(manifestWorks.Items))
-			return true, nil
-		}
-
-		logger.V(3).Info("waiting for addon manifestWorks cleanup",
-			"spokeName", spokeName,
-			"addonManifestWorks", len(manifestWorks.Items))
-
-		// Continue polling
-		return false, nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("timeout waiting for addon manifestWorks cleanup for spoke %s: %w", spokeName, err)
-	}
-
-	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -7,14 +7,17 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/apimachinery/pkg/types"
 	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
+	workapi "open-cluster-management.io/api/client/work/clientset/versioned"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -555,4 +558,39 @@ func isAddonInstalled(ctx context.Context, addonC *addonapi.Clientset, addonName
 	// and handle deleting addOnConfigs first
 	// so if the addon is found here, we can assume it was previously installed by `install hub-addon`
 	return true, nil
+}
+
+// waitForAddonManifestWorksCleanup polls for addon-related manifestWorks to be removed
+// after addon disable operation to avoid race conditions during spoke unjoin
+func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Clientset, spokeName string, timeout time.Duration) error {
+	logger := log.FromContext(ctx)
+	logger.V(1).Info("waiting for addon manifestWorks cleanup", "spokeName", spokeName, "timeout", timeout)
+
+	err := wait.PollUntilContextTimeout(ctx, addonCleanupPollInterval, timeout, true, func(ctx context.Context) (bool, error) {
+		manifestWorks, err := workC.WorkV1().ManifestWorks(spokeName).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			logger.V(3).Info("failed to list manifestWorks during cleanup wait", "error", err)
+			// Return false to continue polling on transient errors
+			return false, nil
+		}
+
+		// Success condition: no manifestWorks remaining
+		if len(manifestWorks.Items) == 0 {
+			logger.V(1).Info("addon manifestWorks cleanup completed", "spokeName", spokeName, "remainingManifestWorks", len(manifestWorks.Items))
+			return true, nil
+		}
+
+		logger.V(3).Info("waiting for addon manifestWorks cleanup",
+			"spokeName", spokeName,
+			"addonManifestWorks", len(manifestWorks.Items))
+
+		// Continue polling
+		return false, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("timeout waiting for addon manifestWorks cleanup for spoke %s: %w", spokeName, err)
+	}
+
+	return nil
 }

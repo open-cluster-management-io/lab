@@ -223,7 +223,8 @@ spec:
                         type: string
                     type: object
                   values:
-                    description: Values for the klusterlet Helm chart.
+                    description: Values for the klusterlet Helm chart. Values defined
+                      here override values which are defined in ValuesFrom.
                     properties:
                       affinity:
                         description: Affinity is the affinity of the operator deployment
@@ -2210,6 +2211,21 @@ spec:
                               type: string
                           type: object
                         type: array
+                    type: object
+                  valuesFrom:
+                    description: |-
+                      ValuesFrom is an optional reference to a ConfigMap containing values for the klusterlet Helm chart.
+                      optional
+                    properties:
+                      key:
+                        description: Key is the key under which the data is stored.
+                        type: string
+                      name:
+                        description: Name is the name of the ConfigMap
+                        type: string
+                    required:
+                    - key
+                    - name
                     type: object
                 type: object
               kubeconfig:
