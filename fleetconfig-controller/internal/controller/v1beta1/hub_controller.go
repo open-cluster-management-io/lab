@@ -29,12 +29,18 @@ import (
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	operatorapi "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
@@ -557,6 +563,37 @@ func (r *HubReconciler) upgradeHub(ctx context.Context, hub *v1beta1.Hub) error 
 func (r *HubReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1beta1.Hub{}).
+		// watch for deleted Spokes to prevent idly waiting after all spokes have been GCd during Hub deletion
+		Watches(
+			&v1beta1.Spoke{},
+			handler.EnqueueRequestsFromMapFunc(mapSpokeRequestToHub),
+			builder.WithPredicates(
+				predicate.Funcs{
+					DeleteFunc: func(e event.DeleteEvent) bool {
+						return true
+					},
+					CreateFunc: func(e event.CreateEvent) bool {
+						return true
+					},
+					UpdateFunc: func(e event.UpdateEvent) bool {
+						return true
+					},
+					GenericFunc: func(e event.GenericEvent) bool {
+						return true
+					},
+				},
+			),
+		).
 		Named("hub").
 		Complete(r)
+}
+
+func mapSpokeRequestToHub(ctx context.Context, obj client.Object) []reconcile.Request {
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Name: v1beta1.HubResourceName,
+			},
+		},
+	}
 }

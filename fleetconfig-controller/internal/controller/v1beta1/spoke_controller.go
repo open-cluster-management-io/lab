@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"maps"
 	"os/exec"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -37,9 +38,14 @@ import (
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/yaml"
 
 	"github.com/go-logr/logr"
@@ -919,6 +925,52 @@ func (r *SpokeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: r.ConcurrentReconciles,
 		}).
+		// watch for Hub updates, to immediately propagate any updates to RegistrationAuth, OCMSource
+		Watches(
+			&v1beta1.Hub{},
+			handler.EnqueueRequestsFromMapFunc(r.mapHubEventToSpoke),
+			builder.WithPredicates(predicate.Funcs{
+				DeleteFunc: func(e event.DeleteEvent) bool {
+					return false
+				},
+				CreateFunc: func(e event.CreateEvent) bool {
+					return false
+				},
+				// only return true if old and new hub specs are different
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					oldHub, ok := e.ObjectOld.(*v1beta1.Hub)
+					if !ok {
+						return false
+					}
+					newHub, ok := e.ObjectNew.(*v1beta1.Hub)
+					if !ok {
+						return false
+					}
+					return !reflect.DeepEqual(oldHub.Spec, newHub.Spec)
+				},
+				GenericFunc: func(e event.GenericEvent) bool {
+					return false
+				},
+			}),
+		).
 		Named("spoke").
 		Complete(r)
+}
+
+func (r *SpokeReconciler) mapHubEventToSpoke(ctx context.Context, obj client.Object) []reconcile.Request {
+	spokeList := &v1beta1.SpokeList{}
+	err := r.List(ctx, spokeList)
+	if err != nil {
+		r.Log.Error(err, "failed to List spokes")
+		return nil
+	}
+	req := make([]reconcile.Request, 0)
+	for _, s := range spokeList.Items {
+		req = append(req, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name: s.Name,
+			},
+		})
+	}
+	return req
 }
