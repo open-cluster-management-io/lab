@@ -79,7 +79,7 @@ func getHubAddOns(ctx context.Context, addonC *addonapi.Clientset) ([]string, er
 	return hubAddons, nil
 }
 
-func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addonapi.Clientset, hub *v1beta1.Hub) (bool, error) {
+func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addonapi.Clientset, hub *v1beta1.Hub, ctrlNamespace string) (bool, error) {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("handleAddOnConfig")
 
@@ -131,7 +131,7 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 		return true, err
 	}
 
-	err = handleAddonCreate(ctx, kClient, hub, addonsToCreate)
+	err = handleAddonCreate(ctx, kClient, hub, addonsToCreate, ctrlNamespace)
 	if err != nil {
 		return true, err
 	}
@@ -139,7 +139,7 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 	return true, nil
 }
 
-func handleAddonCreate(ctx context.Context, kClient client.Client, hub *v1beta1.Hub, addons []v1beta1.AddOnConfig) error {
+func handleAddonCreate(ctx context.Context, kClient client.Client, hub *v1beta1.Hub, addons []v1beta1.AddOnConfig, ctrlNamespace string) error {
 	if len(addons) == 0 {
 		return nil
 	}
@@ -152,7 +152,7 @@ func handleAddonCreate(ctx context.Context, kClient client.Client, hub *v1beta1.
 		// look up manifests CM for the addon
 		cm := corev1.ConfigMap{}
 		cmName := fmt.Sprintf("%s-%s-%s", v1beta1.AddonConfigMapNamePrefix, a.Name, a.Version)
-		err := kClient.Get(ctx, types.NamespacedName{Name: cmName, Namespace: hub.Namespace}, &cm)
+		err := kClient.Get(ctx, types.NamespacedName{Name: cmName, Namespace: ctrlNamespace}, &cm)
 		if err != nil {
 			return errors.Wrapf(err, "could not load configuration for add-on %s version %s", a.Name, a.Version)
 		}
@@ -290,15 +290,15 @@ func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke *v
 	addons := spoke.Spec.AddOns
 
 	// Get actual enabled addons from cluster instead of status
-	actualEnabledAddons, err := getManagedClusterAddOns(ctx, addonC, spoke.Name)
+	enabledAddons, err := getManagedClusterAddOns(ctx, addonC, spoke.Name)
 	if err != nil {
-		logger.V(1).Info("failed to get actual ManagedClusterAddOns, assuming none enabled", "error", err, "spokeName", spoke.Name)
-		actualEnabledAddons = []string{}
+		logger.V(1).Info("failed to get ManagedClusterAddOns, assuming none enabled", "error", err, "spokeName", spoke.Name)
+		enabledAddons = []string{}
 	}
 
-	if len(addons) == 0 && len(actualEnabledAddons) == 0 {
+	if len(addons) == 0 && len(enabledAddons) == 0 {
 		// nothing to do
-		return actualEnabledAddons, nil
+		return enabledAddons, nil
 	}
 
 	// compare existing to requested
@@ -307,19 +307,19 @@ func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke *v
 		requestedAddonNames[i] = addon.ConfigName
 	}
 
-	// Find addons that need to be enabled (present in requested, missing from actualEnabledAddons)
+	// Find addons that need to be enabled (present in requested, missing from enabledAddons)
 	addonsToEnable := make([]v1beta1.AddOn, 0)
 	for i, requestedName := range requestedAddonNames {
-		if !slices.Contains(actualEnabledAddons, requestedName) {
+		if !slices.Contains(enabledAddons, requestedName) {
 			addonsToEnable = append(addonsToEnable, addons[i])
 		}
 	}
 
-	// Find addons that need to be disabled (present in actualEnabledAddons, missing from requested)
+	// Find addons that need to be disabled (present in enabledAddons, missing from requested)
 	addonsToDisable := make([]string, 0)
-	for _, actualEnabledAddon := range actualEnabledAddons {
-		if !slices.Contains(requestedAddonNames, actualEnabledAddon) {
-			addonsToDisable = append(addonsToDisable, actualEnabledAddon)
+	for _, enabledAddon := range enabledAddons {
+		if !slices.Contains(requestedAddonNames, enabledAddon) {
+			addonsToDisable = append(addonsToDisable, enabledAddon)
 		}
 	}
 
@@ -329,12 +329,12 @@ func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke *v
 		spoke.SetConditions(true, v1beta1.NewCondition(
 			err.Error(), v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
 		))
-		return actualEnabledAddons, err
+		return enabledAddons, err
 	}
 
-	// Remove disabled addons from actualEnabledAddons
+	// Remove disabled addons from enabledAddons
 	for _, disabledAddon := range addonsToDisable {
-		actualEnabledAddons = slices.DeleteFunc(actualEnabledAddons, func(ea string) bool {
+		enabledAddons = slices.DeleteFunc(enabledAddons, func(ea string) bool {
 			return ea == disabledAddon
 		})
 	}
@@ -342,18 +342,18 @@ func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke *v
 	// Enable new addons and updated addons
 	newEnabledAddons, err := handleAddonEnable(ctx, spoke, addonsToEnable)
 	// even if an error is returned, any addon which was successfully enabled is tracked, so append before returning
-	actualEnabledAddons = append(actualEnabledAddons, newEnabledAddons...)
+	enabledAddons = append(enabledAddons, newEnabledAddons...)
 	if err != nil {
 		spoke.SetConditions(true, v1beta1.NewCondition(
 			err.Error(), v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,
 		))
-		return actualEnabledAddons, err
+		return enabledAddons, err
 	}
 	spoke.SetConditions(true, v1beta1.NewCondition(
 		v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
 	))
 
-	return actualEnabledAddons, nil
+	return enabledAddons, nil
 }
 
 func handleAddonEnable(ctx context.Context, spoke *v1beta1.Spoke, addons []v1beta1.AddOn) ([]string, error) {
@@ -459,10 +459,10 @@ func handleHubAddons(ctx context.Context, addonC *addonapi.Clientset, hub *v1bet
 	bundleVersion := hub.Spec.ClusterManager.Source.BundleVersion
 
 	// Get actual hub addons from cluster to verify what's really installed
-	actualHubAddons, err := getHubAddOns(ctx, addonC)
+	hubAddons, err := getHubAddOns(ctx, addonC)
 	if err != nil {
 		logger.V(1).Info("failed to get hub addons, assuming none installed", "error", err)
-		actualHubAddons = []string{}
+		hubAddons = []string{}
 	}
 
 	// Use status as the source of truth for detailed addon information (namespace, version)
@@ -472,25 +472,10 @@ func handleHubAddons(ctx context.Context, addonC *addonapi.Clientset, hub *v1bet
 	// Reconcile status with actual cluster state - remove from status any addons not found in cluster
 	reconciledInstalledAddOns := make([]v1beta1.InstalledHubAddOn, 0)
 	for _, installed := range installedAddOns {
-		if slices.Contains(actualHubAddons, installed.Name) {
+		if slices.Contains(hubAddons, installed.Name) {
 			reconciledInstalledAddOns = append(reconciledInstalledAddOns, installed)
 		} else {
 			logger.V(1).Info("addon in status but not found in cluster, removing from status", "addon", installed.Name)
-		}
-	}
-
-	// Add any addons found in cluster but not in status (manually installed or status desync)
-	for _, actualAddon := range actualHubAddons {
-		found := slices.ContainsFunc(reconciledInstalledAddOns, func(installed v1beta1.InstalledHubAddOn) bool {
-			return installed.Name == actualAddon
-		})
-		if !found {
-			logger.V(1).Info("addon found in cluster but not in status, adding to status with unknown version", "addon", actualAddon)
-			reconciledInstalledAddOns = append(reconciledInstalledAddOns, v1beta1.InstalledHubAddOn{
-				Name:          actualAddon,
-				Namespace:     "", // Unknown namespace
-				BundleVersion: "", // Unknown version - will trigger reinstall if desired
-			})
 		}
 	}
 
