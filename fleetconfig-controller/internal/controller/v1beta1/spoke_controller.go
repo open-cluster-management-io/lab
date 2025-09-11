@@ -26,6 +26,7 @@ import (
 	"slices"
 	"strings"
 
+	"dario.cat/mergo"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
@@ -143,8 +144,18 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 	}
 
+	hub, hubKubeconfig, err := r.getHubMeta(ctx)
+	if err != nil {
+		logger.Error(err, "Failed to get latest hub metadata")
+		spoke.Status.Phase = v1beta1.Unhealthy
+	}
+
+	if hub != nil {
+		setManagedSpokeFields(spoke, hub.Spec.DeepCopy())
+	}
+
 	// Handle Spoke cluster: join and/or upgrade
-	if err := r.handleSpoke(ctx, spoke); err != nil {
+	if err := r.handleSpoke(ctx, spoke, hub, hubKubeconfig); err != nil {
 		logger.Error(err, "Failed to handle spoke operations")
 		spoke.Status.Phase = v1beta1.Unhealthy
 	}
@@ -173,6 +184,20 @@ const (
 
 func withOriginalSpoke(ctx context.Context, spoke *v1beta1.Spoke) context.Context {
 	return context.WithValue(ctx, originalSpokeKey, spoke.DeepCopy())
+}
+
+func setManagedSpokeFields(spoke *v1beta1.Spoke, hSpec *v1beta1.HubSpec) {
+	// these should always be the same between hub and spokes
+	spoke.Spec.RegistrationAuth = hSpec.RegistrationAuth
+	spoke.Spec.Klusterlet.Source = hSpec.ClusterManager.Source
+
+	// only set these if they are unset, to allow per-resource values
+	if spoke.Spec.Timeout == 300 { // default value
+		spoke.Spec.Timeout = hSpec.Timeout
+	}
+	if spoke.Spec.LogVerbosity == 0 {
+		spoke.Spec.LogVerbosity = hSpec.LogVerbosity
+	}
 }
 
 // cleanup cleans up a Spoke and its associated resources.
@@ -268,14 +293,9 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) err
 }
 
 // handleSpoke manages Spoke cluster join and upgrade operations
-func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke) error {
+func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke, hub *v1beta1.Hub, hubKubeconfig []byte) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("handleSpoke", "spoke", spoke.Name)
-
-	hub, hubKubeconfig, err := r.getHubMeta(ctx)
-	if err != nil {
-		return err
-	}
 
 	clusterClient, err := common.ClusterClient(hubKubeconfig)
 	if err != nil {
@@ -761,84 +781,42 @@ func getToken(ctx context.Context, kClient client.Client, hub *v1beta1.Hub) (*to
 func (r *SpokeReconciler) getHubMeta(ctx context.Context) (*v1beta1.Hub, []byte, error) {
 	hub := &v1beta1.Hub{}
 	var hubKubeconfig []byte
+	nn := types.NamespacedName{Name: v1beta1.HubResourceName}
 
-	err := r.Get(ctx, types.NamespacedName{Name: v1beta1.HubResourceName}, hub)
-	if err != nil {
-		if !kerrs.IsNotFound(err) {
-			return nil, nil, err
-		}
-		// TODO @arturshadnik - for now, load an inCluster hub kubeconfig. After the addon refactor, this will need be loaded from mount or secret
-		hubKubeconfig, err = kube.RawFromInClusterRestConfig()
+	// get Hub using local client
+	err := r.Get(ctx, nn, hub)
+	if err == nil {
+		// if found, load the hub's kubeconfig
+		hubKubeconfig, err = kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig)
 		if err != nil {
-			return nil, nil, err
+			return hub, nil, err
 		}
 		return hub, hubKubeconfig, nil
 	}
-	hubKubeconfig, err = kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig)
+	if !kerrs.IsNotFound(err) {
+		return nil, nil, err
+	}
+	// if not found, load the hub's kubeconfig, create a hubClient and use it to try to get the Hub
+
+	// TODO @arturshadnik - for now, load an inCluster hub kubeconfig. After the addon refactor, this will need be loaded from mount or secret
+	hubKubeconfig, err = kube.RawFromInClusterRestConfig()
 	if err != nil {
-		return hub, nil, err
+		return nil, nil, err
+	}
+	restConfig, err := kube.RestConfigFromKubeconfig(hubKubeconfig)
+	if err != nil {
+		return nil, hubKubeconfig, err
+	}
+	hubClient, err := client.New(restConfig, client.Options{})
+	if err != nil {
+		return nil, hubKubeconfig, err
+	}
+	err = hubClient.Get(ctx, nn, hub)
+	if err != nil {
+		return nil, hubKubeconfig, err
 	}
 	return hub, hubKubeconfig, nil
-}
 
-// deepMergeNonZero recursively merges src into dst, but only copies non-zero values from src.
-// This prevents zero values in the spec from overwriting actual values from the ConfigMap.
-// This does limit a users ability to manually override a non-zero value in the CM with a zero value in the spec.
-func deepMergeNonZero(dst, src map[string]any) {
-	for key, srcValue := range src {
-		if isZeroValue(srcValue) {
-			// Skip zero values - don't overwrite dst
-			continue
-		}
-
-		dstValue, exists := dst[key]
-		if !exists {
-			// Key doesn't exist in dst, safe to copy
-			dst[key] = srcValue
-			continue
-		}
-
-		// Both src and dst have this key
-		srcMap, srcIsMap := srcValue.(map[string]any)
-		dstMap, dstIsMap := dstValue.(map[string]any)
-
-		if srcIsMap && dstIsMap {
-			// Both are maps, recurse
-			deepMergeNonZero(dstMap, srcMap)
-		} else {
-			// Not both maps, src value takes precedence (since it's non-zero)
-			dst[key] = srcValue
-		}
-	}
-}
-
-// isZeroValue checks if a value is considered "zero" and should be ignored during merge.
-// Note: booleans are never considered zero values since both true and false are valid explicit choices.
-func isZeroValue(v any) bool {
-	if v == nil {
-		return true
-	}
-
-	switch val := v.(type) {
-	case bool:
-		// Don't treat false as zero value - both true and false are valid explicit choices
-		return false
-	case int, int8, int16, int32, int64:
-		return val == 0
-	case uint, uint8, uint16, uint32, uint64:
-		return val == 0
-	case float32, float64:
-		return val == 0.0
-	case string:
-		return val == ""
-	case []any:
-		return len(val) == 0
-	case map[string]any:
-		return len(val) == 0
-	default:
-		// For other types, consider nil as zero
-		return false
-	}
 }
 
 // TODO @arturshadnik - after the addon refactor, this will need to use hubClient, not spokeClient, because the klusterlet values CM will be configured in the hub
@@ -883,8 +861,11 @@ func (r *SpokeReconciler) mergeKlusterletValues(ctx context.Context, spoke *v1be
 
 	mergedMap := map[string]any{}
 	maps.Copy(mergedMap, fromInterface)
-	// Only copy non-zero values from spec to avoid overwriting CM values with zero values
-	deepMergeNonZero(mergedMap, specInterface)
+
+	// Merge spec on top but ignore zero-values from spec
+	if err := mergo.Map(&mergedMap, specInterface, mergo.WithOverride); err != nil {
+		return nil, fmt.Errorf("merge failed for spoke %s: %w", spoke.Name, err)
+	}
 
 	mergedBytes, err := yaml.Marshal(mergedMap)
 	if err != nil {
@@ -898,6 +879,7 @@ func (r *SpokeReconciler) mergeKlusterletValues(ctx context.Context, spoke *v1be
 	}
 
 	return merged, nil
+
 }
 
 // prepareKlusterletValuesFile creates a temporary file with klusterlet values and returns

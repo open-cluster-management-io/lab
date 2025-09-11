@@ -154,28 +154,6 @@ type ClusterManager struct {
 	UseBootstrapToken bool `json:"useBootstrapToken,omitempty"`
 }
 
-// RegistrationAuth provides specifications for registration authentication.
-type RegistrationAuth struct {
-	// The registration authentication driver to use.
-	// Options are:
-	//  - csr: Use the default CSR-based registration authentication.
-	//  - awsirsa: Use AWS IAM Role for Service Accounts (IRSA) registration authentication.
-	// The set of valid options is open for extension.
-	// +kubebuilder:validation:Enum=csr;awsirsa
-	// +kubebuilder:default:="csr"
-	// +optional
-	Driver string `json:"driver,omitempty"`
-
-	// The Hub cluster ARN for awsirsa registration authentication. Required when Type is awsirsa, otherwise ignored.
-	// +optional
-	HubClusterARN string `json:"hubClusterARN,omitempty"`
-
-	// List of AWS EKS ARN patterns so any EKS clusters with these patterns will be auto accepted to join with hub cluster.
-	// Example pattern: "arn:aws:eks:us-west-2:123456789013:cluster/.*"
-	// +optional
-	AutoApprovedARNPatterns []string `json:"autoApprovedARNPatterns,omitempty"`
-}
-
 // AddOnConfig is the configuration of a custom AddOn that can be installed on a cluster.
 type AddOnConfig struct {
 	// The name of the add-on.

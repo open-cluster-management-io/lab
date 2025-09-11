@@ -64,6 +64,8 @@ type SpokeSpec struct {
 	// +optional
 	AddOns []AddOn `json:"addOns,omitempty"`
 
+	// The Spoke's RegistrationAuth is automatically managed by the controller. It will be inherited from the Hub's spec.registrationAuth field
+	// and should not be set when creating a spoke.
 	// +kubebuilder:default:={}
 	// +optional
 	RegistrationAuth RegistrationAuth `json:"registrationAuth,omitzero"`
@@ -136,18 +138,20 @@ type Klusterlet struct {
 	// +optional
 	Singleton bool `json:"singleton,omitempty"`
 
-	// Version and image registry details for the klusterlet.
+	// Version and image registry details for the klusterlet. The Spoke's Source is automatically managed by the controller. It will be inherited from the Hub's
+	// spec.clusterManager.source field
+	// and should not be set when creating a spoke.
 	// +kubebuilder:default:={}
 	// +optional
 	Source OCMSource `json:"source,omitzero"`
 
-	// Values for the klusterlet Helm chart. Values defined here override values which are defined in ValuesFrom.
-	// +optional
-	Values *KlusterletChartConfig `json:"values,omitempty"`
-
 	// ValuesFrom is an optional reference to a ConfigMap containing values for the klusterlet Helm chart.
 	// optional
 	ValuesFrom *ConfigMapRef `json:"valuesFrom,omitempty"`
+
+	// Values for the klusterlet Helm chart. Values defined here override values which are defined in ValuesFrom.
+	// +optional
+	Values *KlusterletChartConfig `json:"values,omitempty"`
 }
 
 // ConfigMapRef is a reference to data inside a ConfigMap, in the same namespace as the controller pod.

@@ -3,6 +3,7 @@ module github.com/open-cluster-management-io/lab/fleetconfig-controller
 go 1.24.4
 
 require (
+	dario.cat/mergo v1.0.2
 	github.com/Masterminds/semver v1.5.0
 	github.com/go-logr/logr v1.4.3
 	github.com/mitchellh/hashstructure/v2 v2.0.2
@@ -24,7 +25,6 @@ require (
 )
 
 require (
-	dario.cat/mergo v1.0.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
