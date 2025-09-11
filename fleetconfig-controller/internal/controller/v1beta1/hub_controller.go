@@ -181,7 +181,7 @@ func (r *HubReconciler) cleanup(ctx context.Context, hub *v1beta1.Hub) error {
 		return err
 	}
 	if doCleanup {
-		if err := r.cleanHub(ctx, hub); err != nil {
+		if err := r.cleanHub(ctx, hub, hubKubeconfig); err != nil {
 			return err
 		}
 	}
@@ -227,7 +227,7 @@ func (r *HubReconciler) cleanupPreflight(ctx context.Context, hubKubeconfig []by
 }
 
 // cleanHub uninstalls OCM components from the Hub cluster via 'clusteradm clean'
-func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub) error {
+func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub, hubKubeconfig []byte) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("cleanHub", "hub", hub.Name)
 
@@ -259,7 +259,19 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub) error {
 
 	logger.Info("All Spokes have been deleted, proceeding with Hub cleanup")
 
-	err = handleHubAddonUninstall(ctx, hub.Status.InstalledHubAddOns, hub)
+	addonC, err := common.AddOnClient(hubKubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to create addon client for cleanup: %w", err)
+	}
+
+	hubCopy := hub.DeepCopy()
+	hubCopy.Spec.HubAddOns = nil
+	hubCopy.Spec.AddOnConfigs = nil
+	_, err = handleHubAddons(ctx, addonC, hubCopy)
+	if err != nil {
+		return err
+	}
+	_, err = handleAddonConfig(ctx, r.Client, addonC, hubCopy)
 	if err != nil {
 		return err
 	}

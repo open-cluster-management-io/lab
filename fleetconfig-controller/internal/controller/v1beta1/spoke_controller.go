@@ -218,6 +218,10 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) err
 	if err != nil {
 		return err
 	}
+	addonC, err := common.AddOnClient(hubKubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to create addon client for cleanup: %w", err)
+	}
 
 	// skip clean up if the ManagedCluster resource is not found or if any manifestWorks exist
 	managedCluster, err := clusterC.ClusterV1().ManagedClusters().Get(ctx, spoke.Name, metav1.GetOptions{})
@@ -239,8 +243,10 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) err
 		return errors.New(msg)
 	}
 
-	// // remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
-	if err := handleAddonDisable(ctx, spoke, spoke.Status.EnabledAddons); err != nil {
+	// remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
+	spokeCopy := spoke.DeepCopy()
+	spokeCopy.Spec.AddOns = nil
+	if _, err := handleSpokeAddons(ctx, addonC, spokeCopy); err != nil {
 		spoke.SetConditions(true, v1beta1.NewCondition(
 			err.Error(), v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionFalse,
 		))
@@ -300,6 +306,10 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 	clusterClient, err := common.ClusterClient(hubKubeconfig)
 	if err != nil {
 		return err
+	}
+	addonC, err := common.AddOnClient(hubKubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to create addon client: %w", err)
 	}
 
 	// check if the spoke has already been joined to the hub
@@ -397,8 +407,7 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 		}
 	}
 
-	// Handle spoke addons
-	enabledAddons, err := handleSpokeAddons(ctx, spoke)
+	enabledAddons, err := handleSpokeAddons(ctx, addonC, spoke)
 	if err != nil {
 		msg := fmt.Sprintf("failed to enable addons for spoke cluster %s: %s", spoke.Name, err.Error())
 		spoke.SetConditions(true, v1beta1.NewCondition(
