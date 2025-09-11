@@ -458,18 +458,17 @@ func handleHubAddons(ctx context.Context, addonC *addonapi.Clientset, hub *v1bet
 	desiredAddOns := hub.Spec.HubAddOns
 	bundleVersion := hub.Spec.ClusterManager.Source.BundleVersion
 
-	// Get actual hub addons from cluster to verify what's really installed
 	hubAddons, err := getHubAddOns(ctx, addonC)
 	if err != nil {
 		logger.V(1).Info("failed to get hub addons, assuming none installed", "error", err)
 		hubAddons = []string{}
 	}
 
-	// Use status as the source of truth for detailed addon information (namespace, version)
+	// use status as the source of truth for detailed addon information (namespace, version)
 	// but cross-reference with actual cluster state to handle discrepancies
 	installedAddOns := hub.Status.DeepCopy().InstalledHubAddOns
 
-	// Reconcile status with actual cluster state - remove from status any addons not found in cluster
+	// reconcile status with actual cluster state - remove from status any addons not found in cluster
 	reconciledInstalledAddOns := make([]v1beta1.InstalledHubAddOn, 0)
 	for _, installed := range installedAddOns {
 		if slices.Contains(hubAddons, installed.Name) {
@@ -485,7 +484,7 @@ func handleHubAddons(ctx context.Context, addonC *addonapi.Clientset, hub *v1bet
 		return false, nil
 	}
 
-	// Find addons that need to be uninstalled (present in installed, missing from desired or version mismatch)
+	// find addons that need to be uninstalled (present in installed, missing from desired or version mismatch)
 	addonsToUninstall := make([]v1beta1.InstalledHubAddOn, 0)
 	for _, installed := range reconciledInstalledAddOns {
 		found := slices.ContainsFunc(desiredAddOns, func(desired v1beta1.HubAddOn) bool {
@@ -496,7 +495,7 @@ func handleHubAddons(ctx context.Context, addonC *addonapi.Clientset, hub *v1bet
 		}
 	}
 
-	// Find addons that need to be installed (present in desired, missing from installed or version upgrade)
+	// find addons that need to be installed (present in desired, missing from installed or version upgrade)
 	addonsToInstall := make([]v1beta1.HubAddOn, 0)
 	for _, desired := range desiredAddOns {
 		found := slices.ContainsFunc(reconciledInstalledAddOns, func(installed v1beta1.InstalledHubAddOn) bool {
@@ -607,6 +606,11 @@ func handleHubAddonInstall(ctx context.Context, addonC *addonapi.Clientset, addo
 			outStr := string(out)
 			errs = append(errs, fmt.Errorf("failed to install hubAddon %s: %v, output: %s", addon.Name, err, outStr))
 			continue
+		}
+		// the argocd pull integration addon logs the entire helm template output including CRDs to stdout.
+		// to prevent flooding the logs, overwrite it.
+		if addon.Name == addonArgoCD {
+			stdout = []byte("ArgoCD hub addon successfully installed")
 		}
 		logger.V(1).Info("installed hubAddon", "name", addon.Name, "output", string(stdout))
 	}
