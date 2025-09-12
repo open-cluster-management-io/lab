@@ -12,6 +12,7 @@ import (
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const (
@@ -26,16 +27,17 @@ var csrSuffixPattern = regexp.MustCompile(`-[a-zA-Z0-9]{5}$`)
 
 func ret(ctx context.Context, res ctrl.Result, err error) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+	if err != nil {
+		logger.Error(err, "requeueing due to error")
+		return reconcile.Result{}, err
+	}
 	if res.RequeueAfter > 0 {
 		logger.Info("requeueing", "after", res.RequeueAfter)
-	}
-	if err != nil {
-		logger.Info("requeueing due to error")
-	}
-	if res.RequeueAfter == 0 && err == nil {
+	} else {
 		logger.Info("reconciliation complete; no requeue or error")
 	}
-	return res, err
+	return res, nil
+
 }
 
 // getClusterManager retrieves the ClusterManager resource from the Hub cluster

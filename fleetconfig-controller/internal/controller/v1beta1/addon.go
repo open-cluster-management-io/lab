@@ -238,17 +238,20 @@ func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, addons [
 		}
 
 		// delete the addon template
-		if addon != nil {
-			err = addonC.AddonV1alpha1().AddOnTemplates().Delete(ctx, addonName, metav1.DeleteOptions{})
-			if err != nil && !kerrs.IsNotFound(err) {
-				errs = append(errs, fmt.Errorf("failed to delete addon %s: %v", addonName, err))
-				continue
-			}
+		if addon == nil {
+			logger.V(0).Info("addon not found, nothing to do", "AddOnTemplate", addonName)
+			continue
 		}
 
+		err = addonC.AddonV1alpha1().AddOnTemplates().Delete(ctx, addonName, metav1.DeleteOptions{})
+		if err != nil && !kerrs.IsNotFound(err) {
+			errs = append(errs, fmt.Errorf("failed to delete addon %s: %v", addonName, err))
+			continue
+		}
 		baseAddonName := addon.Spec.AddonName
 		// get the addon name without a version suffix, add it to purge list
 		purgeList = append(purgeList, baseAddonName)
+
 		logger.V(0).Info("deleted addon", "AddOnTemplate", addonName)
 	}
 

@@ -121,7 +121,7 @@ func (v *SpokeCustomValidator) ValidateCreate(ctx context.Context, obj runtime.O
 	allErrs = append(allErrs, errs...)
 
 	if len(allErrs) > 0 {
-		return warn, errors.NewInvalid(v1beta1.HubGroupKind, spoke.Name, allErrs)
+		return warn, errors.NewInvalid(v1beta1.SpokeGroupKind, spoke.Name, allErrs)
 	}
 	return warn, nil
 }
@@ -134,7 +134,7 @@ func (v *SpokeCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newOb
 	}
 	oldSpoke, ok := oldObj.(*v1beta1.Spoke)
 	if !ok {
-		return nil, fmt.Errorf("expected a Spoke object for the newObj but got %T", newObj)
+		return nil, fmt.Errorf("expected a Spoke object for the oldObj but got %T", oldObj)
 	}
 	spokelog.Info("Validation for Spoke upon update", "name", spoke.GetName())
 

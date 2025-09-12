@@ -44,8 +44,8 @@ func isKubeconfigValid(kubeconfig v1beta1.Kubeconfig) (bool, string) {
 // - spec.registrationAuth
 func allowHubUpdate(oldHub, newHub *v1beta1.Hub) error {
 	if !reflect.DeepEqual(newHub.Spec, oldHub.Spec) {
-		oldHubCopy := oldHub.Spec
-		newHubCopy := newHub.Spec
+		oldHubCopy := oldHub.Spec.DeepCopy()
+		newHubCopy := newHub.Spec.DeepCopy()
 
 		// Allow changes to ClusterManager.Source
 		if oldHubCopy.ClusterManager != nil {
@@ -91,8 +91,8 @@ func allowHubUpdate(oldHub, newHub *v1beta1.Hub) error {
 // - spec.addOns
 func allowSpokeUpdate(oldSpoke, newSpoke *v1beta1.Spoke) error {
 	if !reflect.DeepEqual(newSpoke.Spec, oldSpoke.Spec) {
-		oldSpokeCopy := oldSpoke
-		newSpokeCopy := newSpoke
+		oldSpokeCopy := oldSpoke.DeepCopy()
+		newSpokeCopy := newSpoke.DeepCopy()
 		newSpokeCopy.Spec.Klusterlet.Annotations = nil
 		oldSpokeCopy.Spec.Klusterlet.Annotations = nil
 		oldSpokeCopy.Spec.Klusterlet.Source = (v1beta1.OCMSource{})

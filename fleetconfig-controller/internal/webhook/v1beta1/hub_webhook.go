@@ -124,7 +124,7 @@ func (v *HubCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj 
 	}
 	oldHub, ok := oldObj.(*v1beta1.Hub)
 	if !ok {
-		return nil, fmt.Errorf("expected a Hub object for the oldObj but got %T", newObj)
+		return nil, fmt.Errorf("expected a Hub object for the oldObj but got %T", oldObj)
 	}
 	hublog.Info("Validation for Hub upon update", "name", hub.GetName())
 
@@ -133,7 +133,7 @@ func (v *HubCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj 
 		return nil, err
 	}
 
-	allErrs := validateHubAddons(ctx, v.client, nil, hub)
+	allErrs := validateHubAddons(ctx, v.client, oldHub, hub)
 
 	if len(allErrs) > 0 {
 		return nil, errors.NewInvalid(v1beta1.HubGroupKind, hub.Name, allErrs)
