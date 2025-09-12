@@ -391,7 +391,9 @@ func handleAddonEnable(ctx context.Context, spoke *v1beta1.Spoke, addons []v1bet
 			annots = append(annots, fmt.Sprintf("%s=%s", k, v))
 		}
 		annot := strings.Join(annots, ",")
-		args = append(args, fmt.Sprintf("--annotate=%s", annot))
+		if annot != "" {
+			args = append(args, fmt.Sprintf("--annotate=%s", annot))
+		}
 
 		args = append(baseArgs, args...)
 		logger.V(7).Info("running", "command", clusteradm, "args", args)
