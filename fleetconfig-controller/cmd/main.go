@@ -80,7 +80,7 @@ func main() {
 	flag.StringVar(&certDir, "webhook-cert-dir", certDir, "Admission webhook cert/key dir")
 	flag.IntVar(&webhookPort, "webhook-port", webhookPort, "Admission webhook port")
 
-	flag.IntVar(&spokeConcurrentReconciles, "spoke-concurrent-recocniles", apiv1beta1.SpokeDefaultMaxConcurrentReconciles, fmt.Sprintf("Maximum number of Spoke resources that may be reconciled in parallel. Defaults to %d.", apiv1beta1.SpokeDefaultMaxConcurrentReconciles))
+	flag.IntVar(&spokeConcurrentReconciles, "spoke-concurrent-reconciles", apiv1beta1.SpokeDefaultMaxConcurrentReconciles, fmt.Sprintf("Maximum number of Spoke resources that may be reconciled in parallel. Defaults to %d.", apiv1beta1.SpokeDefaultMaxConcurrentReconciles))
 
 	opts := zap.Options{
 		Development: true,
