@@ -14,22 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// TODO - remove once hub webhooks are implemented.
-//
-//nolint:all // Required because of `dupl` between this file and spoke_webhook.go
 package v1beta1
 
 import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	fleetconfigopenclustermanagementiov1beta1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 )
 
 // nolint:unused
@@ -38,13 +38,11 @@ var hublog = logf.Log.WithName("hub-resource")
 
 // SetupHubWebhookWithManager registers the webhook for Hub in the manager.
 func SetupHubWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&fleetconfigopenclustermanagementiov1beta1.Hub{}).
-		WithValidator(&HubCustomValidator{}).
+	return ctrl.NewWebhookManagedBy(mgr).For(&v1beta1.Hub{}).
+		WithValidator(&HubCustomValidator{client: mgr.GetClient()}).
 		WithDefaulter(&HubCustomDefaulter{}).
 		Complete()
 }
-
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
 // +kubebuilder:webhook:path=/mutate-fleetconfig-open-cluster-management-io-v1beta1-hub,mutating=true,failurePolicy=fail,sideEffects=None,groups=fleetconfig.open-cluster-management.io,resources=hubs,verbs=create;update,versions=v1beta1,name=mhub-v1beta1.kb.io,admissionReviewVersions=v1
 
@@ -61,7 +59,7 @@ var _ webhook.CustomDefaulter = &HubCustomDefaulter{}
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Hub.
 func (d *HubCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
-	hub, ok := obj.(*fleetconfigopenclustermanagementiov1beta1.Hub)
+	hub, ok := obj.(*v1beta1.Hub)
 
 	if !ok {
 		return fmt.Errorf("expected an Hub object but got %T", obj)
@@ -84,40 +82,68 @@ func (d *HubCustomDefaulter) Default(_ context.Context, obj runtime.Object) erro
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
 // as this struct is used only for temporary operations and does not need to be deeply copied.
 type HubCustomValidator struct {
-	// TODO(user): Add more fields as needed for validation
+	client client.Client
 }
 
 var _ webhook.CustomValidator = &HubCustomValidator{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Hub.
-func (v *HubCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	hub, ok := obj.(*fleetconfigopenclustermanagementiov1beta1.Hub)
+func (v *HubCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+	hub, ok := obj.(*v1beta1.Hub)
 	if !ok {
 		return nil, fmt.Errorf("expected a Hub object but got %T", obj)
 	}
 	hublog.Info("Validation for Hub upon creation", "name", hub.GetName())
 
-	// TODO(user): fill in your validation logic upon object creation.
+	var allErrs field.ErrorList
 
+	if valid, msg := isKubeconfigValid(hub.Spec.Kubeconfig); !valid {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("hub"), hub.Spec.Kubeconfig, msg),
+		)
+	}
+	if hub.Spec.ClusterManager == nil && hub.Spec.SingletonControlPlane == nil {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("hub"), hub.Spec, "either hub.clusterManager or hub.singletonControlPlane must be specified"),
+		)
+	}
+
+	allErrs = append(allErrs, validateHubAddons(ctx, v.client, nil, hub)...)
+
+	if len(allErrs) > 0 {
+		return nil, errors.NewInvalid(v1beta1.HubGroupKind, hub.Name, allErrs)
+	}
 	return nil, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Hub.
-func (v *HubCustomValidator) ValidateUpdate(_ context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
-	hub, ok := newObj.(*fleetconfigopenclustermanagementiov1beta1.Hub)
+func (v *HubCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+	hub, ok := newObj.(*v1beta1.Hub)
 	if !ok {
 		return nil, fmt.Errorf("expected a Hub object for the newObj but got %T", newObj)
 	}
+	oldHub, ok := oldObj.(*v1beta1.Hub)
+	if !ok {
+		return nil, fmt.Errorf("expected a Hub object for the oldObj but got %T", newObj)
+	}
 	hublog.Info("Validation for Hub upon update", "name", hub.GetName())
 
-	// TODO(user): fill in your validation logic upon object update.
+	err := allowHubUpdate(oldHub, hub)
+	if err != nil {
+		return nil, err
+	}
 
+	allErrs := validateHubAddons(ctx, v.client, nil, hub)
+
+	if len(allErrs) > 0 {
+		return nil, errors.NewInvalid(v1beta1.HubGroupKind, hub.Name, allErrs)
+	}
 	return nil, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Hub.
 func (v *HubCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	hub, ok := obj.(*fleetconfigopenclustermanagementiov1beta1.Hub)
+	hub, ok := obj.(*v1beta1.Hub)
 	if !ok {
 		return nil, fmt.Errorf("expected a Hub object but got %T", obj)
 	}

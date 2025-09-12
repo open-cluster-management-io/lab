@@ -24,9 +24,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
+const group = "fleetconfig.open-cluster-management.io"
+
 var (
+
+	// HubGroupKind is the group kind for the Hub API
+	HubGroupKind = schema.GroupKind{Group: group, Kind: "Hub"}
+
+	// SpokeGroupKind is the group kind for the Spoke API
+	SpokeGroupKind = schema.GroupKind{Group: group, Kind: "Spoke"}
+
 	// GroupVersion is group version used to register these objects.
-	GroupVersion = schema.GroupVersion{Group: "fleetconfig.open-cluster-management.io", Version: "v1beta1"}
+	GroupVersion = schema.GroupVersion{Group: group, Version: "v1beta1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme.
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
