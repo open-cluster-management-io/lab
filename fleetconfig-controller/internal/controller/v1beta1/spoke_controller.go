@@ -959,10 +959,10 @@ func (r *SpokeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // sharedFieldsChanged checks whether the spec fields that are shared between Hub and Spokes were updated,
 // to prevent unnecessary reconciles of Spokes
-func sharedFieldsChanged(old, new *v1beta1.HubSpec) bool {
-	return !reflect.DeepEqual(old.RegistrationAuth, new.RegistrationAuth) ||
-		!reflect.DeepEqual(old.ClusterManager.Source, new.ClusterManager.Source) ||
-		old.Timeout != new.Timeout || old.LogVerbosity != new.LogVerbosity
+func sharedFieldsChanged(oldSpec, newSpec *v1beta1.HubSpec) bool {
+	return !reflect.DeepEqual(oldSpec.RegistrationAuth, newSpec.RegistrationAuth) ||
+		!reflect.DeepEqual(oldSpec.ClusterManager.Source, newSpec.ClusterManager.Source) ||
+		oldSpec.Timeout != newSpec.Timeout || oldSpec.LogVerbosity != newSpec.LogVerbosity
 }
 
 func (r *SpokeReconciler) mapHubEventToSpoke(ctx context.Context, _ client.Object) []reconcile.Request {
