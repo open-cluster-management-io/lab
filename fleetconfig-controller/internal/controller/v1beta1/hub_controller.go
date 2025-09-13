@@ -105,7 +105,7 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		}
 
 		if slices.Contains(hub.Finalizers, v1beta1.HubCleanupFinalizer) {
-			if err := r.cleanup(ctx, hub); err != nil {
+			if err := r.cleanHub(ctx, hub); err != nil {
 				hub.SetConditions(true, v1beta1.NewCondition(
 					err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
 				))
@@ -177,70 +177,16 @@ func withOriginalHub(ctx context.Context, hub *v1beta1.Hub) context.Context {
 }
 
 // cleanup cleans up a Hub and its associated resources.
-func (r *HubReconciler) cleanup(ctx context.Context, hub *v1beta1.Hub) error {
+func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub) error {
+	logger := log.FromContext(ctx)
+	logger.V(0).Info("cleanHub", "hub", hub.Name)
 	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig)
 	if err != nil {
 		return err
 	}
-
-	doCleanup, err := r.cleanupPreflight(ctx, hubKubeconfig)
-	if err != nil {
-		return err
-	}
-	if doCleanup {
-		if err := r.cleanHub(ctx, hub, hubKubeconfig); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// cleanupPreflight performs preflight checks before attempting Hub cleanup.
-func (r *HubReconciler) cleanupPreflight(ctx context.Context, hubKubeconfig []byte) (bool, error) {
-	logger := log.FromContext(ctx)
-
-	clusterC, err := common.ClusterClient(hubKubeconfig)
-	if err != nil {
-		return false, err
-	}
-	workC, err := common.WorkClient(hubKubeconfig)
-	if err != nil {
-		return false, err
-	}
-
-	// skip clean up if the ManagedCluster resource is not found or if any manifestWorks exist
-	managedClusters, err := clusterC.ClusterV1().ManagedClusters().List(ctx, metav1.ListOptions{})
-	if kerrs.IsNotFound(err) {
-		logger.Info("ManagedCluster resource not found; nothing to do")
-		return false, nil
-	} else if err != nil {
-		return false, fmt.Errorf("unexpected error listing managedClusters: %w", err)
-	}
-	for _, managedCluster := range managedClusters.Items {
-		manifestWorks, err := workC.WorkV1().ManifestWorks(managedCluster.Name).List(ctx, metav1.ListOptions{})
-		if err != nil {
-			return false, fmt.Errorf("failed to list manifestWorks for managedCluster %s: %w", managedCluster.Name, err)
-		}
-		// check that the number of manifestWorks is the same as the number of addons enabled for that spoke
-		if len(manifestWorks.Items) > 0 && !allOwnersAddOns(manifestWorks.Items) {
-			msg := fmt.Sprintf("Found manifestWorks for ManagedCluster %s; cannot unjoin spoke cluster while it has active ManifestWorks", managedCluster.Name)
-			logger.Info(msg)
-			return false, errors.New(msg)
-		}
-	}
-
-	return true, nil
-}
-
-// cleanHub uninstalls OCM components from the Hub cluster via 'clusteradm clean'
-func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub, hubKubeconfig []byte) error {
-	logger := log.FromContext(ctx)
-	logger.V(0).Info("cleanHub", "hub", hub.Name)
-
 	// Check if there are any Spokes that need to be deleted
 	spokeList := &v1beta1.SpokeList{}
-	err := r.List(ctx, spokeList)
+	err = r.List(ctx, spokeList)
 	if err != nil {
 		return err
 	}
@@ -299,6 +245,7 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub, hubKubec
 	logger.V(1).Info("hub cleaned", "output", string(stdout))
 
 	return nil
+
 }
 
 // handleHub manages Hub cluster init and upgrade operations

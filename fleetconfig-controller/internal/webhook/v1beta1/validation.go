@@ -85,24 +85,27 @@ func allowHubUpdate(oldHub, newHub *v1beta1.Hub) error {
 // allowSpokeUpdate validates that only allowed fields are changed when updating a Spoke.
 // Allowed changes include:
 // - spec.klusterlet.annotations
-// - spec.klusterlet.source.*
 // - spec.klusterlet.values
 // - spec.kubeconfig
 // - spec.addOns
+// - spec.timeout
+// - spec.logVerbosity
 func allowSpokeUpdate(oldSpoke, newSpoke *v1beta1.Spoke) error {
 	if !reflect.DeepEqual(newSpoke.Spec, oldSpoke.Spec) {
-		oldSpokeCopy := oldSpoke.DeepCopy()
-		newSpokeCopy := newSpoke.DeepCopy()
-		newSpokeCopy.Spec.Klusterlet.Annotations = nil
-		oldSpokeCopy.Spec.Klusterlet.Annotations = nil
-		oldSpokeCopy.Spec.Klusterlet.Source = (v1beta1.OCMSource{})
-		newSpokeCopy.Spec.Klusterlet.Source = (v1beta1.OCMSource{})
-		oldSpokeCopy.Spec.Klusterlet.Values = nil
-		newSpokeCopy.Spec.Klusterlet.Values = nil
-		oldSpokeCopy.Spec.Kubeconfig = v1beta1.Kubeconfig{}
-		newSpokeCopy.Spec.Kubeconfig = v1beta1.Kubeconfig{}
-		newSpokeCopy.Spec.AddOns = []v1beta1.AddOn{}
-		oldSpokeCopy.Spec.AddOns = []v1beta1.AddOn{}
+		oldSpokeCopy := oldSpoke.Spec.DeepCopy()
+		newSpokeCopy := newSpoke.Spec.DeepCopy()
+		newSpokeCopy.Klusterlet.Annotations = nil
+		oldSpokeCopy.Klusterlet.Annotations = nil
+		oldSpokeCopy.Klusterlet.Values = nil
+		newSpokeCopy.Klusterlet.Values = nil
+		oldSpokeCopy.Kubeconfig = v1beta1.Kubeconfig{}
+		newSpokeCopy.Kubeconfig = v1beta1.Kubeconfig{}
+		oldSpokeCopy.AddOns = []v1beta1.AddOn{}
+		newSpokeCopy.AddOns = []v1beta1.AddOn{}
+		oldSpokeCopy.LogVerbosity = 0
+		newSpokeCopy.LogVerbosity = 0
+		oldSpokeCopy.Timeout = 0
+		newSpokeCopy.Timeout = 0
 
 		if !reflect.DeepEqual(oldSpokeCopy, newSpokeCopy) {
 			return errors.New("spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.source.*, spec.klusterlet.values, spec.kubeconfig, and spec.addOns are allowed when updating a spoke")
