@@ -936,7 +936,7 @@ func (r *SpokeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				CreateFunc: func(_ event.CreateEvent) bool {
 					return false
 				},
-				// only return true if old and new hub specs are different
+				// only return true if old and new hub specs shared fields are different
 				UpdateFunc: func(e event.UpdateEvent) bool {
 					oldHub, ok := e.ObjectOld.(*v1beta1.Hub)
 					if !ok {
@@ -946,7 +946,7 @@ func (r *SpokeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					if !ok {
 						return false
 					}
-					return !reflect.DeepEqual(oldHub.Spec, newHub.Spec)
+					return sharedFieldsChanged(oldHub.Spec.DeepCopy(), newHub.Spec.DeepCopy())
 				},
 				GenericFunc: func(_ event.GenericEvent) bool {
 					return false
@@ -955,6 +955,14 @@ func (r *SpokeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		).
 		Named("spoke").
 		Complete(r)
+}
+
+// sharedFieldsChanged checks whether the spec fields that are shared between Hub and Spokes were updated,
+// to prevent unnecessary reconciles of Spokes
+func sharedFieldsChanged(old, new *v1beta1.HubSpec) bool {
+	return !reflect.DeepEqual(old.RegistrationAuth, new.RegistrationAuth) ||
+		!reflect.DeepEqual(old.ClusterManager.Source, new.ClusterManager.Source) ||
+		old.Timeout != new.Timeout || old.LogVerbosity != new.LogVerbosity
 }
 
 func (r *SpokeReconciler) mapHubEventToSpoke(ctx context.Context, _ client.Object) []reconcile.Request {
