@@ -128,12 +128,19 @@ func (v *HubCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj 
 	}
 	hublog.Info("Validation for Hub upon update", "name", hub.GetName())
 
+	var allErrs field.ErrorList
+
 	err := allowHubUpdate(oldHub, hub)
 	if err != nil {
 		return nil, err
 	}
 
-	allErrs := validateHubAddons(ctx, v.client, oldHub, hub)
+	if valid, msg := isKubeconfigValid(hub.Spec.Kubeconfig); !valid {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("hub"), hub.Spec.Kubeconfig, msg),
+		)
+	}
+	allErrs = append(allErrs, validateHubAddons(ctx, v.client, oldHub, hub)...)
 
 	if len(allErrs) > 0 {
 		return nil, errors.NewInvalid(v1beta1.HubGroupKind, hub.Name, allErrs)

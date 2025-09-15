@@ -143,10 +143,7 @@ func (v *SpokeCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newOb
 		return nil, err
 	}
 
-	var (
-		allErrs field.ErrorList
-		warn    admission.Warnings
-	)
+	var allErrs field.ErrorList
 
 	valid, msg := isKubeconfigValid(spoke.Spec.Kubeconfig)
 	if !valid {
@@ -155,7 +152,8 @@ func (v *SpokeCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newOb
 		)
 	}
 
-	warn, allErrs = validateAddons(ctx, v.client, spoke)
+	warn, valErrs := validateAddons(ctx, v.client, spoke)
+	allErrs = append(allErrs, valErrs...)
 
 	if len(allErrs) > 0 {
 		return warn, errors.NewInvalid(v1beta1.SpokeGroupKind, spoke.Name, allErrs)
