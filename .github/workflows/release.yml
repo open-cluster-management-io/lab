@@ -57,7 +57,7 @@ jobs:
           path: go/src/open-cluster-management.io/lab
 
       - name: Set up Python 3.x
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           # Semantic version range syntax or exact version of a Python version
           python-version: '3.x'
