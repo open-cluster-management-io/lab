@@ -12,7 +12,7 @@ spec:
     listKind: SpokeList
     plural: spokes
     singular: spoke
-  scope: Cluster
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.phase
@@ -79,6 +79,17 @@ spec:
                   If true, create open-cluster-management namespace and agent namespace (open-cluster-management-agent for Default mode,
                   <klusterlet-name> for Hosted mode), otherwise use existing one.
                 type: boolean
+              hubRef:
+                description: HubRef is a reference to the Hub that this Spoke is managed
+                  by.
+                properties:
+                  name:
+                    description: Name is the name of the Hub that this Spoke is managed
+                      by.
+                    type: string
+                required:
+                - name
+                type: object
               klusterlet:
                 default: {}
                 description: Klusterlet configuration.
@@ -206,25 +217,6 @@ spec:
                       If true, deploy klusterlet in singleton mode, with registration and work agents running in a single pod.
                       This is an alpha stage flag.
                     type: boolean
-                  source:
-                    default: {}
-                    description: |-
-                      Version and image registry details for the klusterlet. The Spoke's Source is automatically managed by the controller. It will be inherited from the Hub's
-                      spec.clusterManager.source field
-                      and should not be set when creating a spoke.
-                    properties:
-                      bundleVersion:
-                        default: default
-                        description: |-
-                          The version of predefined compatible image versions (e.g. v0.6.0). Defaults to the latest released version.
-                          You can also set "latest" to install the latest development version.
-                        type: string
-                      registry:
-                        default: quay.io/open-cluster-management
-                        description: The name of the image registry serving OCM images,
-                          which will be used for all OCM components."
-                        type: string
-                    type: object
                   values:
                     description: Values for the klusterlet Helm chart. Values defined
                       here override values which are defined in ValuesFrom.
@@ -2288,36 +2280,6 @@ spec:
                 description: URL of a forward proxy server used by agents to connect
                   to the Hub cluster.
                 type: string
-              registrationAuth:
-                default: {}
-                description: |-
-                  The Spoke's RegistrationAuth is automatically managed by the controller. It will be inherited from the Hub's spec.registrationAuth field
-                  and should not be set when creating a spoke.
-                properties:
-                  autoApprovedARNPatterns:
-                    description: |-
-                      List of AWS EKS ARN patterns so any EKS clusters with these patterns will be auto accepted to join with hub cluster.
-                      Example pattern: "arn:aws:eks:us-west-2:123456789013:cluster/.*"
-                    items:
-                      type: string
-                    type: array
-                  driver:
-                    default: csr
-                    description: |-
-                      The registration authentication driver to use.
-                      Options are:
-                       - csr: Use the default CSR-based registration authentication.
-                       - awsirsa: Use AWS IAM Role for Service Accounts (IRSA) registration authentication.
-                      The set of valid options is open for extension.
-                    enum:
-                    - csr
-                    - awsirsa
-                    type: string
-                  hubClusterARN:
-                    description: The Hub cluster ARN for awsirsa registration authentication.
-                      Required when Type is awsirsa, otherwise ignored.
-                    type: string
-                type: object
               syncLabels:
                 description: If true, sync the labels from klusterlet to all agent
                   resources.
@@ -2328,6 +2290,7 @@ spec:
                   operations, including init, accept, join, upgrade, etc.
                 type: integer
             required:
+            - hubRef
             - kubeconfig
             type: object
           status:

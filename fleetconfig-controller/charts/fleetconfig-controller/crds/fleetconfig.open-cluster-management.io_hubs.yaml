@@ -421,9 +421,6 @@ spec:
         required:
         - spec
         type: object
-        x-kubernetes-validations:
-        - message: Hub is a cluster singleton; name must be 'hub'
-          rule: self.metadata.name == 'hub'
     served: true
     storage: true
     subresources:

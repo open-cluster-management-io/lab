@@ -20,8 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -41,7 +42,7 @@ var spokelog = logf.Log.WithName("spoke-resource")
 func SetupSpokeWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&v1beta1.Spoke{}).
 		WithValidator(&SpokeCustomValidator{client: mgr.GetClient()}).
-		WithDefaulter(&SpokeCustomDefaulter{}).
+		WithDefaulter(&SpokeCustomDefaulter{client: mgr.GetClient()}).
 		Complete()
 }
 
@@ -53,13 +54,13 @@ func SetupSpokeWebhookWithManager(mgr ctrl.Manager) error {
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
 // as it is used only for temporary operations and does not need to be deeply copied.
 type SpokeCustomDefaulter struct {
-	// TODO(user): Add more fields as needed for defaulting
+	client client.Client
 }
 
 var _ webhook.CustomDefaulter = &SpokeCustomDefaulter{}
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Spoke.
-func (d *SpokeCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
+func (d *SpokeCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
 	spoke, ok := obj.(*v1beta1.Spoke)
 
 	if !ok {
@@ -67,10 +68,26 @@ func (d *SpokeCustomDefaulter) Default(_ context.Context, obj runtime.Object) er
 	}
 	spokelog.Info("Defaulting for Spoke", "name", spoke.GetName())
 
+	hub := &v1beta1.Hub{}
+	nn := types.NamespacedName{Name: spoke.Spec.HubRef.Name}
+	err := d.client.Get(ctx, nn, hub)
+	if err != nil {
+		if kerrs.IsNotFound(err) {
+			spokelog.Info("warning: hub not found, skip setting defaults")
+		}
+		return client.IgnoreNotFound(err)
+	}
+
+	// only set these if they are unset, to allow per-resource values
+	if spoke.Spec.Timeout == 300 { // default value
+		spoke.Spec.Timeout = hub.Spec.DeepCopy().Timeout
+	}
+	if spoke.Spec.LogVerbosity == 0 {
+		spoke.Spec.LogVerbosity = hub.Spec.DeepCopy().LogVerbosity
+	}
 	return nil
 }
 
-// TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 // NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
 // Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
 // +kubebuilder:webhook:path=/validate-fleetconfig-open-cluster-management-io-v1beta1-spoke,mutating=false,failurePolicy=fail,sideEffects=None,groups=fleetconfig.open-cluster-management.io,resources=spokes,verbs=create;update,versions=v1beta1,name=vspoke-v1beta1.kb.io,admissionReviewVersions=v1
@@ -121,7 +138,7 @@ func (v *SpokeCustomValidator) ValidateCreate(ctx context.Context, obj runtime.O
 	allErrs = append(allErrs, errs...)
 
 	if len(allErrs) > 0 {
-		return warn, errors.NewInvalid(v1beta1.SpokeGroupKind, spoke.Name, allErrs)
+		return warn, kerrs.NewInvalid(v1beta1.SpokeGroupKind, spoke.Name, allErrs)
 	}
 	return warn, nil
 }
@@ -156,7 +173,7 @@ func (v *SpokeCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newOb
 	allErrs = append(allErrs, valErrs...)
 
 	if len(allErrs) > 0 {
-		return warn, errors.NewInvalid(v1beta1.SpokeGroupKind, spoke.Name, allErrs)
+		return warn, kerrs.NewInvalid(v1beta1.SpokeGroupKind, spoke.Name, allErrs)
 	}
 	return warn, nil
 }

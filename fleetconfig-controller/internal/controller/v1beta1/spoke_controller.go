@@ -150,14 +150,10 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 	}
 
-	hub, hubKubeconfig, err := r.getHubMeta(ctx)
+	hub, hubKubeconfig, err := r.getHubMeta(ctx, spoke.Spec.HubRef)
 	if err != nil {
 		logger.Error(err, "Failed to get latest hub metadata")
 		spoke.Status.Phase = v1beta1.Unhealthy
-	}
-
-	if hub != nil {
-		setManagedSpokeFields(spoke, hub.Spec.DeepCopy())
 	}
 
 	// Handle Spoke cluster: join and/or upgrade
@@ -192,25 +188,11 @@ func withOriginalSpoke(ctx context.Context, spoke *v1beta1.Spoke) context.Contex
 	return context.WithValue(ctx, originalSpokeKey, spoke.DeepCopy())
 }
 
-func setManagedSpokeFields(spoke *v1beta1.Spoke, hSpec *v1beta1.HubSpec) {
-	// these should always be the same between hub and spokes
-	spoke.Spec.RegistrationAuth = hSpec.RegistrationAuth
-	spoke.Spec.Klusterlet.Source = hSpec.ClusterManager.Source
-
-	// only set these if they are unset, to allow per-resource values
-	if spoke.Spec.Timeout == 300 { // default value
-		spoke.Spec.Timeout = hSpec.Timeout
-	}
-	if spoke.Spec.LogVerbosity == 0 {
-		spoke.Spec.LogVerbosity = hSpec.LogVerbosity
-	}
-}
-
 // cleanup cleans up a Spoke and its associated resources.
 func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) error {
 	logger := log.FromContext(ctx)
 
-	_, hubKubeconfig, err := r.getHubMeta(ctx)
+	_, hubKubeconfig, err := r.getHubMeta(ctx, spoke.Spec.HubRef)
 	if err != nil {
 		// TODO
 		return err
@@ -402,13 +384,13 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 	if err != nil {
 		return fmt.Errorf("failed to compute hash of spoke %s klusterlet values: %w", spoke.Name, err)
 	}
-	upgrade, err := r.spokeNeedsUpgrade(ctx, spoke, currKlusterletHash)
+	upgrade, err := r.spokeNeedsUpgrade(ctx, spoke, currKlusterletHash, hub.Spec.ClusterManager.Source)
 	if err != nil {
 		return fmt.Errorf("failed to check if spoke cluster needs upgrade: %w", err)
 	}
 
 	if upgrade {
-		if err := r.upgradeSpoke(ctx, spoke, klusterletValues); err != nil {
+		if err := r.upgradeSpoke(ctx, spoke, klusterletValues, hub.Spec.ClusterManager.Source); err != nil {
 			return fmt.Errorf("failed to upgrade spoke cluster %s: %w", spoke.Name, err)
 		}
 	}
@@ -463,8 +445,8 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 		fmt.Sprintf("--force-internal-endpoint-lookup=%t", spoke.Spec.Klusterlet.ForceInternalEndpointLookup),
 		fmt.Sprintf("--singleton=%t", spoke.Spec.Klusterlet.Singleton),
 		// source args
-		"--bundle-version", spoke.Spec.Klusterlet.Source.BundleVersion,
-		"--image-registry", spoke.Spec.Klusterlet.Source.Registry,
+		"--bundle-version", hub.Spec.ClusterManager.Source.BundleVersion,
+		"--image-registry", hub.Spec.ClusterManager.Source.Registry,
 	}, spoke.BaseArgs()...)
 
 	for k, v := range spoke.Spec.Klusterlet.Annotations {
@@ -493,12 +475,13 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 		joinArgs = append([]string{fmt.Sprintf("--ca-file=%s", caFile)}, joinArgs...)
 	}
 
-	if spoke.Spec.RegistrationAuth.Driver == v1alpha1.AWSIRSARegistrationDriver {
+	ra := hub.Spec.RegistrationAuth
+	if ra.Driver == v1alpha1.AWSIRSARegistrationDriver {
 		raArgs := []string{
-			fmt.Sprintf("--registration-auth=%s", spoke.Spec.RegistrationAuth.Driver),
+			fmt.Sprintf("--registration-auth=%s", ra.Driver),
 		}
-		if spoke.Spec.RegistrationAuth.HubClusterARN != "" {
-			raArgs = append(raArgs, fmt.Sprintf("--hub-cluster-arn=%s", spoke.Spec.RegistrationAuth.HubClusterARN))
+		if ra.HubClusterARN != "" {
+			raArgs = append(raArgs, fmt.Sprintf("--hub-cluster-arn=%s", ra.HubClusterARN))
 		}
 		if spoke.Spec.ClusterARN != "" {
 			raArgs = append(raArgs, fmt.Sprintf("--managed-cluster-arn=%s", spoke.Spec.ClusterARN))
@@ -615,7 +598,7 @@ func (r *SpokeReconciler) getJoinedCondition(managedCluster *clusterv1.ManagedCl
 }
 
 // spokeNeedsUpgrade checks if the klusterlet on a Spoke cluster requires an upgrade
-func (r *SpokeReconciler) spokeNeedsUpgrade(ctx context.Context, spoke *v1beta1.Spoke, currKlusterletHash string) (bool, error) {
+func (r *SpokeReconciler) spokeNeedsUpgrade(ctx context.Context, spoke *v1beta1.Spoke, currKlusterletHash string, source v1beta1.OCMSource) (bool, error) {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("spokeNeedsUpgrade", "spokeClusterName", spoke.Name)
 
@@ -629,11 +612,11 @@ func (r *SpokeReconciler) spokeNeedsUpgrade(ctx context.Context, spoke *v1beta1.
 		return true, nil
 	}
 
-	if spoke.Spec.Klusterlet.Source.BundleVersion == "default" {
+	if source.BundleVersion == "default" {
 		logger.V(0).Info("klusterlet bundleVersion is default, skipping upgrade")
 		return false, nil
 	}
-	if spoke.Spec.Klusterlet.Source.BundleVersion == "latest" {
+	if source.BundleVersion == "latest" {
 		logger.V(0).Info("klusterlet bundleVersion is latest, attempting upgrade")
 		return true, nil
 	}
@@ -667,7 +650,7 @@ func (r *SpokeReconciler) spokeNeedsUpgrade(ctx context.Context, spoke *v1beta1.
 	if err != nil {
 		return false, fmt.Errorf("failed to detect bundleVersion from klusterlet spec: %w", err)
 	}
-	desiredBundleVersion, err := version.Normalize(spoke.Spec.Klusterlet.Source.BundleVersion)
+	desiredBundleVersion, err := version.Normalize(source.BundleVersion)
 	if err != nil {
 		return false, err
 	}
@@ -680,14 +663,14 @@ func (r *SpokeReconciler) spokeNeedsUpgrade(ctx context.Context, spoke *v1beta1.
 }
 
 // upgradeSpoke upgrades the Spoke cluster's klusterlet
-func (r *SpokeReconciler) upgradeSpoke(ctx context.Context, spoke *v1beta1.Spoke, klusterletValues *v1beta1.KlusterletChartConfig) error {
+func (r *SpokeReconciler) upgradeSpoke(ctx context.Context, spoke *v1beta1.Spoke, klusterletValues *v1beta1.KlusterletChartConfig, source v1beta1.OCMSource) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("upgradeSpoke", "spoke", spoke.Name)
 
 	upgradeArgs := append([]string{
 		"upgrade", "klusterlet",
-		"--bundle-version", spoke.Spec.Klusterlet.Source.BundleVersion,
-		"--image-registry", spoke.Spec.Klusterlet.Source.Registry,
+		"--bundle-version", source.BundleVersion,
+		"--image-registry", source.Registry,
 		"--wait=true",
 	}, spoke.BaseArgs()...)
 
@@ -716,7 +699,7 @@ func (r *SpokeReconciler) upgradeSpoke(ctx context.Context, spoke *v1beta1.Spoke
 		out := append(stdout, stderr...)
 		return fmt.Errorf(
 			"failed to upgrade klusterlet on spoke cluster %s to %s: %v, output: %s",
-			spoke.Name, spoke.Spec.Klusterlet.Source.BundleVersion, err, string(out),
+			spoke.Name, source.BundleVersion, err, string(out),
 		)
 	}
 	logger.V(1).Info("klusterlet upgraded", "output", string(stdout))
@@ -793,48 +776,25 @@ func getToken(ctx context.Context, kClient client.Client, hub *v1beta1.Hub) (*to
 	return tokenMeta, nil
 }
 
-func (r *SpokeReconciler) getHubMeta(ctx context.Context) (*v1beta1.Hub, []byte, error) {
+func (r *SpokeReconciler) getHubMeta(ctx context.Context, hubRef v1beta1.HubRef) (*v1beta1.Hub, []byte, error) {
 	hub := &v1beta1.Hub{}
 	var hubKubeconfig []byte
-	nn := types.NamespacedName{Name: v1beta1.HubResourceName}
+	nn := types.NamespacedName{Name: hubRef.Name}
 
 	// get Hub using local client
 	err := r.Get(ctx, nn, hub)
-	if err == nil {
-		// if found, load the hub's kubeconfig
-		hubKubeconfig, err = kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig)
-		if err != nil {
-			return hub, nil, err
-		}
-		return hub, hubKubeconfig, nil
-	}
-	if !kerrs.IsNotFound(err) {
-		return nil, nil, err
-	}
-	// if not found, load the hub's kubeconfig, create a hubClient and use it to try to get the Hub
-
-	// TODO @arturshadnik - for now, load an inCluster hub kubeconfig. After the addon refactor, this will need be loaded from mount or secret
-	hubKubeconfig, err = kube.RawFromInClusterRestConfig()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, client.IgnoreNotFound(err)
 	}
-	restConfig, err := kube.RestConfigFromKubeconfig(hubKubeconfig)
+	// if found, load the hub's kubeconfig
+	hubKubeconfig, err = kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig)
 	if err != nil {
-		return nil, hubKubeconfig, err
-	}
-	hubClient, err := client.New(restConfig, client.Options{})
-	if err != nil {
-		return nil, hubKubeconfig, err
-	}
-	err = hubClient.Get(ctx, nn, hub)
-	if err != nil {
-		return nil, hubKubeconfig, err
+		return hub, nil, err
 	}
 	return hub, hubKubeconfig, nil
 
 }
 
-// TODO @arturshadnik - after the addon refactor, this will need to use hubClient, not spokeClient, because the klusterlet values CM will be configured in the hub
 func (r *SpokeReconciler) mergeKlusterletValues(ctx context.Context, spoke *v1beta1.Spoke) (*v1beta1.KlusterletChartConfig, error) {
 	logger := log.FromContext(ctx)
 

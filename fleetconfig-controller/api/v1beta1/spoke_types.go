@@ -34,6 +34,10 @@ type SpokeSpec struct {
 	// +optional
 	CreateNamespace bool `json:"createNamespace,omitempty"`
 
+	// HubRef is a reference to the Hub that this Spoke is managed by.
+	// +required
+	HubRef HubRef `json:"hubRef"`
+
 	// If true, sync the labels from klusterlet to all agent resources.
 	// +optional
 	SyncLabels bool `json:"syncLabels,omitempty"`
@@ -64,12 +68,6 @@ type SpokeSpec struct {
 	// +optional
 	AddOns []AddOn `json:"addOns,omitempty"`
 
-	// The Spoke's RegistrationAuth is automatically managed by the controller. It will be inherited from the Hub's spec.registrationAuth field
-	// and should not be set when creating a spoke.
-	// +kubebuilder:default:={}
-	// +optional
-	RegistrationAuth RegistrationAuth `json:"registrationAuth,omitzero"`
-
 	// Timeout is the timeout in seconds for all clusteradm operations, including init, accept, join, upgrade, etc.
 	// +kubebuilder:default:=300
 	// +optional
@@ -80,6 +78,13 @@ type SpokeSpec struct {
 	// +kubebuilder:default:=0
 	// +optional
 	LogVerbosity int `json:"logVerbosity,omitempty"`
+}
+
+// HubRef is the information required to get a Hub resource.
+type HubRef struct {
+	// Name is the name of the Hub that this Spoke is managed by.
+	// +required
+	Name string `json:"name"`
 }
 
 // Klusterlet is the configuration for a klusterlet.
@@ -137,13 +142,6 @@ type Klusterlet struct {
 	// This is an alpha stage flag.
 	// +optional
 	Singleton bool `json:"singleton,omitempty"`
-
-	// Version and image registry details for the klusterlet. The Spoke's Source is automatically managed by the controller. It will be inherited from the Hub's
-	// spec.clusterManager.source field
-	// and should not be set when creating a spoke.
-	// +kubebuilder:default:={}
-	// +optional
-	Source OCMSource `json:"source,omitzero"`
 
 	// ValuesFrom is an optional reference to a ConfigMap containing values for the klusterlet Helm chart.
 	// optional
@@ -257,7 +255,7 @@ type SpokeStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:path=spokes,scope=Cluster
+// +kubebuilder:resource:path=spokes
 // +kubebuilder:printcolumn:name="PHASE",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=".metadata.creationTimestamp"
 
