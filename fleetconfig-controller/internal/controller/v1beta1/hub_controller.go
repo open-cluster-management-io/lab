@@ -196,7 +196,7 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub) error {
 		// Mark all Spokes for deletion if they haven't been deleted yet
 		for i := range spokes {
 			spoke := &spokes[i]
-			if spoke.DeletionTimestamp.IsZero() {
+			if spoke.DeletionTimestamp.IsZero() && spoke.Spec.HubRef.Name == hub.Name {
 				logger.Info("Marking Spoke for deletion", "spoke", spoke.Name)
 				if err := r.Delete(ctx, spoke); err != nil && !kerrs.IsNotFound(err) {
 					return fmt.Errorf("failed to delete spoke %s: %w", spoke.Name, err)

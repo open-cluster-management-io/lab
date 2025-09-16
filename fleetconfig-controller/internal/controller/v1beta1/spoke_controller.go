@@ -384,14 +384,16 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 	if err != nil {
 		return fmt.Errorf("failed to compute hash of spoke %s klusterlet values: %w", spoke.Name, err)
 	}
-	upgrade, err := r.spokeNeedsUpgrade(ctx, spoke, currKlusterletHash, hub.Spec.ClusterManager.Source)
-	if err != nil {
-		return fmt.Errorf("failed to check if spoke cluster needs upgrade: %w", err)
-	}
+	if hub != nil && hub.Spec.ClusterManager.Source.BundleVersion != "" {
+		upgrade, err := r.spokeNeedsUpgrade(ctx, spoke, currKlusterletHash, hub.Spec.ClusterManager.Source)
+		if err != nil {
+			return fmt.Errorf("failed to check if spoke cluster needs upgrade: %w", err)
+		}
 
-	if upgrade {
-		if err := r.upgradeSpoke(ctx, spoke, klusterletValues, hub.Spec.ClusterManager.Source); err != nil {
-			return fmt.Errorf("failed to upgrade spoke cluster %s: %w", spoke.Name, err)
+		if upgrade {
+			if err := r.upgradeSpoke(ctx, spoke, klusterletValues, hub.Spec.ClusterManager.Source); err != nil {
+				return fmt.Errorf("failed to upgrade spoke cluster %s: %w", spoke.Name, err)
+			}
 		}
 	}
 
