@@ -36,6 +36,7 @@ func isKubeconfigValid(kubeconfig v1beta1.Kubeconfig) (bool, string) {
 
 // allowHubUpdate validates that only allowed fields are changed when updating a Hub.
 // Allowed changes include:
+// - spec.apiServer
 // - spec.clusterManager.source.*
 // - spec.hubAddOns
 // - spec.addOnConfigs
@@ -54,6 +55,10 @@ func allowHubUpdate(oldHub, newHub *v1beta1.Hub) error {
 		if newHubCopy.ClusterManager != nil {
 			newHubCopy.ClusterManager.Source = (v1beta1.OCMSource{})
 		}
+
+		// Allow changes to API Server
+		oldHubCopy.APIServer = ""
+		newHubCopy.APIServer = ""
 
 		// Allow changes to HubAddOns
 		oldHubCopy.HubAddOns = nil
