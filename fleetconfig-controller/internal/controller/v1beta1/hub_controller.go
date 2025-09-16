@@ -229,10 +229,14 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub) error {
 		return err
 	}
 
+	purgeOperator := false
+	if hub.Spec.ClusterManager != nil {
+		purgeOperator = hub.Spec.ClusterManager.PurgeOperator
+	}
 	cleanArgs := []string{
 		"clean",
 		// name is omitted, as the default name, 'cluster-manager', is always used
-		fmt.Sprintf("--purge-operator=%t", hub.Spec.ClusterManager.PurgeOperator),
+		fmt.Sprintf("--purge-operator=%t", purgeOperator),
 	}
 	cleanArgs = append(cleanArgs, hub.BaseArgs()...)
 
