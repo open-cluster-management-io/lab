@@ -110,6 +110,13 @@ jobs:
         id: prime-helm-repos
         run: |
           set -e
+
+          dependency_count=$(yq eval '.dependencies | length' ${{ inputs.repo }}/charts/${{ inputs.repo }}/Chart.yaml)
+          if [[ "$dependency_count" -lt 1 ]]; then
+            echo "No dependencies found in Chart.yaml. Skipping helm repo operations."
+            exit 0
+          fi
+
           yq eval '.dependencies[] | .name + " " + .repository' ${{ inputs.repo }}/charts/${{ inputs.repo }}/Chart.yaml | while read -r repo_name repo_url; do
             if [[ ! "$repo_url" =~ ^(oci://|file://) ]]; then
               helm repo add "$repo_name" "$repo_url"
@@ -117,6 +124,7 @@ jobs:
               echo "Skipping repository $repo_url for $repo_name"
             fi
           done
+
           helm repo update
           helm dependency update ${{ inputs.repo }}/charts/${{ inputs.repo }}
 
