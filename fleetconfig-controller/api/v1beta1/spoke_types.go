@@ -156,10 +156,12 @@ type Klusterlet struct {
 type ConfigMapRef struct {
 	// Name is the name of the ConfigMap
 	// +required
+	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
 
 	// Key is the key under which the data is stored.
 	// +required
+	// +kubebuilder:validation:MinLength=1
 	Key string `json:"key"`
 }
 

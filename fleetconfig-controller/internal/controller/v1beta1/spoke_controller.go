@@ -421,6 +421,9 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("joinSpoke", "spoke", spoke.Name)
 
+	if hub == nil {
+		return errors.New("hub not found")
+	}
 	// dont start join until the hub is ready
 	hubInitCond := hub.GetCondition(v1beta1.HubInitialized)
 	if hubInitCond == nil || hubInitCond.Status != metav1.ConditionTrue {
