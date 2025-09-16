@@ -513,7 +513,7 @@ func (r *HubReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// watch for deleted Spokes to prevent idly waiting after all spokes have been GCd during Hub deletion
 		Watches(
 			&v1beta1.Spoke{},
-			handler.EnqueueRequestsFromMapFunc(mapSpokeEventToHub),
+			handler.EnqueueRequestsFromMapFunc(r.mapSpokeEventToHub),
 			builder.WithPredicates(
 				predicate.Funcs{
 					DeleteFunc: func(_ event.DeleteEvent) bool {
@@ -535,9 +535,10 @@ func (r *HubReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func mapSpokeEventToHub(_ context.Context, obj client.Object) []reconcile.Request {
+func (r *HubReconciler) mapSpokeEventToHub(_ context.Context, obj client.Object) []reconcile.Request {
 	spoke, ok := obj.(*v1beta1.Spoke)
 	if !ok {
+		r.Log.V(1).Info("failed to enqueue hub requests", "expected", "spoke", "got", fmt.Sprintf("%T", obj))
 		return nil
 	}
 	return []reconcile.Request{

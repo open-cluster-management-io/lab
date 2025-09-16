@@ -931,7 +931,7 @@ func sharedFieldsChanged(oldSpec, newSpec *v1beta1.HubSpec) bool {
 func (r *SpokeReconciler) mapHubEventToSpoke(ctx context.Context, obj client.Object) []reconcile.Request {
 	hub, ok := obj.(*v1beta1.Hub)
 	if !ok {
-		r.Log.V(1).Info("failed to enqueue spoke requests")
+		r.Log.V(1).Info("failed to enqueue spoke requests", "expected", "hub", "got", fmt.Sprintf("%T", obj))
 		return nil
 	}
 	spokeList := &v1beta1.SpokeList{}
@@ -947,7 +947,8 @@ func (r *SpokeReconciler) mapHubEventToSpoke(ctx context.Context, obj client.Obj
 		}
 		req = append(req, reconcile.Request{
 			NamespacedName: types.NamespacedName{
-				Name: s.Name,
+				Name:      s.Name,
+				Namespace: s.Namespace,
 			},
 		})
 	}

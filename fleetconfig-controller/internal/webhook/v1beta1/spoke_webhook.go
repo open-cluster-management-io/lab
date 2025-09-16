@@ -64,7 +64,7 @@ func (d *SpokeCustomDefaulter) Default(ctx context.Context, obj runtime.Object) 
 	spoke, ok := obj.(*v1beta1.Spoke)
 
 	if !ok {
-		return fmt.Errorf("expected an Spoke object but got %T", obj)
+		return fmt.Errorf("expected a Spoke object but got %T", obj)
 	}
 	spokelog.Info("Defaulting for Spoke", "name", spoke.GetName())
 
