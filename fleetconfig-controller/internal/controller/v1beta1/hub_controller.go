@@ -520,13 +520,13 @@ func (r *HubReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						return true
 					},
 					CreateFunc: func(_ event.CreateEvent) bool {
-						return true
+						return false
 					},
 					UpdateFunc: func(_ event.UpdateEvent) bool {
-						return true
+						return false
 					},
 					GenericFunc: func(_ event.GenericEvent) bool {
-						return true
+						return false
 					},
 				},
 			),
@@ -535,11 +535,15 @@ func (r *HubReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func mapSpokeEventToHub(_ context.Context, _ client.Object) []reconcile.Request {
+func mapSpokeEventToHub(_ context.Context, obj client.Object) []reconcile.Request {
+	spoke, ok := obj.(*v1beta1.Spoke)
+	if !ok {
+		return nil
+	}
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
-				Name: v1beta1.HubResourceName,
+				Name: spoke.Spec.HubRef.Name,
 			},
 		},
 	}

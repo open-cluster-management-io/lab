@@ -928,7 +928,12 @@ func sharedFieldsChanged(oldSpec, newSpec *v1beta1.HubSpec) bool {
 		oldSpec.Timeout != newSpec.Timeout || oldSpec.LogVerbosity != newSpec.LogVerbosity
 }
 
-func (r *SpokeReconciler) mapHubEventToSpoke(ctx context.Context, _ client.Object) []reconcile.Request {
+func (r *SpokeReconciler) mapHubEventToSpoke(ctx context.Context, obj client.Object) []reconcile.Request {
+	hub, ok := obj.(*v1beta1.Hub)
+	if !ok {
+		r.Log.V(1).Info("failed to enqueue spoke requests")
+		return nil
+	}
 	spokeList := &v1beta1.SpokeList{}
 	err := r.List(ctx, spokeList)
 	if err != nil {
@@ -937,6 +942,9 @@ func (r *SpokeReconciler) mapHubEventToSpoke(ctx context.Context, _ client.Objec
 	}
 	req := make([]reconcile.Request, 0)
 	for _, s := range spokeList.Items {
+		if s.Spec.HubRef.Name != hub.Name {
+			continue
+		}
 		req = append(req, reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Name: s.Name,
