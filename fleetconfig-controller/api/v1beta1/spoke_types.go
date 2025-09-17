@@ -69,13 +69,13 @@ type SpokeSpec struct {
 	AddOns []AddOn `json:"addOns,omitempty"`
 
 	// Timeout is the timeout in seconds for all clusteradm operations, including init, accept, join, upgrade, etc.
-	// +kubebuilder:default:=300
+	// If not set, defaults to the Hub's timeout.
 	// +optional
 	Timeout int `json:"timeout,omitempty"`
 
 	// LogVerbosity is the verbosity of the logs.
+	// If not set, defaults to the Hub's logVerbosity.
 	// +kubebuilder:validation:Enum=0;1;2;3;4;5;6;7;8;9;10
-	// +kubebuilder:default:=0
 	// +optional
 	LogVerbosity int `json:"logVerbosity,omitempty"`
 }
@@ -85,6 +85,15 @@ type HubRef struct {
 	// Name is the name of the Hub that this Spoke is managed by.
 	// +required
 	Name string `json:"name"`
+
+	// Namespace is namespace of the Hub that this Spoke is managed by.
+	// +required
+	Namespace string `json:"namespace"`
+}
+
+// IsManagedBy checks whether or not the Spoke is managed by a particular Hub.
+func (s *Spoke) IsManagedBy(om metav1.ObjectMeta) bool {
+	return s.Spec.HubRef.Name == om.Name && s.Spec.HubRef.Namespace == om.Namespace
 }
 
 // Klusterlet is the configuration for a klusterlet.

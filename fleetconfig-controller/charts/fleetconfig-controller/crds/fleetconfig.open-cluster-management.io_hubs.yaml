@@ -12,7 +12,7 @@ spec:
     listKind: HubList
     plural: hubs
     singular: hub
-  scope: Cluster
+  scope: Namespaced
   versions:
   - additionalPrinterColumns:
     - jsonPath: .status.phase

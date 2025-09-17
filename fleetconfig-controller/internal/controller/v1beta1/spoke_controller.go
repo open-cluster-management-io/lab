@@ -784,7 +784,7 @@ func getToken(ctx context.Context, kClient client.Client, hub *v1beta1.Hub) (*to
 func (r *SpokeReconciler) getHubMeta(ctx context.Context, hubRef v1beta1.HubRef) (*v1beta1.Hub, []byte, error) {
 	hub := &v1beta1.Hub{}
 	var hubKubeconfig []byte
-	nn := types.NamespacedName{Name: hubRef.Name}
+	nn := types.NamespacedName{Name: hubRef.Name, Namespace: hubRef.Namespace}
 
 	// get Hub using local client
 	err := r.Get(ctx, nn, hub)
@@ -944,7 +944,7 @@ func (r *SpokeReconciler) mapHubEventToSpoke(ctx context.Context, obj client.Obj
 	}
 	req := make([]reconcile.Request, 0)
 	for _, s := range spokeList.Items {
-		if s.Spec.HubRef.Name != hub.Name {
+		if !s.IsManagedBy(hub.ObjectMeta) {
 			continue
 		}
 		req = append(req, reconcile.Request{

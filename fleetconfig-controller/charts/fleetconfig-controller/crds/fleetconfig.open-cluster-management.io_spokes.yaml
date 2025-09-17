@@ -87,8 +87,13 @@ spec:
                     description: Name is the name of the Hub that this Spoke is managed
                       by.
                     type: string
+                  namespace:
+                    description: Namespace is namespace of the Hub that this Spoke
+                      is managed by.
+                    type: string
                 required:
                 - name
+                - namespace
                 type: object
               klusterlet:
                 default: {}
@@ -2214,9 +2219,11 @@ spec:
                     properties:
                       key:
                         description: Key is the key under which the data is stored.
+                        minLength: 1
                         type: string
                       name:
                         description: Name is the name of the ConfigMap
+                        minLength: 1
                         type: string
                     required:
                     - key
@@ -2258,8 +2265,9 @@ spec:
                     type: object
                 type: object
               logVerbosity:
-                default: 0
-                description: LogVerbosity is the verbosity of the logs.
+                description: |-
+                  LogVerbosity is the verbosity of the logs.
+                  If not set, defaults to the Hub's logVerbosity.
                 enum:
                 - 0
                 - 1
@@ -2285,9 +2293,9 @@ spec:
                   resources.
                 type: boolean
               timeout:
-                default: 300
-                description: Timeout is the timeout in seconds for all clusteradm
-                  operations, including init, accept, join, upgrade, etc.
+                description: |-
+                  Timeout is the timeout in seconds for all clusteradm operations, including init, accept, join, upgrade, etc.
+                  If not set, defaults to the Hub's timeout.
                 type: integer
             required:
             - hubRef

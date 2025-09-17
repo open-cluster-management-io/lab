@@ -79,11 +79,14 @@ func (d *SpokeCustomDefaulter) Default(ctx context.Context, obj runtime.Object) 
 	}
 
 	// only set these if they are unset, to allow per-resource values
-	if spoke.Spec.Timeout == 300 { // default value
-		spoke.Spec.Timeout = hub.Spec.DeepCopy().Timeout
+	// Note: We can't distinguish between default values and explicitly set values
+	// since kubebuilder defaults are applied before webhooks run.
+	// So we only default from Hub if the Spoke has the kubebuilder default values.
+	if spoke.Spec.Timeout == 0 {
+		spoke.Spec.Timeout = hub.Spec.Timeout
 	}
 	if spoke.Spec.LogVerbosity == 0 {
-		spoke.Spec.LogVerbosity = hub.Spec.DeepCopy().LogVerbosity
+		spoke.Spec.LogVerbosity = hub.Spec.LogVerbosity
 	}
 	return nil
 }

@@ -196,7 +196,10 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub) error {
 		// Mark all Spokes for deletion if they haven't been deleted yet
 		for i := range spokes {
 			spoke := &spokes[i]
-			if spoke.DeletionTimestamp.IsZero() && spoke.Spec.HubRef.Name == hub.Name {
+			if spoke.DeletionTimestamp.IsZero() {
+				if !spoke.IsManagedBy(hub.ObjectMeta) {
+					continue
+				}
 				logger.Info("Marking Spoke for deletion", "spoke", spoke.Name)
 				if err := r.Delete(ctx, spoke); err != nil && !kerrs.IsNotFound(err) {
 					return fmt.Errorf("failed to delete spoke %s: %w", spoke.Name, err)
@@ -548,7 +551,8 @@ func (r *HubReconciler) mapSpokeEventToHub(_ context.Context, obj client.Object)
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
-				Name: spoke.Spec.HubRef.Name,
+				Name:      spoke.Spec.HubRef.Name,
+				Namespace: spoke.Spec.HubRef.Namespace,
 			},
 		},
 	}
