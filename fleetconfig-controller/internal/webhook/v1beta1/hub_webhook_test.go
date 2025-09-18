@@ -21,28 +21,26 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	fleetconfigopenclustermanagementiov1beta1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
-	// TODO (user): Add any additional imports if needed
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 )
 
 var _ = Describe("Hub Webhook", func() {
 	var (
-		obj       *fleetconfigopenclustermanagementiov1beta1.Hub
-		oldObj    *fleetconfigopenclustermanagementiov1beta1.Hub
+		obj       *v1beta1.Hub
+		oldObj    *v1beta1.Hub
 		validator HubCustomValidator
 		defaulter HubCustomDefaulter
 	)
 
 	BeforeEach(func() {
-		obj = &fleetconfigopenclustermanagementiov1beta1.Hub{}
-		oldObj = &fleetconfigopenclustermanagementiov1beta1.Hub{}
-		validator = HubCustomValidator{}
+		obj = &v1beta1.Hub{}
+		oldObj = &v1beta1.Hub{}
+		validator = HubCustomValidator{client: k8sClient}
 		Expect(validator).NotTo(BeNil(), "Expected validator to be initialized")
 		defaulter = HubCustomDefaulter{}
 		Expect(defaulter).NotTo(BeNil(), "Expected defaulter to be initialized")
 		Expect(oldObj).NotTo(BeNil(), "Expected oldObj to be initialized")
 		Expect(obj).NotTo(BeNil(), "Expected obj to be initialized")
-		// TODO (user): Add any setup logic common to all tests
 	})
 
 	AfterEach(func() {
@@ -50,39 +48,92 @@ var _ = Describe("Hub Webhook", func() {
 	})
 
 	Context("When creating Hub under Defaulting Webhook", func() {
-		// TODO (user): Add logic for defaulting webhooks
-		// Example:
-		// It("Should apply defaults when a required field is empty", func() {
-		//     By("simulating a scenario where defaults should be applied")
-		//     obj.SomeFieldWithDefault = ""
-		//     By("calling the Default method to apply defaults")
-		//     defaulter.Default(ctx, obj)
-		//     By("checking that the default values are set")
-		//     Expect(obj.SomeFieldWithDefault).To(Equal("default_value"))
-		// })
+		It("Should apply defaults when fields are empty", func() {
+			By("simulating a scenario where defaults should be applied")
+			// Currently no defaulting logic implemented in Hub webhook
+			By("calling the Default method")
+			err := defaulter.Default(ctx, obj)
+			Expect(err).NotTo(HaveOccurred())
+		})
 	})
 
-	Context("When creating or updating Hub under Validating Webhook", func() {
-		// TODO (user): Add logic for validating webhooks
-		// Example:
-		// It("Should deny creation if a required field is missing", func() {
-		//     By("simulating an invalid creation scenario")
-		//     obj.SomeRequiredField = ""
-		//     Expect(validator.ValidateCreate(ctx, obj)).Error().To(HaveOccurred())
-		// })
-		//
-		// It("Should admit creation if all required fields are present", func() {
-		//     By("simulating an invalid creation scenario")
-		//     obj.SomeRequiredField = "valid_value"
-		//     Expect(validator.ValidateCreate(ctx, obj)).To(BeNil())
-		// })
-		//
-		// It("Should validate updates correctly", func() {
-		//     By("simulating a valid update scenario")
-		//     oldObj.SomeRequiredField = "updated_value"
-		//     obj.SomeRequiredField = "updated_value"
-		//     Expect(validator.ValidateUpdate(ctx, oldObj, obj)).To(BeNil())
-		// })
+	Context("When creating Hub under Validating Webhook", func() {
+		It("Should allow creation with valid configuration", func() {
+			By("setting up a valid Hub resource")
+			obj.ObjectMeta.Name = "hub"
+			obj.ObjectMeta.Namespace = "default"
+			obj.Spec.Kubeconfig = v1beta1.Kubeconfig{
+				InCluster: true,
+			}
+			obj.Spec.ClusterManager = &v1beta1.ClusterManager{
+				FeatureGates: "AddonManagement=true",
+			}
+
+			By("validating the creation")
+			_, err := validator.ValidateCreate(ctx, obj)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Should deny creation when neither ClusterManager nor SingletonControlPlane is specified", func() {
+			By("setting up a Hub without ClusterManager or SingletonControlPlane")
+			obj.ObjectMeta.Name = "hub"
+			obj.ObjectMeta.Namespace = "default"
+			obj.Spec.Kubeconfig = v1beta1.Kubeconfig{
+				InCluster: true,
+			}
+			// Both ClusterManager and SingletonControlPlane are nil
+
+			By("validating the creation should fail")
+			_, err := validator.ValidateCreate(ctx, obj)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("either hub.clusterManager or hub.singletonControlPlane must be specified"))
+		})
+	})
+
+	Context("When updating Hub under Validating Webhook", func() {
+		BeforeEach(func() {
+			// Set up valid old and new objects
+			oldObj.ObjectMeta.Name = "hub"
+			oldObj.ObjectMeta.Namespace = "default"
+			oldObj.Spec.Kubeconfig = v1beta1.Kubeconfig{
+				InCluster: true,
+			}
+			oldObj.Spec.ClusterManager = &v1beta1.ClusterManager{
+				FeatureGates: "AddonManagement=true",
+			}
+
+			obj.ObjectMeta.Name = "hub"
+			obj.ObjectMeta.Namespace = "default"
+			obj.Spec.Kubeconfig = v1beta1.Kubeconfig{
+				InCluster: true,
+			}
+			obj.Spec.ClusterManager = &v1beta1.ClusterManager{
+				FeatureGates: "AddonManagement=true",
+			}
+		})
+
+		It("Should allow valid updates", func() {
+			By("updating Hub with valid changes - only allowed fields")
+			// Update timeout (which is allowed)
+			obj.Spec.Timeout = 600
+
+			By("validating the update")
+			_, err := validator.ValidateUpdate(ctx, oldObj, obj)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Should deny updates with invalid kubeconfig", func() {
+			By("setting up invalid kubeconfig in the update")
+			obj.Spec.Kubeconfig = v1beta1.Kubeconfig{
+				InCluster: false,
+				// Missing SecretReference when InCluster is false
+			}
+
+			By("validating the update should fail")
+			_, err := validator.ValidateUpdate(ctx, oldObj, obj)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("either secretReference or inCluster must be specified"))
+		})
 	})
 
 })

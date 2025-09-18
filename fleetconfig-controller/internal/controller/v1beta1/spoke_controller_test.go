@@ -47,7 +47,7 @@ var _ = Describe("Spoke Controller", Ordered, func() {
 		BeforeAll(func() {
 			// Create a test Hub first since Spoke references it
 			testHubNN = types.NamespacedName{
-				Name:      "test-hub",
+				Name:      "test-hub-2",
 				Namespace: "default",
 			}
 			testHub = &v1beta1.Hub{
@@ -67,7 +67,7 @@ var _ = Describe("Spoke Controller", Ordered, func() {
 			Expect(k8sClient.Create(ctx, testHub)).To(Succeed())
 
 			spokeNN = types.NamespacedName{
-				Name:      "test-spoke",
+				Name:      "hub-as-spoke",
 				Namespace: "default",
 			}
 			spokeReconciler = &SpokeReconciler{

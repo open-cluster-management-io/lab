@@ -43,6 +43,7 @@ func isKubeconfigValid(kubeconfig v1beta1.Kubeconfig) (bool, string) {
 // - spec.logVerbosity
 // - spec.timeout
 // - spec.registrationAuth
+// - spec.kubeconfig
 func allowHubUpdate(oldHub, newHub *v1beta1.Hub) error {
 	if !reflect.DeepEqual(newHub.Spec, oldHub.Spec) {
 		oldHubCopy := oldHub.Spec.DeepCopy()
@@ -79,6 +80,10 @@ func allowHubUpdate(oldHub, newHub *v1beta1.Hub) error {
 		// Allow changes to RegistrationAuth
 		oldHubCopy.RegistrationAuth = v1beta1.RegistrationAuth{}
 		newHubCopy.RegistrationAuth = v1beta1.RegistrationAuth{}
+
+		// Allow changes to Kubeconfig
+		oldHubCopy.Kubeconfig = v1beta1.Kubeconfig{}
+		newHubCopy.Kubeconfig = v1beta1.Kubeconfig{}
 
 		if !reflect.DeepEqual(oldHubCopy, newHubCopy) {
 			return errors.New("only changes to hub.spec.clusterManager.source.*, hub.spec.hubAddOns, hub.spec.addOnConfigs, hub.spec.logVerbosity, hub.spec.timeout, and hub.spec.registrationAuth are allowed when updating the hub")
@@ -341,7 +346,7 @@ func validateAddons(ctx context.Context, cli client.Client, newObject *v1beta1.S
 
 	// try to get hub, if not present or not ready, log a warning that addons cant be properly validated
 	hub := &v1beta1.Hub{}
-	err := cli.Get(ctx, types.NamespacedName{Name: v1beta1.HubResourceName}, hub)
+	err := cli.Get(ctx, types.NamespacedName{Name: newObject.Spec.HubRef.Name, Namespace: newObject.Spec.HubRef.Namespace}, hub)
 	if err != nil {
 		if !kerrs.IsNotFound(err) {
 			return nil, field.ErrorList{field.InternalError(field.NewPath("spec").Child("addOns"), err)}
