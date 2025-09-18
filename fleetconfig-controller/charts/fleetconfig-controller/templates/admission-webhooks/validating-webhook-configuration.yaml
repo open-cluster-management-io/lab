@@ -36,4 +36,54 @@ webhooks:
   {{- else }}
   timeoutSeconds: 30
   {{- end }}
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "chart.fullname" . }}-webhook
+      namespace: {{ .Release.Namespace }}
+      path: /validate-fleetconfig-open-cluster-management-io-v1beta1-hub
+  failurePolicy: {{ .Values.admissionWebhooks.failurePolicy }}
+  name: vhub-v1beta1.kb.io
+  rules:
+  - apiGroups:
+    - fleetconfig.open-cluster-management.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - hubs
+  sideEffects: None
+  {{- if not .Values.devspaceEnabled }}
+  timeoutSeconds: 5
+  {{- else }}
+  timeoutSeconds: 30
+  {{- end }}
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "chart.fullname" . }}-webhook
+      namespace: {{ .Release.Namespace }}
+      path: /validate-fleetconfig-open-cluster-management-io-v1beta1-spoke
+  failurePolicy: {{ .Values.admissionWebhooks.failurePolicy }}
+  name: vspoke-v1beta1.kb.io
+  rules:
+  - apiGroups:
+    - fleetconfig.open-cluster-management.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - spokes
+  sideEffects: None
+  {{- if not .Values.devspaceEnabled }}
+  timeoutSeconds: 5
+  {{- else }}
+  timeoutSeconds: 30
+  {{- end }}
 {{- end }}
