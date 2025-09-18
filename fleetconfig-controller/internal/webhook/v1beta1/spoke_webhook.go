@@ -69,7 +69,7 @@ func (d *SpokeCustomDefaulter) Default(ctx context.Context, obj runtime.Object) 
 	spokelog.Info("Defaulting for Spoke", "name", spoke.GetName())
 
 	hub := &v1beta1.Hub{}
-	nn := types.NamespacedName{Name: spoke.Spec.HubRef.Name}
+	nn := types.NamespacedName{Name: spoke.Spec.HubRef.Name, Namespace: spoke.Spec.HubRef.Namespace}
 	err := d.client.Get(ctx, nn, hub)
 	if err != nil {
 		if kerrs.IsNotFound(err) {
