@@ -32,12 +32,16 @@ import (
 
 var _ = Describe("Spoke Controller", func() {
 	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+		const (
+			resourceName      = "test-resource"
+			resourceNamespace = "fleetconfig-controller"
+		)
 
 		ctx := context.Background()
 
 		typeNamespacedName := types.NamespacedName{
-			Name: resourceName,
+			Name:      resourceName,
+			Namespace: resourceNamespace,
 		}
 		spoke := &v1beta1.Spoke{}
 
@@ -47,7 +51,8 @@ var _ = Describe("Spoke Controller", func() {
 			if err != nil && errors.IsNotFound(err) {
 				resource := &v1beta1.Spoke{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: resourceName,
+						Name:      resourceName,
+						Namespace: resourceNamespace,
 					},
 					// TODO(user): Specify other spec details if needed.
 				}

@@ -32,12 +32,16 @@ import (
 
 var _ = Describe("Hub Controller", func() {
 	Context("When reconciling a resource", func() {
-		const resourceName = "hub"
+		const (
+			resourceName      = "hub"
+			resourceNamespace = "fleetconfig-controller"
+		)
 
 		ctx := context.Background()
 
 		typeNamespacedName := types.NamespacedName{
-			Name: resourceName,
+			Name:      resourceName,
+			Namespace: resourceNamespace,
 		}
 		hub := &v1beta1.Hub{}
 
@@ -47,7 +51,8 @@ var _ = Describe("Hub Controller", func() {
 			if err != nil && errors.IsNotFound(err) {
 				resource := &v1beta1.Hub{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: resourceName,
+						Name:      resourceName,
+						Namespace: resourceNamespace,
 					},
 					// TODO(user): Specify other spec details if needed.
 				}

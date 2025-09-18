@@ -18,7 +18,6 @@ package v1beta1
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -41,15 +40,22 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	ctx       context.Context
-	cancel    context.CancelFunc
-	testEnv   *envtest.Environment
-	cfg       *rest.Config
-	k8sClient client.Client
+	ctx        context.Context
+	cancel     context.CancelFunc
+	testEnv    *envtest.Environment
+	cfg        *rest.Config
+	k8sClient  client.Client
+	testConfig *test.Config
+	err        error
 )
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
+
+	testConfig, err = test.LoadConfig()
+	if err != nil {
+		panic(err)
+	}
 
 	RunSpecs(t, "Controller Suite")
 }
@@ -75,8 +81,9 @@ var _ = BeforeSuite(func() {
 	}
 
 	// Retrieve the first found binary directory to allow running tests from IDEs
-	if getFirstFoundEnvTestBinaryDir() != "" {
-		testEnv.BinaryAssetsDirectory = getFirstFoundEnvTestBinaryDir()
+	envTestBinaryDir := test.FindEnvTestBinaryDir(testConfig)
+	if envTestBinaryDir != "" {
+		testEnv.BinaryAssetsDirectory = envTestBinaryDir
 	}
 
 	// cfg is defined in this file globally.
@@ -95,26 +102,3 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
-
-// getFirstFoundEnvTestBinaryDir locates the first binary in the specified path.
-// ENVTEST-based tests depend on specific binaries, usually located in paths set by
-// controller-runtime. When running tests directly (e.g., via an IDE) without using
-// Makefile targets, the 'BinaryAssetsDirectory' must be explicitly configured.
-//
-// This function streamlines the process by finding the required binaries, similar to
-// setting the 'KUBEBUILDER_ASSETS' environment variable. To ensure the binaries are
-// properly set up, run 'make setup-envtest' beforehand.
-func getFirstFoundEnvTestBinaryDir() string {
-	basePath := filepath.Join("..", "..", "bin", "k8s")
-	entries, err := os.ReadDir(basePath)
-	if err != nil {
-		logf.Log.Error(err, "Failed to read directory", "path", basePath)
-		return ""
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			return filepath.Join(basePath, entry.Name())
-		}
-	}
-	return ""
-}
