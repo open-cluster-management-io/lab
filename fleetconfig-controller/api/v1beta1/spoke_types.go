@@ -70,12 +70,14 @@ type SpokeSpec struct {
 
 	// Timeout is the timeout in seconds for all clusteradm operations, including init, accept, join, upgrade, etc.
 	// If not set, defaults to the Hub's timeout.
+	// +kubebuilder:default:=300
 	// +optional
 	Timeout int `json:"timeout,omitempty"`
 
 	// LogVerbosity is the verbosity of the logs.
 	// If not set, defaults to the Hub's logVerbosity.
 	// +kubebuilder:validation:Enum=0;1;2;3;4;5;6;7;8;9;10
+	// +kubebuilder:default:=0
 	// +optional
 	LogVerbosity int `json:"logVerbosity,omitempty"`
 }

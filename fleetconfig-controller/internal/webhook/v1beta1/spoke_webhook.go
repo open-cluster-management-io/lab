@@ -22,7 +22,6 @@ import (
 
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -42,53 +41,7 @@ var spokelog = logf.Log.WithName("spoke-resource")
 func SetupSpokeWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&v1beta1.Spoke{}).
 		WithValidator(&SpokeCustomValidator{client: mgr.GetClient()}).
-		WithDefaulter(&SpokeCustomDefaulter{client: mgr.GetClient()}).
 		Complete()
-}
-
-// +kubebuilder:webhook:path=/mutate-fleetconfig-open-cluster-management-io-v1beta1-spoke,mutating=true,failurePolicy=fail,sideEffects=None,groups=fleetconfig.open-cluster-management.io,resources=spokes,verbs=create;update,versions=v1beta1,name=mspoke-v1beta1.kb.io,admissionReviewVersions=v1
-
-// SpokeCustomDefaulter struct is responsible for setting default values on the custom resource of the
-// Kind Spoke when those are created or updated.
-//
-// NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
-// as it is used only for temporary operations and does not need to be deeply copied.
-type SpokeCustomDefaulter struct {
-	client client.Client
-}
-
-var _ webhook.CustomDefaulter = &SpokeCustomDefaulter{}
-
-// Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Spoke.
-func (d *SpokeCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
-	spoke, ok := obj.(*v1beta1.Spoke)
-
-	if !ok {
-		return fmt.Errorf("expected a Spoke object but got %T", obj)
-	}
-	spokelog.Info("Defaulting for Spoke", "name", spoke.GetName())
-
-	hub := &v1beta1.Hub{}
-	nn := types.NamespacedName{Name: spoke.Spec.HubRef.Name, Namespace: spoke.Spec.HubRef.Namespace}
-	err := d.client.Get(ctx, nn, hub)
-	if err != nil {
-		if kerrs.IsNotFound(err) {
-			spokelog.Info("warning: hub not found, skip setting defaults")
-		}
-		return client.IgnoreNotFound(err)
-	}
-
-	// only set these if they are unset, to allow per-resource values
-	// Note: We can't distinguish between default values and explicitly set values
-	// since kubebuilder defaults are applied before webhooks run.
-	// So we only default from Hub if the Spoke has the kubebuilder default values.
-	if spoke.Spec.Timeout == 0 {
-		spoke.Spec.Timeout = hub.Spec.Timeout
-	}
-	if spoke.Spec.LogVerbosity == 0 {
-		spoke.Spec.LogVerbosity = hub.Spec.LogVerbosity
-	}
-	return nil
 }
 
 // NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.

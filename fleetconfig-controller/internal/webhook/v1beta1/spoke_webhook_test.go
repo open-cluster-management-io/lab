@@ -28,7 +28,6 @@ var _ = Describe("Spoke Webhook", func() {
 		obj       *v1beta1.Spoke
 		oldObj    *v1beta1.Spoke
 		validator SpokeCustomValidator
-		defaulter SpokeCustomDefaulter
 	)
 
 	BeforeEach(func() {
@@ -36,27 +35,8 @@ var _ = Describe("Spoke Webhook", func() {
 		oldObj = &v1beta1.Spoke{}
 		validator = SpokeCustomValidator{client: k8sClient}
 		Expect(validator).NotTo(BeNil(), "Expected validator to be initialized")
-		defaulter = SpokeCustomDefaulter{client: k8sClient}
-		Expect(defaulter).NotTo(BeNil(), "Expected defaulter to be initialized")
 		Expect(oldObj).NotTo(BeNil(), "Expected oldObj to be initialized")
 		Expect(obj).NotTo(BeNil(), "Expected obj to be initialized")
-	})
-
-	Context("When creating Spoke under Defaulting Webhook", func() {
-		It("Should apply defaults from Hub when fields are empty", func() {
-			By("setting up a Spoke with HubRef")
-			obj.Spec.HubRef = v1beta1.HubRef{
-				Name:      "test-hub",
-				Namespace: "default",
-			}
-			obj.Spec.Timeout = 0
-			obj.Spec.LogVerbosity = 0
-
-			By("calling the Default method")
-			err := defaulter.Default(ctx, obj)
-
-			Expect(err).NotTo(HaveOccurred())
-		})
 	})
 
 	Context("When creating Spoke under Validating Webhook", func() {

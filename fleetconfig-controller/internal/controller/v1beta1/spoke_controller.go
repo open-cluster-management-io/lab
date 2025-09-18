@@ -102,8 +102,16 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 	}()
 
-	// Add a finalizer and requeue if not already present
+	hubMeta, err := r.getHubMeta(ctx, spoke.Spec.HubRef)
+	if err != nil {
+		// notFound does not return an error
+		logger.V(0).Info("Failed to get latest hub metadata", "error", err)
+		spoke.Status.Phase = v1beta1.Unhealthy
+	}
+
+	// Add a finalizer if not already present, set defaults, and requeue
 	if !slices.Contains(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) {
+		setDefaults(ctx, spoke, hubMeta)
 		spoke.Finalizers = append(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer)
 		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 	}
@@ -156,12 +164,6 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 	}
 
-	hubMeta, err := r.getHubMeta(ctx, spoke.Spec.HubRef)
-	if err != nil {
-		logger.Error(err, "Failed to get latest hub metadata")
-		spoke.Status.Phase = v1beta1.Unhealthy
-	}
-
 	// Handle Spoke cluster: join and/or upgrade
 	if err := r.handleSpoke(ctx, spoke, hubMeta, spokeKubeconfig); err != nil {
 		logger.Error(err, "Failed to handle spoke operations")
@@ -192,6 +194,20 @@ const (
 
 func withOriginalSpoke(ctx context.Context, spoke *v1beta1.Spoke) context.Context {
 	return context.WithValue(ctx, originalSpokeKey, spoke.DeepCopy())
+}
+
+func setDefaults(ctx context.Context, spoke *v1beta1.Spoke, hubMeta hubMeta) {
+	logger := log.FromContext(ctx)
+	if hubMeta.hub == nil {
+		logger.V(0).Info("hub not found, skip overriding default timeout and log verbosity")
+		return
+	}
+	if spoke.Spec.Timeout == 300 {
+		spoke.Spec.Timeout = hubMeta.hub.Spec.Timeout
+	}
+	if spoke.Spec.LogVerbosity == 0 {
+		spoke.Spec.LogVerbosity = hubMeta.hub.Spec.LogVerbosity
+	}
 }
 
 // cleanup cleans up a Spoke and its associated resources.

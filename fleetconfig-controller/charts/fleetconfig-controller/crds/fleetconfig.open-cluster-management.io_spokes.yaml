@@ -2257,6 +2257,7 @@ spec:
                     type: object
                 type: object
               logVerbosity:
+                default: 0
                 description: |-
                   LogVerbosity is the verbosity of the logs.
                   If not set, defaults to the Hub's logVerbosity.
@@ -2285,6 +2286,7 @@ spec:
                   resources.
                 type: boolean
               timeout:
+                default: 300
                 description: |-
                   Timeout is the timeout in seconds for all clusteradm operations, including init, accept, join, upgrade, etc.
                   If not set, defaults to the Hub's timeout.
