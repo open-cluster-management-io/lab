@@ -47,7 +47,7 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("handleSpokes", "fleetconfig", fc.Name)
 
-	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, kClient, fc.Spec.Hub.Kubeconfig)
+	hubKubeconfig, err := kube.KubeconfigFromNamespacedSecretOrCluster(ctx, kClient, fc.Spec.Hub.Kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 
 		// attempt to join the spoke cluster if it hasn't already been joined
 		if managedCluster == nil {
-			tokenMeta, err := getToken(ctx, kClient, fc)
+			tokenMeta, err := getToken(ctx, kClient, fc, hubKubeconfig)
 			if err != nil {
 				return fmt.Errorf("failed to get join token: %w", err)
 			}
@@ -266,7 +266,7 @@ type tokenMeta struct {
 }
 
 // getToken gets a join token from the Hub cluster via 'clusteradm get token'
-func getToken(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetConfig) (*tokenMeta, error) {
+func getToken(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetConfig, hubKubeconfig []byte) (*tokenMeta, error) {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("getToken")
 
@@ -277,7 +277,7 @@ func getToken(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetConf
 	if fc.Spec.Hub.ClusterManager != nil {
 		tokenArgs = append(tokenArgs, fmt.Sprintf("--use-bootstrap-token=%t", fc.Spec.Hub.ClusterManager.UseBootstrapToken))
 	}
-	tokenArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, fc.Spec.Hub.Kubeconfig, tokenArgs)
+	tokenArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, hubKubeconfig, fc.Spec.Hub.Kubeconfig.Context, tokenArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -368,7 +368,7 @@ func joinSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetCon
 		joinArgs = append(joinArgs,
 			fmt.Sprintf("--force-internal-endpoint-lookup-managed=%t", spoke.Klusterlet.ForceInternalEndpointLookupManaged),
 		)
-		raw, err := kube.KubeconfigFromSecretOrCluster(ctx, kClient, spoke.Klusterlet.ManagedClusterKubeconfig)
+		raw, err := kube.KubeconfigFromNamespacedSecretOrCluster(ctx, kClient, spoke.Klusterlet.ManagedClusterKubeconfig)
 		if err != nil {
 			return err
 		}
@@ -405,7 +405,11 @@ func joinSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetCon
 	}
 	joinArgs = append(joinArgs, valuesArgs...)
 
-	joinArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, spoke.Kubeconfig, joinArgs)
+	kubeconfig, err := kube.KubeconfigFromNamespacedSecretOrCluster(ctx, kClient, spoke.Kubeconfig)
+	if err != nil {
+		return err
+	}
+	joinArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, kubeconfig, spoke.Kubeconfig.Context, joinArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -456,7 +460,7 @@ func spokeNeedsUpgrade(ctx context.Context, kClient client.Client, spoke v1alpha
 		return true, nil
 	}
 
-	kubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, kClient, spoke.Kubeconfig)
+	kubeconfig, err := kube.KubeconfigFromNamespacedSecretOrCluster(ctx, kClient, spoke.Kubeconfig)
 	if err != nil {
 		return false, err
 	}
@@ -518,7 +522,11 @@ func upgradeSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 	}
 	upgradeArgs = append(upgradeArgs, valuesArgs...)
 
-	upgradeArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, spoke.Kubeconfig, upgradeArgs)
+	kubeconfig, err := kube.KubeconfigFromNamespacedSecretOrCluster(ctx, kClient, spoke.Kubeconfig)
+	if err != nil {
+		return err
+	}
+	upgradeArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, kubeconfig, spoke.Kubeconfig.Context, upgradeArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -574,7 +582,11 @@ func unjoinSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetC
 		fmt.Sprintf("--purge-operator=%t", spoke.GetPurgeKlusterletOperator()),
 	}, fc.BaseArgs()...)
 
-	unjoinArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, spoke.GetKubeconfig(), unjoinArgs)
+	kubeconfig, err := kube.KubeconfigFromNamespacedSecretOrCluster(ctx, kClient, spoke.GetKubeconfig())
+	if err != nil {
+		return err
+	}
+	unjoinArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, kubeconfig, spoke.GetKubeconfig().Context, unjoinArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}

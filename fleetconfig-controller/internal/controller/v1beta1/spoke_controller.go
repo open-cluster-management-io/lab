@@ -107,6 +107,11 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 	}
 
+	spokeKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, spoke.Spec.Kubeconfig, spoke.Namespace)
+	if err != nil {
+		return ret(ctx, ctrl.Result{}, err)
+	}
+
 	// Handle deletion logic with finalizer
 	if !spoke.DeletionTimestamp.IsZero() {
 		if spoke.Status.Phase != v1beta1.Deleting {
@@ -115,7 +120,7 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 
 		if slices.Contains(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) {
-			if err := r.cleanup(ctx, spoke); err != nil {
+			if err := r.cleanup(ctx, spoke, spokeKubeconfig); err != nil {
 				spoke.SetConditions(true, v1beta1.NewCondition(
 					err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
 				))
@@ -150,14 +155,14 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 	}
 
-	hub, hubKubeconfig, err := r.getHubMeta(ctx, spoke.Spec.HubRef)
+	hubMeta, err := r.getHubMeta(ctx, spoke.Spec.HubRef)
 	if err != nil {
 		logger.Error(err, "Failed to get latest hub metadata")
 		spoke.Status.Phase = v1beta1.Unhealthy
 	}
 
 	// Handle Spoke cluster: join and/or upgrade
-	if err := r.handleSpoke(ctx, spoke, hub, hubKubeconfig); err != nil {
+	if err := r.handleSpoke(ctx, spoke, hubMeta, spokeKubeconfig); err != nil {
 		logger.Error(err, "Failed to handle spoke operations")
 		spoke.Status.Phase = v1beta1.Unhealthy
 	}
@@ -189,24 +194,24 @@ func withOriginalSpoke(ctx context.Context, spoke *v1beta1.Spoke) context.Contex
 }
 
 // cleanup cleans up a Spoke and its associated resources.
-func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) error {
+func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke, spokeKubeconfig []byte) error {
 	logger := log.FromContext(ctx)
 
-	_, hubKubeconfig, err := r.getHubMeta(ctx, spoke.Spec.HubRef)
+	hubMeta, err := r.getHubMeta(ctx, spoke.Spec.HubRef)
 	if err != nil {
 		// TODO
 		return err
 	}
 
-	clusterC, err := common.ClusterClient(hubKubeconfig)
+	clusterC, err := common.ClusterClient(hubMeta.kubeconfig)
 	if err != nil {
 		return err
 	}
-	workC, err := common.WorkClient(hubKubeconfig)
+	workC, err := common.WorkClient(hubMeta.kubeconfig)
 	if err != nil {
 		return err
 	}
-	addonC, err := common.AddOnClient(hubKubeconfig)
+	addonC, err := common.AddOnClient(hubMeta.kubeconfig)
 	if err != nil {
 		return fmt.Errorf("failed to create addon client for cleanup: %w", err)
 	}
@@ -254,7 +259,7 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) err
 		))
 	}
 
-	if err := r.unjoinSpoke(ctx, spoke); err != nil {
+	if err := r.unjoinSpoke(ctx, spoke, spokeKubeconfig); err != nil {
 		return err
 	}
 
@@ -287,9 +292,12 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke) err
 }
 
 // handleSpoke manages Spoke cluster join and upgrade operations
-func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke, hub *v1beta1.Hub, hubKubeconfig []byte) error {
+func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke, hubMeta hubMeta, spokeKubeconfig []byte) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("handleSpoke", "spoke", spoke.Name)
+
+	hub := hubMeta.hub
+	hubKubeconfig := hubMeta.kubeconfig
 
 	clusterClient, err := common.ClusterClient(hubKubeconfig)
 	if err != nil {
@@ -314,7 +322,7 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 
 	// attempt to join the spoke cluster if it hasn't already been joined
 	if managedCluster == nil {
-		if err := r.joinSpoke(ctx, spoke, hub, klusterletValues); err != nil {
+		if err := r.joinSpoke(ctx, spoke, hubMeta, klusterletValues, spokeKubeconfig); err != nil {
 			spoke.SetConditions(true, v1beta1.NewCondition(
 				err.Error(), v1beta1.SpokeJoined, metav1.ConditionFalse, metav1.ConditionTrue,
 			))
@@ -385,13 +393,13 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 		return fmt.Errorf("failed to compute hash of spoke %s klusterlet values: %w", spoke.Name, err)
 	}
 	if hub != nil && hub.Spec.ClusterManager.Source.BundleVersion != "" {
-		upgrade, err := r.spokeNeedsUpgrade(ctx, spoke, currKlusterletHash, hub.Spec.ClusterManager.Source)
+		upgrade, err := r.spokeNeedsUpgrade(ctx, spoke, currKlusterletHash, hub.Spec.ClusterManager.Source, spokeKubeconfig)
 		if err != nil {
 			return fmt.Errorf("failed to check if spoke cluster needs upgrade: %w", err)
 		}
 
 		if upgrade {
-			if err := r.upgradeSpoke(ctx, spoke, klusterletValues, hub.Spec.ClusterManager.Source); err != nil {
+			if err := r.upgradeSpoke(ctx, spoke, klusterletValues, hub.Spec.ClusterManager.Source, spokeKubeconfig); err != nil {
 				return fmt.Errorf("failed to upgrade spoke cluster %s: %w", spoke.Name, err)
 			}
 		}
@@ -418,21 +426,28 @@ type tokenMeta struct {
 	HubAPIServer string `json:"hub-apiserver"`
 }
 
+type hubMeta struct {
+	hub        *v1beta1.Hub
+	kubeconfig []byte
+}
+
 // joinSpoke joins a Spoke cluster to the Hub cluster
-func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, hub *v1beta1.Hub, klusterletValues *v1beta1.KlusterletChartConfig) error {
+func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, hubMeta hubMeta, klusterletValues *v1beta1.KlusterletChartConfig, spokeKubeconfig []byte) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("joinSpoke", "spoke", spoke.Name)
 
-	if hub == nil {
+	hub := hubMeta.hub
+
+	if hubMeta.hub == nil {
 		return errors.New("hub not found")
 	}
 	// dont start join until the hub is ready
-	hubInitCond := hub.GetCondition(v1beta1.HubInitialized)
+	hubInitCond := hubMeta.hub.GetCondition(v1beta1.HubInitialized)
 	if hubInitCond == nil || hubInitCond.Status != metav1.ConditionTrue {
 		return errors.New("hub does not have initialized condition")
 	}
 
-	tokenMeta, err := getToken(ctx, r.Client, hub)
+	tokenMeta, err := getToken(ctx, r.Client, hubMeta)
 	if err != nil {
 		return fmt.Errorf("failed to get join token: %w", err)
 	}
@@ -499,7 +514,7 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 		joinArgs = append(joinArgs,
 			fmt.Sprintf("--force-internal-endpoint-lookup-managed=%t", spoke.Spec.Klusterlet.ForceInternalEndpointLookupManaged),
 		)
-		raw, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, spoke.Spec.Klusterlet.ManagedClusterKubeconfig)
+		raw, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, spoke.Spec.Klusterlet.ManagedClusterKubeconfig, spoke.Namespace)
 		if err != nil {
 			return err
 		}
@@ -536,7 +551,7 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 	}
 	joinArgs = append(joinArgs, valuesArgs...)
 
-	joinArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, r.Client, spoke.Spec.Kubeconfig, joinArgs)
+	joinArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, r.Client, spokeKubeconfig, spoke.Spec.Kubeconfig.Context, joinArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -603,7 +618,7 @@ func (r *SpokeReconciler) getJoinedCondition(managedCluster *clusterv1.ManagedCl
 }
 
 // spokeNeedsUpgrade checks if the klusterlet on a Spoke cluster requires an upgrade
-func (r *SpokeReconciler) spokeNeedsUpgrade(ctx context.Context, spoke *v1beta1.Spoke, currKlusterletHash string, source v1beta1.OCMSource) (bool, error) {
+func (r *SpokeReconciler) spokeNeedsUpgrade(ctx context.Context, spoke *v1beta1.Spoke, currKlusterletHash string, source v1beta1.OCMSource, spokeKubeconfig []byte) (bool, error) {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("spokeNeedsUpgrade", "spokeClusterName", spoke.Name)
 
@@ -626,11 +641,7 @@ func (r *SpokeReconciler) spokeNeedsUpgrade(ctx context.Context, spoke *v1beta1.
 		return true, nil
 	}
 
-	kubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, spoke.Spec.Kubeconfig)
-	if err != nil {
-		return false, err
-	}
-	operatorC, err := common.OperatorClient(kubeconfig)
+	operatorC, err := common.OperatorClient(spokeKubeconfig)
 	if err != nil {
 		return false, err
 	}
@@ -668,7 +679,7 @@ func (r *SpokeReconciler) spokeNeedsUpgrade(ctx context.Context, spoke *v1beta1.
 }
 
 // upgradeSpoke upgrades the Spoke cluster's klusterlet
-func (r *SpokeReconciler) upgradeSpoke(ctx context.Context, spoke *v1beta1.Spoke, klusterletValues *v1beta1.KlusterletChartConfig, source v1beta1.OCMSource) error {
+func (r *SpokeReconciler) upgradeSpoke(ctx context.Context, spoke *v1beta1.Spoke, klusterletValues *v1beta1.KlusterletChartConfig, source v1beta1.OCMSource, spokeKubeconfig []byte) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("upgradeSpoke", "spoke", spoke.Name)
 
@@ -688,7 +699,7 @@ func (r *SpokeReconciler) upgradeSpoke(ctx context.Context, spoke *v1beta1.Spoke
 	}
 	upgradeArgs = append(upgradeArgs, valuesArgs...)
 
-	upgradeArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, r.Client, spoke.Spec.Kubeconfig, upgradeArgs)
+	upgradeArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, r.Client, spokeKubeconfig, spoke.Spec.Kubeconfig.Context, upgradeArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -713,7 +724,7 @@ func (r *SpokeReconciler) upgradeSpoke(ctx context.Context, spoke *v1beta1.Spoke
 }
 
 // unjoinSpoke unjoins a spoke from the hub
-func (r *SpokeReconciler) unjoinSpoke(ctx context.Context, spoke *v1beta1.Spoke) error {
+func (r *SpokeReconciler) unjoinSpoke(ctx context.Context, spoke *v1beta1.Spoke, spokeKubeconfig []byte) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("unjoinSpoke", "spoke", spoke.Name)
 
@@ -723,7 +734,7 @@ func (r *SpokeReconciler) unjoinSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 		fmt.Sprintf("--purge-operator=%t", spoke.Spec.Klusterlet.PurgeOperator),
 	}, spoke.BaseArgs()...)
 
-	unjoinArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, r.Client, spoke.Spec.Kubeconfig, unjoinArgs)
+	unjoinArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, r.Client, spokeKubeconfig, spoke.Spec.Kubeconfig.Context, unjoinArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -745,18 +756,18 @@ func (r *SpokeReconciler) unjoinSpoke(ctx context.Context, spoke *v1beta1.Spoke)
 }
 
 // getToken gets a join token from the Hub cluster via 'clusteradm get token'
-func getToken(ctx context.Context, kClient client.Client, hub *v1beta1.Hub) (*tokenMeta, error) {
+func getToken(ctx context.Context, kClient client.Client, hubMeta hubMeta) (*tokenMeta, error) {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("getToken")
 
 	tokenArgs := append([]string{
 		"get", "token", "--output=json",
-	}, hub.BaseArgs()...)
+	}, hubMeta.hub.BaseArgs()...)
 
-	if hub.Spec.ClusterManager != nil {
-		tokenArgs = append(tokenArgs, fmt.Sprintf("--use-bootstrap-token=%t", hub.Spec.ClusterManager.UseBootstrapToken))
+	if hubMeta.hub.Spec.ClusterManager != nil {
+		tokenArgs = append(tokenArgs, fmt.Sprintf("--use-bootstrap-token=%t", hubMeta.hub.Spec.ClusterManager.UseBootstrapToken))
 	}
-	tokenArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, hub.Spec.Kubeconfig, tokenArgs)
+	tokenArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, hubMeta.kubeconfig, hubMeta.hub.Spec.Kubeconfig.Context, tokenArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -781,23 +792,24 @@ func getToken(ctx context.Context, kClient client.Client, hub *v1beta1.Hub) (*to
 	return tokenMeta, nil
 }
 
-func (r *SpokeReconciler) getHubMeta(ctx context.Context, hubRef v1beta1.HubRef) (*v1beta1.Hub, []byte, error) {
+func (r *SpokeReconciler) getHubMeta(ctx context.Context, hubRef v1beta1.HubRef) (hubMeta, error) {
 	hub := &v1beta1.Hub{}
-	var hubKubeconfig []byte
+	hubMeta := hubMeta{}
 	nn := types.NamespacedName{Name: hubRef.Name, Namespace: hubRef.Namespace}
 
 	// get Hub using local client
 	err := r.Get(ctx, nn, hub)
 	if err != nil {
-		return nil, nil, client.IgnoreNotFound(err)
+		return hubMeta, client.IgnoreNotFound(err)
 	}
+	hubMeta.hub = hub
 	// if found, load the hub's kubeconfig
-	hubKubeconfig, err = kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig)
+	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig, hub.Namespace)
 	if err != nil {
-		return hub, nil, err
+		return hubMeta, err
 	}
-	return hub, hubKubeconfig, nil
-
+	hubMeta.kubeconfig = hubKubeconfig
+	return hubMeta, nil
 }
 
 func (r *SpokeReconciler) mergeKlusterletValues(ctx context.Context, spoke *v1beta1.Spoke) (*v1beta1.KlusterletChartConfig, error) {

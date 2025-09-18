@@ -94,19 +94,15 @@ func UpdateManagedCluster(ctx context.Context, client *clusterapi.Clientset, man
 
 // PrepareKubeconfig parses a kubeconfig spec and returns updated clusteradm args.
 // The '--kubeconfig' flag is added and a cleanup function is returned to remove the temp kubeconfig file.
-func PrepareKubeconfig(ctx context.Context, kClient client.Client, kubeconfig kube.Kubeconfig, args []string) ([]string, func(), error) {
+func PrepareKubeconfig(ctx context.Context, kClient client.Client, rawKubeconfig []byte, context string, args []string) ([]string, func(), error) {
 	logger := log.FromContext(ctx)
 
-	raw, err := kube.KubeconfigFromSecretOrCluster(ctx, kClient, kubeconfig)
-	if err != nil {
-		return args, nil, err
-	}
-	kubeconfigPath, cleanup, err := file.TmpFile(raw, "kubeconfig")
+	kubeconfigPath, cleanup, err := file.TmpFile(rawKubeconfig, "kubeconfig")
 	if err != nil {
 		return args, cleanup, err
 	}
-	if kubeconfig.GetContext() != "" {
-		args = append(args, "--context", kubeconfig.GetContext())
+	if context != "" {
+		args = append(args, "--context", context)
 	}
 
 	logger.V(1).Info("Using kubeconfig", "path", kubeconfigPath)
@@ -133,16 +129,4 @@ func PrepareResources(resources ResourceSpec) []string {
 		}
 	}
 	return flags
-}
-
-// ResourceSpec defines an interface for specifying resource requirements for managed clusters.
-type ResourceSpec interface {
-	GetQosClass() string
-	GetRequests() ResourceValues
-	GetLimits() ResourceValues
-}
-
-// ResourceValues defines an interface for representing resource values such as CPU and memory.
-type ResourceValues interface {
-	String() string
 }

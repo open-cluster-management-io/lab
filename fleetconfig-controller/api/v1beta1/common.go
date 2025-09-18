@@ -5,10 +5,6 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-
-	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
-	"github.com/open-cluster-management-io/lab/fleetconfig-controller/pkg/common"
 )
 
 // Kubeconfig is the configuration for a kubeconfig.
@@ -30,52 +26,17 @@ type Kubeconfig struct {
 	Context string `json:"context,omitempty"`
 }
 
-// IsInCluster returns true if the kubeconfig should be loaded from the in-cluster configuration.
-func (k Kubeconfig) IsInCluster() bool {
-	return k.InCluster
-}
-
-// GetSecretReference returns the SecretReference used to locate the kubeconfig secret.
-func (k Kubeconfig) GetSecretReference() kube.SecretReference {
-	return k.SecretReference
-}
-
-// GetContext returns the context to use from the kubeconfig file.
-func (k Kubeconfig) GetContext() string {
-	return k.Context
-}
-
-// SecretReference describes how to retrieve a kubeconfig stored as a secret
+// SecretReference describes how to retrieve a kubeconfig stored as a secret in the same namespace as the resource.
 type SecretReference struct {
 	// The name of the secret.
 	// +required
 	Name string `json:"name"`
-
-	// The namespace the secret is in.
-	// +required
-	Namespace string `json:"namespace"`
 
 	// The map key to access the kubeconfig. Defaults to 'kubeconfig'.
 	// +kubebuilder:default:="kubeconfig"
 	// +optional
 	KubeconfigKey string `json:"kubeconfigKey,omitempty"`
 }
-
-// GetNamespacedName returns the NamespacedName for the SecretReference.
-func (s *SecretReference) GetNamespacedName() types.NamespacedName {
-	return types.NamespacedName{
-		Name:      s.Name,
-		Namespace: s.Namespace,
-	}
-}
-
-// GetKubeconfigKey returns the key used to access the kubeconfig in the secret.
-func (s *SecretReference) GetKubeconfigKey() string {
-	return s.KubeconfigKey
-}
-
-var _ kube.Kubeconfig = &Kubeconfig{}
-var _ kube.SecretReference = &SecretReference{}
 
 // OCMSource is the configuration for an OCM source.
 type OCMSource struct {
@@ -109,21 +70,6 @@ type ResourceSpec struct {
 	QosClass string `json:"qosClass,omitempty"`
 }
 
-// GetQosClass returns the resource QoS class for all containers managed by the Cluster Manager or Klusterlet operators.
-func (s ResourceSpec) GetQosClass() string {
-	return s.QosClass
-}
-
-// GetLimits returns the resource limits for all containers managed by the Cluster Manager or Klusterlet operators.
-func (s ResourceSpec) GetLimits() common.ResourceValues {
-	return s.Limits
-}
-
-// GetRequests returns the resource requests for all containers managed by the Cluster Manager or Klusterlet operators.
-func (s ResourceSpec) GetRequests() common.ResourceValues {
-	return s.Requests
-}
-
 // ResourceValues detail container resource constraints.
 type ResourceValues struct {
 	// The number of CPU units to request, e.g., '800m'.
@@ -146,9 +92,6 @@ func (r *ResourceValues) String() string {
 	}
 	return ""
 }
-
-var _ common.ResourceSpec = &ResourceSpec{}
-var _ common.ResourceValues = &ResourceValues{}
 
 // NewCondition returns a new v1beta1.Condition.
 func NewCondition(msg, cType string, status, wantStatus metav1.ConditionStatus) Condition {

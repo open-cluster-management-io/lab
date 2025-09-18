@@ -34,7 +34,7 @@ func handleHub(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetCon
 	logger.V(0).Info("handleHub", "fleetconfig", fc.Name)
 
 	// check if the hub is already initialized
-	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, kClient, fc.Spec.Hub.Kubeconfig)
+	hubKubeconfig, err := kube.KubeconfigFromNamespacedSecretOrCluster(ctx, kClient, fc.Spec.Hub.Kubeconfig)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func handleHub(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetCon
 			return errors.New(msg)
 		}
 	} else {
-		if err := initializeHub(ctx, kClient, fc); err != nil {
+		if err := initializeHub(ctx, kClient, fc, hubKubeconfig); err != nil {
 			return err
 		}
 	}
@@ -122,7 +122,7 @@ func handleHub(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetCon
 }
 
 // initializeHub initializes the Hub cluster via 'clusteradm init'
-func initializeHub(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetConfig) error {
+func initializeHub(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetConfig, hubKubeconfig []byte) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("initHub", "fleetconfig", fc.Name)
 
@@ -187,7 +187,7 @@ func initializeHub(ctx context.Context, kClient client.Client, fc *v1alpha1.Flee
 		return fmt.Errorf("unknown hub type, must specify either hub.clusterManager or hub.singletonControlPlane")
 	}
 
-	initArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, fc.Spec.Hub.Kubeconfig, initArgs)
+	initArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, hubKubeconfig, fc.Spec.Hub.Kubeconfig.Context, initArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}

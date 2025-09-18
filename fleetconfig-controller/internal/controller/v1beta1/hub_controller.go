@@ -97,6 +97,11 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 	}
 
+	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig, hub.Namespace)
+	if err != nil {
+		return ret(ctx, ctrl.Result{}, err)
+	}
+
 	// Handle deletion logic with finalizer
 	if !hub.DeletionTimestamp.IsZero() {
 		if hub.Status.Phase != v1beta1.Deleting {
@@ -105,7 +110,7 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		}
 
 		if slices.Contains(hub.Finalizers, v1beta1.HubCleanupFinalizer) {
-			if err := r.cleanHub(ctx, hub); err != nil {
+			if err := r.cleanHub(ctx, hub, hubKubeconfig); err != nil {
 				hub.SetConditions(true, v1beta1.NewCondition(
 					err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
 				))
@@ -141,7 +146,7 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 
 	// Handle Hub cluster: initialization and/or upgrade
-	if err := r.handleHub(ctx, hub); err != nil {
+	if err := r.handleHub(ctx, hub, hubKubeconfig); err != nil {
 		logger.Error(err, "Failed to handle hub operations")
 		hub.Status.Phase = v1beta1.Unhealthy
 	}
@@ -177,16 +182,13 @@ func withOriginalHub(ctx context.Context, hub *v1beta1.Hub) context.Context {
 }
 
 // cleanup cleans up a Hub and its associated resources.
-func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub) error {
+func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub, hubKubeconfig []byte) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("cleanHub", "hub", hub.Name)
-	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig)
-	if err != nil {
-		return err
-	}
+
 	// Check if there are any Spokes that need to be deleted
 	spokeList := &v1beta1.SpokeList{}
-	err = r.List(ctx, spokeList)
+	err := r.List(ctx, spokeList)
 	if err != nil {
 		return err
 	}
@@ -256,15 +258,10 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub) error {
 }
 
 // handleHub manages Hub cluster init and upgrade operations
-func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub) error {
+func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub, hubKubeconfig []byte) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("handleHub", "hub", hub.Name)
 
-	// check if the hub is already initialized
-	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig)
-	if err != nil {
-		return err
-	}
 	operatorC, err := common.OperatorClient(hubKubeconfig)
 	if err != nil {
 		return err
@@ -304,7 +301,7 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub) error {
 			return errors.New(msg)
 		}
 	} else {
-		if err := r.initializeHub(ctx, hub); err != nil {
+		if err := r.initializeHub(ctx, hub, hubKubeconfig); err != nil {
 			return err
 		}
 	}
@@ -350,7 +347,7 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub) error {
 }
 
 // initializeHub initializes the Hub cluster via 'clusteradm init'
-func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub) error {
+func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub, hubKubeconfig []byte) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("initHub", "hub", hub.Name)
 
@@ -415,7 +412,7 @@ func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub) err
 		return fmt.Errorf("unknown hub type, must specify either hub.clusterManager or hub.singletonControlPlane")
 	}
 
-	initArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, r.Client, hub.Spec.Kubeconfig, initArgs)
+	initArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, r.Client, hubKubeconfig, hub.Spec.Kubeconfig.Context, initArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}

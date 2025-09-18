@@ -184,7 +184,7 @@ func ret(ctx context.Context, res ctrl.Result, err error) (ctrl.Result, error) {
 
 // cleanup cleans up a FleetConfig and its associated resources.
 func (r *FleetConfigReconciler) cleanup(ctx context.Context, fc *v1alpha1.FleetConfig) error {
-	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, fc.Spec.Hub.Kubeconfig)
+	hubKubeconfig, err := kube.KubeconfigFromNamespacedSecretOrCluster(ctx, r.Client, fc.Spec.Hub.Kubeconfig)
 	if err != nil {
 		return err
 	}
