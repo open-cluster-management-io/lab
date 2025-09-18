@@ -40,35 +40,7 @@ var hublog = logf.Log.WithName("hub-resource")
 func SetupHubWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&v1beta1.Hub{}).
 		WithValidator(&HubCustomValidator{client: mgr.GetClient()}).
-		WithDefaulter(&HubCustomDefaulter{}).
 		Complete()
-}
-
-// +kubebuilder:webhook:path=/mutate-fleetconfig-open-cluster-management-io-v1beta1-hub,mutating=true,failurePolicy=fail,sideEffects=None,groups=fleetconfig.open-cluster-management.io,resources=hubs,verbs=create;update,versions=v1beta1,name=mhub-v1beta1.kb.io,admissionReviewVersions=v1
-
-// HubCustomDefaulter struct is responsible for setting default values on the custom resource of the
-// Kind Hub when those are created or updated.
-//
-// NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
-// as it is used only for temporary operations and does not need to be deeply copied.
-type HubCustomDefaulter struct {
-	// TODO(user): Add more fields as needed for defaulting
-}
-
-var _ webhook.CustomDefaulter = &HubCustomDefaulter{}
-
-// Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Hub.
-func (d *HubCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
-	hub, ok := obj.(*v1beta1.Hub)
-
-	if !ok {
-		return fmt.Errorf("expected an Hub object but got %T", obj)
-	}
-	hublog.Info("Defaulting for Hub", "name", hub.GetName())
-
-	// TODO(user): fill in your defaulting logic.
-
-	return nil
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.

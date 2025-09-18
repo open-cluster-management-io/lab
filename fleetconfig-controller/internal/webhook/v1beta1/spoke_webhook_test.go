@@ -42,10 +42,6 @@ var _ = Describe("Spoke Webhook", func() {
 		Expect(obj).NotTo(BeNil(), "Expected obj to be initialized")
 	})
 
-	AfterEach(func() {
-		// TODO (user): Add any teardown logic common to all tests
-	})
-
 	Context("When creating Spoke under Defaulting Webhook", func() {
 		It("Should apply defaults from Hub when fields are empty", func() {
 			By("setting up a Spoke with HubRef")
@@ -53,13 +49,12 @@ var _ = Describe("Spoke Webhook", func() {
 				Name:      "test-hub",
 				Namespace: "default",
 			}
-			obj.Spec.Timeout = 0      // Should be defaulted from Hub
-			obj.Spec.LogVerbosity = 0 // Should be defaulted from Hub
+			obj.Spec.Timeout = 0
+			obj.Spec.LogVerbosity = 0
 
 			By("calling the Default method")
 			err := defaulter.Default(ctx, obj)
-			// Note: This will fail in unit tests since Hub doesn't exist in k8sClient
-			// but shows the defaulting logic works
+
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -70,14 +65,13 @@ var _ = Describe("Spoke Webhook", func() {
 			obj.ObjectMeta.Name = "test-spoke"
 			obj.ObjectMeta.Namespace = "default"
 			obj.Spec.HubRef = v1beta1.HubRef{
-				Name:      "hub", // Use the standard Hub resource name
+				Name:      "hub",
 				Namespace: "default",
 			}
 			obj.Spec.Kubeconfig = v1beta1.Kubeconfig{
 				InCluster: true,
 			}
 			obj.Spec.Klusterlet.Mode = "Default"
-			// Don't set AddOns to avoid validation issues in unit tests
 
 			By("validating the creation")
 			warnings, err := validator.ValidateCreate(ctx, obj)

@@ -29,7 +29,6 @@ var _ = Describe("Hub Webhook", func() {
 		obj       *v1beta1.Hub
 		oldObj    *v1beta1.Hub
 		validator HubCustomValidator
-		defaulter HubCustomDefaulter
 	)
 
 	BeforeEach(func() {
@@ -37,24 +36,8 @@ var _ = Describe("Hub Webhook", func() {
 		oldObj = &v1beta1.Hub{}
 		validator = HubCustomValidator{client: k8sClient}
 		Expect(validator).NotTo(BeNil(), "Expected validator to be initialized")
-		defaulter = HubCustomDefaulter{}
-		Expect(defaulter).NotTo(BeNil(), "Expected defaulter to be initialized")
 		Expect(oldObj).NotTo(BeNil(), "Expected oldObj to be initialized")
 		Expect(obj).NotTo(BeNil(), "Expected obj to be initialized")
-	})
-
-	AfterEach(func() {
-		// TODO (user): Add any teardown logic common to all tests
-	})
-
-	Context("When creating Hub under Defaulting Webhook", func() {
-		It("Should apply defaults when fields are empty", func() {
-			By("simulating a scenario where defaults should be applied")
-			// Currently no defaulting logic implemented in Hub webhook
-			By("calling the Default method")
-			err := defaulter.Default(ctx, obj)
-			Expect(err).NotTo(HaveOccurred())
-		})
 	})
 
 	Context("When creating Hub under Validating Webhook", func() {
@@ -92,7 +75,6 @@ var _ = Describe("Hub Webhook", func() {
 
 	Context("When updating Hub under Validating Webhook", func() {
 		BeforeEach(func() {
-			// Set up valid old and new objects
 			oldObj.ObjectMeta.Name = "hub"
 			oldObj.ObjectMeta.Namespace = "default"
 			oldObj.Spec.Kubeconfig = v1beta1.Kubeconfig{
