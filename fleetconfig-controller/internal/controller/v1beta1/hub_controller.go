@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/args"
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
@@ -406,13 +407,13 @@ func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub, hub
 		initArgs = append(initArgs, "--bundle-version", hub.Spec.ClusterManager.Source.BundleVersion)
 		initArgs = append(initArgs, "--image-registry", hub.Spec.ClusterManager.Source.Registry)
 		// resources args
-		initArgs = append(initArgs, common.PrepareResources(hub.Spec.ClusterManager.Resources)...)
+		initArgs = append(initArgs, args.PrepareResources(hub.Spec.ClusterManager.Resources)...)
 	} else {
 		// one of clusterManager or singletonControlPlane must be specified, per validating webhook, but handle the edge case anyway
 		return fmt.Errorf("unknown hub type, must specify either hub.clusterManager or hub.singletonControlPlane")
 	}
 
-	initArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, r.Client, hubKubeconfig, hub.Spec.Kubeconfig.Context, initArgs)
+	initArgs, cleanupKcfg, err := args.PrepareKubeconfig(ctx, hubKubeconfig, hub.Spec.Kubeconfig.Context, initArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}

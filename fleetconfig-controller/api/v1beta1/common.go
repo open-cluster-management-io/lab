@@ -5,6 +5,8 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/args"
 )
 
 // Kubeconfig is the configuration for a kubeconfig.
@@ -92,6 +94,33 @@ func (r *ResourceValues) String() string {
 	}
 	return ""
 }
+
+// GetRequests returns the resource requests.
+func (r ResourceSpec) GetRequests() args.ResourceValues {
+	if r.Requests == nil {
+		return &ResourceValues{}
+	}
+	return r.Requests
+}
+
+// GetLimits returns the resource limits.
+func (r ResourceSpec) GetLimits() args.ResourceValues {
+	if r.Limits == nil {
+		return &ResourceValues{}
+	}
+	return r.Limits
+}
+
+// GetQosClass returns the QoS class.
+func (r ResourceSpec) GetQosClass() string {
+	return r.QosClass
+}
+
+// Ensure ResourceSpec implements args.ResourceSpec interface
+var _ args.ResourceSpec = (*ResourceSpec)(nil)
+
+// Ensure ResourceValues implements args.ResourceValues interface
+var _ args.ResourceValues = (*ResourceValues)(nil)
 
 // NewCondition returns a new v1beta1.Condition.
 func NewCondition(msg, cType string, status, wantStatus metav1.ConditionStatus) Condition {

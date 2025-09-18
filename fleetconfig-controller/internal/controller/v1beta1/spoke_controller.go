@@ -51,6 +51,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/args"
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/hash"
@@ -447,7 +448,7 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 		return errors.New("hub does not have initialized condition")
 	}
 
-	tokenMeta, err := getToken(ctx, r.Client, hubMeta)
+	tokenMeta, err := getToken(ctx, hubMeta)
 	if err != nil {
 		return fmt.Errorf("failed to get join token: %w", err)
 	}
@@ -474,7 +475,7 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 	}
 
 	// resources args
-	joinArgs = append(joinArgs, common.PrepareResources(spoke.Spec.Klusterlet.Resources)...)
+	joinArgs = append(joinArgs, args.PrepareResources(spoke.Spec.Klusterlet.Resources)...)
 
 	// Use hub API server from spec if provided and not forced to use internal endpoint,
 	// otherwise fall back to the hub API server from the tokenMeta
@@ -551,7 +552,7 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 	}
 	joinArgs = append(joinArgs, valuesArgs...)
 
-	joinArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, r.Client, spokeKubeconfig, spoke.Spec.Kubeconfig.Context, joinArgs)
+	joinArgs, cleanupKcfg, err := args.PrepareKubeconfig(ctx, spokeKubeconfig, spoke.Spec.Kubeconfig.Context, joinArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -699,7 +700,7 @@ func (r *SpokeReconciler) upgradeSpoke(ctx context.Context, spoke *v1beta1.Spoke
 	}
 	upgradeArgs = append(upgradeArgs, valuesArgs...)
 
-	upgradeArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, r.Client, spokeKubeconfig, spoke.Spec.Kubeconfig.Context, upgradeArgs)
+	upgradeArgs, cleanupKcfg, err := args.PrepareKubeconfig(ctx, spokeKubeconfig, spoke.Spec.Kubeconfig.Context, upgradeArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -734,7 +735,7 @@ func (r *SpokeReconciler) unjoinSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 		fmt.Sprintf("--purge-operator=%t", spoke.Spec.Klusterlet.PurgeOperator),
 	}, spoke.BaseArgs()...)
 
-	unjoinArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, r.Client, spokeKubeconfig, spoke.Spec.Kubeconfig.Context, unjoinArgs)
+	unjoinArgs, cleanupKcfg, err := args.PrepareKubeconfig(ctx, spokeKubeconfig, spoke.Spec.Kubeconfig.Context, unjoinArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -756,7 +757,7 @@ func (r *SpokeReconciler) unjoinSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 }
 
 // getToken gets a join token from the Hub cluster via 'clusteradm get token'
-func getToken(ctx context.Context, kClient client.Client, hubMeta hubMeta) (*tokenMeta, error) {
+func getToken(ctx context.Context, hubMeta hubMeta) (*tokenMeta, error) {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("getToken")
 
@@ -767,7 +768,7 @@ func getToken(ctx context.Context, kClient client.Client, hubMeta hubMeta) (*tok
 	if hubMeta.hub.Spec.ClusterManager != nil {
 		tokenArgs = append(tokenArgs, fmt.Sprintf("--use-bootstrap-token=%t", hubMeta.hub.Spec.ClusterManager.UseBootstrapToken))
 	}
-	tokenArgs, cleanupKcfg, err := common.PrepareKubeconfig(ctx, kClient, hubMeta.kubeconfig, hubMeta.hub.Spec.Kubeconfig.Context, tokenArgs)
+	tokenArgs, cleanupKcfg, err := args.PrepareKubeconfig(ctx, hubMeta.kubeconfig, hubMeta.hub.Spec.Kubeconfig.Context, tokenArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}

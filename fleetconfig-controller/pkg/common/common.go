@@ -4,7 +4,6 @@ package common
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,10 +12,7 @@ import (
 	operatorapi "open-cluster-management.io/api/client/operator/clientset/versioned"
 	workapi "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
 )
 
@@ -90,43 +86,4 @@ func UpdateManagedCluster(ctx context.Context, client *clusterapi.Clientset, man
 		return fmt.Errorf("failed to update ManagedCluster %s: %w", managedCluster.Name, err)
 	}
 	return nil
-}
-
-// PrepareKubeconfig parses a kubeconfig spec and returns updated clusteradm args.
-// The '--kubeconfig' flag is added and a cleanup function is returned to remove the temp kubeconfig file.
-func PrepareKubeconfig(ctx context.Context, kClient client.Client, rawKubeconfig []byte, context string, args []string) ([]string, func(), error) {
-	logger := log.FromContext(ctx)
-
-	kubeconfigPath, cleanup, err := file.TmpFile(rawKubeconfig, "kubeconfig")
-	if err != nil {
-		return args, cleanup, err
-	}
-	if context != "" {
-		args = append(args, "--context", context)
-	}
-
-	logger.V(1).Info("Using kubeconfig", "path", kubeconfigPath)
-	args = append(args, "--kubeconfig", kubeconfigPath)
-	return args, cleanup, nil
-}
-
-// PrepareResources returns resource-related flags
-func PrepareResources(resources ResourceSpec) []string {
-	flags := []string{
-		"--resource-qos-class", resources.GetQosClass(),
-	}
-
-	if req := resources.GetRequests(); req != nil && !reflect.ValueOf(req).IsNil() {
-		requests := resources.GetRequests().String()
-		if requests != "" {
-			flags = append(flags, "--resource-requests", requests)
-		}
-	}
-	if lim := resources.GetLimits(); lim != nil && !reflect.ValueOf(lim).IsNil() {
-		limits := resources.GetLimits().String()
-		if limits != "" {
-			flags = append(flags, "--resource-limits", limits)
-		}
-	}
-	return flags
 }

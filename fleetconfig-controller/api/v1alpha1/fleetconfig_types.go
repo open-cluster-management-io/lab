@@ -26,6 +26,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
+
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/args"
 )
 
 // FleetConfigSpec defines the desired state of FleetConfig.
@@ -673,6 +675,33 @@ func (r *ResourceValues) String() string {
 	}
 	return ""
 }
+
+// GetRequests returns the resource requests.
+func (r ResourceSpec) GetRequests() args.ResourceValues {
+	if r.Requests == nil {
+		return &ResourceValues{}
+	}
+	return r.Requests
+}
+
+// GetLimits returns the resource limits.
+func (r ResourceSpec) GetLimits() args.ResourceValues {
+	if r.Limits == nil {
+		return &ResourceValues{}
+	}
+	return r.Limits
+}
+
+// GetQosClass returns the QoS class.
+func (r ResourceSpec) GetQosClass() string {
+	return r.QosClass
+}
+
+// Ensure ResourceSpec implements args.ResourceSpec interface
+var _ args.ResourceSpec = (*ResourceSpec)(nil)
+
+// Ensure ResourceValues implements args.ResourceValues interface
+var _ args.ResourceValues = (*ResourceValues)(nil)
 
 // RegistrationAuth provides specifications for registration authentication.
 type RegistrationAuth struct {
