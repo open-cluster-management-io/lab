@@ -939,8 +939,7 @@ func (r *SpokeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // to prevent unnecessary reconciles of Spokes
 func sharedFieldsChanged(oldSpec, newSpec *v1beta1.HubSpec) bool {
 	return !reflect.DeepEqual(oldSpec.RegistrationAuth, newSpec.RegistrationAuth) ||
-		!reflect.DeepEqual(oldSpec.ClusterManager.Source, newSpec.ClusterManager.Source) ||
-		oldSpec.Timeout != newSpec.Timeout || oldSpec.LogVerbosity != newSpec.LogVerbosity
+		!reflect.DeepEqual(oldSpec.ClusterManager.Source, newSpec.ClusterManager.Source)
 }
 
 func (r *SpokeReconciler) mapHubEventToSpoke(ctx context.Context, obj client.Object) []reconcile.Request {
