@@ -832,31 +832,38 @@ func (r *SpokeReconciler) getHubMeta(ctx context.Context, hubRef v1beta1.HubRef)
 func (r *SpokeReconciler) mergeKlusterletValues(ctx context.Context, spoke *v1beta1.Spoke) (*v1beta1.KlusterletChartConfig, error) {
 	logger := log.FromContext(ctx)
 
-	cm := &corev1.ConfigMap{}
-	nn := types.NamespacedName{Name: spoke.Spec.Klusterlet.ValuesFrom.Name, Namespace: r.PodNamespace}
-	err := r.Get(ctx, nn, cm)
-	if err != nil {
-		if kerrs.IsNotFound(err) {
-			// cm not found, return spec's values
-			logger.V(1).Info("warning: Klusterlet values ConfigMap not found", "spoke", spoke.Name, "configMap", nn)
+	if spoke.Spec.Klusterlet.ValuesFrom == nil && spoke.Spec.Klusterlet.Values == nil {
+		logger.V(3).Info("no values or valuesFrom provided. Using default klusterlet chart values", "spoke", spoke.Name)
+		return nil, nil
+	}
+
+	var fromInterface = map[string]any{}
+	var specInterface = map[string]any{}
+
+	if spoke.Spec.Klusterlet.ValuesFrom != nil {
+		cm := &corev1.ConfigMap{}
+		nn := types.NamespacedName{Name: spoke.Spec.Klusterlet.ValuesFrom.Name, Namespace: r.PodNamespace}
+		err := r.Get(ctx, nn, cm)
+		if err != nil {
+			if kerrs.IsNotFound(err) {
+				// cm not found, return spec's values
+				logger.V(1).Info("warning: Klusterlet values ConfigMap not found", "spoke", spoke.Name, "configMap", nn)
+				return spoke.Spec.Klusterlet.Values, nil
+			}
+			return nil, fmt.Errorf("failed to retrieve Klusterlet values ConfigMap %s: %w", nn, err)
+		}
+		fromValues, ok := cm.Data[spoke.Spec.Klusterlet.ValuesFrom.Key]
+		if !ok {
+			logger.V(1).Info("warning: Klusterlet values ConfigMap not found", "spoke", spoke.Name, "configMap", nn, "key", spoke.Spec.Klusterlet.ValuesFrom.Key)
 			return spoke.Spec.Klusterlet.Values, nil
 		}
-		return nil, fmt.Errorf("failed to retrieve Klusterlet values ConfigMap %s: %w", nn, err)
+		fromBytes := []byte(fromValues)
+		err = yaml.Unmarshal(fromBytes, &fromInterface)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal YAML values from ConfigMap %s key %s: %w", nn, spoke.Spec.Klusterlet.ValuesFrom.Key, err)
+		}
 	}
 
-	fromValues, ok := cm.Data[spoke.Spec.Klusterlet.ValuesFrom.Key]
-	if !ok {
-		logger.V(1).Info("warning: Klusterlet values ConfigMap not found", "spoke", spoke.Name, "configMap", nn, "key", spoke.Spec.Klusterlet.ValuesFrom.Key)
-		return spoke.Spec.Klusterlet.Values, nil
-	}
-
-	fromBytes := []byte(fromValues)
-	var fromInterface = map[string]any{}
-	err = yaml.Unmarshal(fromBytes, &fromInterface)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal YAML values from ConfigMap %s key %s: %w", nn, spoke.Spec.Klusterlet.ValuesFrom.Key, err)
-	}
-	var specInterface = map[string]any{}
 	if spoke.Spec.Klusterlet.Values != nil {
 		specBytes, err := yaml.Marshal(spoke.Spec.Klusterlet.Values)
 		if err != nil {

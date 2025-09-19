@@ -21,6 +21,8 @@ fleetConfig:
     hubRef:
       name: hub
       namespace: fleetconfig-system
+    addOns:
+    - configName: test-addon
     createNamespace: true
     syncLabels: false
     kubeconfig:
