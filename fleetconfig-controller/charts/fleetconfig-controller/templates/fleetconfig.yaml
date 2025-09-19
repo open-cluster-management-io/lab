@@ -1,11 +1,13 @@
+{{- $releaseNamespace := .Release.Namespace }}
+{{- $spokeFeatureGates := .Values.fleetConfig.spokeFeatureGates }}
 {{- if index .Values "fleetConfig" "enabled" }}
-apiVersion: fleetconfig.open-cluster-management.io/v1alpha1
-kind: FleetConfig
+apiVersion: fleetconfig.open-cluster-management.io/v1beta1
+kind: Hub
 metadata:
   annotations:
     helm.sh/resource-policy: keep
   name: fleetconfig
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ $releaseNamespace }}
 spec:
   timeout: {{ .Values.fleetConfig.timeout }}
   logVerbosity: {{ .Values.fleetConfig.logVerbosity }}
@@ -22,86 +24,32 @@ spec:
       {{- end }}
     {{- end }}
   {{- end }}
-  hub:
-    {{- if (.Values.fleetConfig.hub.clusterManager | default dict).enabled }}
-    clusterManager:
-      featureGates: {{ include "featureGates" (dict "dict" .Values.fleetConfig.hub.clusterManager.featureGates) | quote }}
-      purgeOperator: {{ .Values.fleetConfig.hub.clusterManager.purgeOperator }}
-      resources: {{- include "deepClean" .Values.fleetConfig.hub.clusterManager.resources | nindent 8 }}
-      source:
-        bundleVersion: {{ .Values.fleetConfig.source.bundleVersion }}
-        registry: {{ .Values.fleetConfig.source.registry }}
+  {{- if (.Values.fleetConfig.hub.clusterManager | default dict).enabled }}
+  clusterManager:
+    featureGates: {{ include "featureGates" (dict "dict" .Values.fleetConfig.hub.clusterManager.featureGates) | quote }}
+    purgeOperator: {{ .Values.fleetConfig.hub.clusterManager.purgeOperator }}
+    resources: {{- include "deepClean" .Values.fleetConfig.hub.clusterManager.resources | nindent 6 }}
+    source:
+      bundleVersion: {{ .Values.fleetConfig.source.bundleVersion }}
+      registry: {{ .Values.fleetConfig.source.registry }}
+  {{- end }}
+  {{- if (.Values.fleetConfig.hub.singletonControlPlane | default dict).enabled }}
+  {{- $scp := omit .Values.fleetConfig.hub.singletonControlPlane "enabled" -}}
+  singleton: {{- toYaml $scp | nindent 6 }}
+  {{- end }}
+  createNamespace: {{ .Values.fleetConfig.hub.createNamespace }}
+  force: {{ .Values.fleetConfig.hub.force }}
+  {{- with .Values.fleetConfig.hub.kubeconfig }}
+  kubeconfig:
+    context: {{ .context | quote }}
+    inCluster: {{ .inCluster }}
+    {{- if and .secretReference (not (empty .secretReference.name)) }}
+    secretReference: {{ toYaml .secretReference | nindent 6 }}
     {{- end }}
-    {{- if (.Values.fleetConfig.hub.singletonControlPlane | default dict).enabled }}
-    {{- $scp := omit .Values.fleetConfig.hub.singletonControlPlane "enabled" -}}
-    singleton: {{- toYaml $scp | nindent 6 }}
-    {{- end }}
-    createNamespace: {{ .Values.fleetConfig.hub.createNamespace }}
-    force: {{ .Values.fleetConfig.hub.force }}
-    {{- with .Values.fleetConfig.hub.kubeconfig }}
-    kubeconfig:
-      context: {{ .context | quote }}
-      inCluster: {{ .inCluster }}
-      {{- if and .secretReference (not (empty .secretReference.name)) }}
-      secretReference: {{ toYaml .secretReference | nindent 8 }}
-      {{- end }}
-    {{- end }}
-    apiServer: {{ .Values.fleetConfig.hub.apiServer | quote }}
-    ca: {{ .Values.fleetConfig.hub.ca | quote }}
-  spokes:
-    {{- $spokeFeatureGates := .Values.fleetConfig.spokeFeatureGates }}
-    {{- range .Values.fleetConfig.spokes }}
-    - name: {{ .name }}
-      createNamespace: {{ .createNamespace }}
-      syncLabels: {{ .syncLabels }}
-      {{- with .kubeconfig }}
-      kubeconfig:
-        context: {{ .context | quote }}
-        inCluster: {{ .inCluster }}
-        {{- if and .secretReference (not (empty .secretReference.name)) }}
-        secretReference: {{ toYaml .secretReference | nindent 10 }}
-        {{- end }}
-      {{- end }}
-      proxyCa: {{ .proxyCa | quote }}
-      proxyUrl: {{ .proxyUrl | quote }}
-      {{- if .clusterARN }}
-      clusterARN: {{ .clusterARN | quote }}
-      {{- end }}
-      klusterlet:
-        {{- if and .klusterlet.annotations $.Values.fleetConfig.spokeAnnotations }}
-        annotations: {{- toYaml (merge .klusterlet.annotations $.Values.fleetConfig.spokeAnnotations) | nindent 10 }}
-        {{- else if .klusterlet.annotations }}
-        annotations: {{- toYaml .klusterlet.annotations | nindent 10 }}
-        {{- else if $.Values.fleetConfig.spokeAnnotations }}
-        annotations: {{- toYaml $.Values.fleetConfig.spokeAnnotations | nindent 10 }}
-        {{- end }}
-        mode: {{ .klusterlet.mode | quote }}
-        purgeOperator: {{ .klusterlet.purgeOperator }}
-        featureGates: {{ include "featureGates" (dict "dict" $spokeFeatureGates) | quote }}
-        forceInternalEndpointLookup: {{ .klusterlet.forceInternalEndpointLookup }}
-        forceInternalEndpointLookupManaged: {{ .klusterlet.forceInternalEndpointLookupManaged }}
-        singleton: {{ .klusterlet.singleton }}
-        {{- $mck := .klusterlet.managedClusterKubeconfig -}}
-        {{- if or $mck.context $mck.inCluster (and $mck.secretReference (not (empty $mck.secretReference.name))) }}
-        managedClusterKubeconfig:
-          context: {{ $mck.context | quote }}
-          inCluster: {{ $mck.inCluster }}
-          {{- if and $mck.secretReference (not (empty $mck.secretReference.name)) }}
-          secretReference: {{ toYaml $mck.secretReference | nindent 12 }}
-          {{- end }}
-        {{- end }}
-        resources: {{- include "deepClean" .klusterlet.resources | nindent 10 }}
-        source:
-          bundleVersion: {{ $.Values.fleetConfig.source.bundleVersion }}
-          registry: {{ $.Values.fleetConfig.source.registry }}
-        {{- if .klusterlet.values }}
-        values: {{- toYaml .klusterlet.values | nindent 10 }}
-        {{- end }}
-      {{- if .addOns }}
-      addOns: {{- toYaml .addOns | nindent 8 }}
-      {{- end }}
-    {{- end }}
-  {{- if .Values.fleetConfig.hub.addOnConfigs }}
+  {{- end }}
+  apiServer: {{ .Values.fleetConfig.hub.apiServer | quote }}
+  ca: {{ .Values.fleetConfig.hub.ca | quote }}
+    {{- if .Values.fleetConfig.hub.addOnConfigs }}
   addOnConfigs:
   {{- range .Values.fleetConfig.hub.addOnConfigs }}
   - name: {{ .name }}
@@ -112,4 +60,71 @@ spec:
   {{- end }}
   {{- end }}
   hubAddOns: {{- toYaml .Values.fleetConfig.hub.hubAddOns | nindent 4 }}
+---
+{{- range .Values.fleetConfig.spokes }}
+{{- $hubNamespace := $releaseNamespace -}}
+{{- if .hubRef.namespace }}
+{{- $hubNamespace = .hubRef.namespace -}}
+{{- end -}}
+apiVersion: fleetconfig.open-cluster-management.io/v1beta1
+kind: Spoke
+metadata:
+  annotations:
+    helm.sh/resource-policy: keep
+  name: fleetconfig
+  namespace: {{ $releaseNamespace }}    
+spec:
+  hubRef:
+    name: {{ .hubRef.name }}
+    namespace: {{ $hubNamespace }}
+  createNamespace: {{ .createNamespace }}
+  syncLabels: {{ .syncLabels }}
+  {{- with .kubeconfig }}
+  kubeconfig:
+    context: {{ .context | quote }}
+    inCluster: {{ .inCluster }}
+    {{- if and .secretReference (not (empty .secretReference.name)) }}
+    secretReference: {{ toYaml .secretReference | nindent 6 }}
+    {{- end }}
+  {{- end }}
+  proxyCa: {{ .proxyCa | quote }}
+  proxyUrl: {{ .proxyUrl | quote }}
+  {{- if .clusterARN }}
+  clusterARN: {{ .clusterARN | quote }}
+  {{- end }}
+  klusterlet:
+    {{- if and .klusterlet.annotations $.Values.fleetConfig.spokeAnnotations }}
+    annotations: {{- toYaml (merge .klusterlet.annotations $.Values.fleetConfig.spokeAnnotations) | nindent 6 }}
+    {{- else if .klusterlet.annotations }}
+    annotations: {{- toYaml .klusterlet.annotations | nindent 6 }}
+    {{- else if $.Values.fleetConfig.spokeAnnotations }}
+    annotations: {{- toYaml $.Values.fleetConfig.spokeAnnotations | nindent 6 }}
+    {{- end }}
+    mode: {{ .klusterlet.mode | quote }}
+    purgeOperator: {{ .klusterlet.purgeOperator }}
+    featureGates: {{ include "featureGates" (dict "dict" $spokeFeatureGates) | quote }}
+    forceInternalEndpointLookup: {{ .klusterlet.forceInternalEndpointLookup }}
+    forceInternalEndpointLookupManaged: {{ .klusterlet.forceInternalEndpointLookupManaged }}
+    singleton: {{ .klusterlet.singleton }}
+    {{- $mck := .klusterlet.managedClusterKubeconfig -}}
+    {{- if or $mck.context $mck.inCluster (and $mck.secretReference (not (empty $mck.secretReference.name))) }}
+    managedClusterKubeconfig:
+      context: {{ $mck.context | quote }}
+      inCluster: {{ $mck.inCluster }}
+      {{- if and $mck.secretReference (not (empty $mck.secretReference.name)) }}
+      secretReference: {{ toYaml $mck.secretReference | nindent 8 }}
+      {{- end }}
+    {{- end }}
+    resources: {{- include "deepClean" .klusterlet.resources | nindent 6 }}
+    {{- if .klusterlet.values }}
+    values: {{- toYaml .klusterlet.values | nindent 6 }}
+    {{- end }}
+    {{- if .klusterlet.valuesFrom }}
+    valuesFrom: {{- toYaml .klusterlet.valuesFrom | nindent 6 }}
+    {{- end }}
+  {{- if .addOns }}
+  addOns: {{- toYaml .addOns | nindent 4 }}
+  {{- end }}
+---
+{{- end }}
 {{- end }}

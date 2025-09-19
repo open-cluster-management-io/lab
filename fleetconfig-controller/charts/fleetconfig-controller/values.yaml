@@ -5,10 +5,10 @@
 ## @section FleetConfig Configuration
 
 ## @descriptionStart
-## Configuration for the FleetConfig resource created on the Hub. By default, bootstraps the Hub cluster in hub-as-spoke mode.
+## Configuration for the FleetConfig resources (Hub and Spoke) created on the Hub. By default, bootstraps the Hub cluster in hub-as-spoke mode.
 ## @descriptionEnd
 fleetConfig:
-  ## @param fleetConfig.enabled Whether to create a FleetConfig resource.
+  ## @param fleetConfig.enabled Whether to create a FleetConfig resources.
   enabled: true
   ## @param fleetConfig.timeout Timeout in seconds for all clusteradm operations, including init, accept, join, upgrade, etc.
   timeout: 300
@@ -204,6 +204,9 @@ fleetConfig:
   ## @param fleetConfig.spokes[0].klusterlet.singleton If true, deploy klusterlet in singleton mode, with registration and work agents running in a single pod. This is an alpha stage flag.
   spokes:
   - name: hub-as-spoke
+    hubRef:
+      name: hub
+      namespace: ""
     createNamespace: true
     syncLabels: false
     clusterARN: ""
@@ -262,6 +265,9 @@ topologyResources:
   enabled: true
 
 ## @section fleetconfig-controller parameters
+
+## @param spokeConcurrentReconciles Maximum number of Spoke resources that will be reconciled at the same time.
+spokeConcurrentReconciles: 5
 
 ## @param kubernetesProvider Kubernetes provider of the cluster that fleetconfig-controller will be installed on. Valid values are "Generic", "EKS", "GKE-Ingress".
 kubernetesProvider: "Generic"
