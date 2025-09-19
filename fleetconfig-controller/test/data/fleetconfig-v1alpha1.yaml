@@ -1,0 +1,71 @@
+apiVersion: fleetconfig.openclustermanagement.io/v1alpha1
+kind: FleetConfig
+metadata:
+  name: fleetconfig
+  namespace: fleetconfig-system
+spec:
+  timeout: 300
+  logVerbosity: 5
+  spokeAnnotations:
+    foo: "not-bar"
+    baz: "quux"
+  hub:
+    clusterManager:
+      featureGates: DefaultClusterSet=true,ManifestWorkReplicaSet=true,ResourceCleanup=true
+      purgeOperator: true
+      resources:
+        qosClass: Default
+      source:
+        bundleVersion: v1.0.0
+        registry: quay.io/open-cluster-management
+    createNamespace: true
+    force: false
+    kubeconfig:
+      inCluster: true
+      context: ""
+    registrationAuth:
+      driver: csr
+    timeout: 120
+    logVerbosity: 3
+  spokes:
+  - name: hub-as-spoke
+    createNamespace: true
+    syncLabels: false
+    kubeconfig:
+      inCluster: true
+    klusterlet:
+      mode: "Default"
+      purgeOperator: true
+      forceInternalEndpointLookup: true
+      forceInternalEndpointLookupManaged: false
+      singleton: false
+  - name: spoke
+    addOns:
+    - configName: test-addon
+    createNamespace: true
+    syncLabels: false
+    kubeconfig:
+      # secret is provisioned during E2E test setup
+      secretReference:
+        name: "test-fleetconfig-kubeconfig"
+        namespace: "fleetconfig-system"
+        kubeconfigKey: "value"
+    klusterlet:
+      annotations:
+        foo: "bar"
+      mode: "Default"
+      purgeOperator: true
+      forceInternalEndpointLookup: true
+      forceInternalEndpointLookupManaged: false
+      singleton: false
+  addOnConfigs:
+  - name: test-addon
+    version: "v1.0.0"
+    manifests: |
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: test-addon
+    clusterRoleBinding: ""
+    hubRegistration: false
+    overwrite: false

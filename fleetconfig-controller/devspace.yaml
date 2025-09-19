@@ -14,6 +14,20 @@ vars:
   PROVIDER:
     value: "production" # production (generic), eks, gke
   DEVSPACE_ENV_FILE: './hack/.versions.env'
+  FLEETCONFIG_ENABLED:
+    value: true
+
+profiles:
+  - name: v1alpha1
+    patches:
+      - path: values.fleetConfig.enabled
+        op: replace
+        value: false
+  - name: v1beta1
+    patches:
+      - path: values.fleetConfig.enabled
+        op: replace
+        value: true
 
 pipelines:
   dev: |-
@@ -87,8 +101,6 @@ deployments:
       chart:
         name: ${CONTEXT}/charts/fleetconfig-controller
       values:
-        fleetConfig:
-          enabled: false
         devspaceEnabled: true
       valuesFiles:
       - ${CONTEXT}/charts/fleetconfig-controller/values.yaml

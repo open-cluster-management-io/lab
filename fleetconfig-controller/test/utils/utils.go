@@ -75,7 +75,7 @@ func WarnError(err error, format string, a ...any) {
 }
 
 // DevspaceRunPipeline runs a devspace pipeline
-func DevspaceRunPipeline(ctx context.Context, kubeconfig, pipeline, namespace string) error {
+func DevspaceRunPipeline(ctx context.Context, kubeconfig, pipeline, namespace, profile string) error {
 	projDir, err := GetProjectDir()
 	if err != nil {
 		return fmt.Errorf("failed to get project directory: %v", err)
@@ -85,6 +85,7 @@ func DevspaceRunPipeline(ctx context.Context, kubeconfig, pipeline, namespace st
 		"devspace", "run-pipeline", pipeline,
 		"--kubeconfig", kubeconfig,
 		"--namespace", namespace,
+		"--profile", profile,
 		"--no-warn", "--force-build",
 		// "--debug",
 	)

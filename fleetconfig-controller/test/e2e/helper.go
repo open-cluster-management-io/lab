@@ -535,3 +535,40 @@ func ensureHubAndSpokesProvisioned(tc *E2EContext, hub *v1beta1.Hub, spokes []*v
 		return nil
 	}, 20*time.Minute, 10*time.Second).Should(Succeed())
 }
+
+func deployV1alpha1FleetConfig(tc *E2EContext) error {
+	projectDir, err := utils.GetProjectDir()
+	if err != nil {
+		return fmt.Errorf("failed to get project dir: %w", err)
+	}
+
+	fcPath := filepath.Join(projectDir, "test", "data", "fleetconfig-v1alpha1.yaml")
+	fcBytes, err := os.ReadFile(fcPath)
+	if err != nil {
+		return fmt.Errorf("failed to read fleetconfig-v1alpha1.yaml: %w", err)
+	}
+
+	var fleetConfig v1alpha1.FleetConfig
+	if err := yaml.Unmarshal(fcBytes, &fleetConfig); err != nil {
+		return fmt.Errorf("failed to unmarshal fleetconfig-v1alpha1.yaml: %w", err)
+	}
+
+	// Apply the FleetConfig using the controller-runtime client
+	if err := tc.kClient.Create(tc.ctx, &fleetConfig); err != nil {
+		// If already exists, try to update
+		if kerrs.IsAlreadyExists(err) {
+			existing := &v1alpha1.FleetConfig{}
+			getErr := tc.kClient.Get(tc.ctx, v1alpha1fleetConfigNN, existing)
+			if getErr != nil {
+				return fmt.Errorf("failed to get existing FleetConfig: %w", getErr)
+			}
+			fleetConfig.ResourceVersion = existing.ResourceVersion
+			if err := tc.kClient.Update(tc.ctx, &fleetConfig); err != nil {
+				return fmt.Errorf("failed to update FleetConfig: %w", err)
+			}
+			return nil
+		}
+		return fmt.Errorf("failed to create FleetConfig: %w", err)
+	}
+	return nil
+}

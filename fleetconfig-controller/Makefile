@@ -117,6 +117,7 @@ test-unit: manifests generate fmt vet envtest ## Run unit tests.
 		-coverprofile=$(COVER_DIR)/unit/cover.out \
 		$(shell go list ./... | grep -v '/test/e2e')
 
+LABEL_FILTER ?= v1beta1
 .PHONY: test-e2e
 test-e2e: kind kubectl ginkgo support-bundle ## Run e2e tests in the top-level test directory.
 	@mkdir -p $(COVER_DIR)/e2e
@@ -125,7 +126,7 @@ test-e2e: kind kubectl ginkgo support-bundle ## Run e2e tests in the top-level t
 	$(GINKGO) run -vv \
 		--cover \
 		--coverpkg=./... \
-		--label-filter="hub_spoke" \
+		--label-filter="$(LABEL_FILTER)" \
 		--output-dir=$(COVER_DIR)/e2e \
 		--timeout 20m \
 		./test/e2e/

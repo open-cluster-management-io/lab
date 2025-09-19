@@ -35,7 +35,7 @@ import (
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/test/utils"
 )
 
-var _ = Describe("hub and spoke", Label("hub_spoke"), Ordered, func() {
+var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 
 	var (
 		tc       *E2EContext
@@ -61,7 +61,7 @@ var _ = Describe("hub and spoke", Label("hub_spoke"), Ordered, func() {
 		tc = setupTestEnvironment()
 
 		By("deploying fleetconfig")
-		Expect(utils.DevspaceRunPipeline(tc.ctx, tc.hubKubeconfig, "deploy-local", fcNamespace)).To(Succeed())
+		Expect(utils.DevspaceRunPipeline(tc.ctx, tc.hubKubeconfig, "deploy-local", fcNamespace, "v1beta1")).To(Succeed())
 	})
 
 	AfterAll(func() {
