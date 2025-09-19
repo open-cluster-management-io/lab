@@ -125,7 +125,7 @@ test-e2e: kind kubectl ginkgo support-bundle ## Run e2e tests in the top-level t
 	$(GINKGO) run -vv \
 		--cover \
 		--coverpkg=./... \
-		--label-filter="fleetconfig" \
+		--label-filter="hub_spoke" \
 		--output-dir=$(COVER_DIR)/e2e \
 		--timeout 20m \
 		./test/e2e/

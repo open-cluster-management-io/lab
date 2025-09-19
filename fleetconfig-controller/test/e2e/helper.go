@@ -28,6 +28,7 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/pkg/common"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/test/utils"
 )
@@ -45,9 +46,16 @@ var (
 	// global test context variables
 	useExistingCluster bool
 
+	// v1alpha1 test variables
+	v1alpha1fleetConfigNN = ktypes.NamespacedName{Name: "fleetconfig", Namespace: fcNamespace}
+
+	// v1beta1 test variables
+	v1beta1hubNN        = ktypes.NamespacedName{Name: "hub", Namespace: fcNamespace}
+	v1beta1spokeNN      = ktypes.NamespacedName{Name: "spoke", Namespace: fcNamespace}
+	v1beta1hubAsSpokeNN = ktypes.NamespacedName{Name: "hub-as-spoke", Namespace: fcNamespace}
+
 	// global test variables
-	fleetConfigNN = ktypes.NamespacedName{Name: "fleetconfig", Namespace: fcNamespace}
-	klusterletNN  = ktypes.NamespacedName{Name: "klusterlet"}
+	klusterletNN = ktypes.NamespacedName{Name: "klusterlet"}
 
 	// addon vars
 	addonData = []struct {
@@ -140,6 +148,7 @@ func setupTestEnvironment() *E2EContext {
 
 	By("adding external APIs to the client-go scheme")
 	Expect(v1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(v1beta1.AddToScheme(scheme.Scheme)).To(Succeed())
 	Expect(clusterv1beta1.AddToScheme(scheme.Scheme)).To(Succeed())
 	Expect(clusterv1beta2.AddToScheme(scheme.Scheme)).To(Succeed())
 	Expect(operatorv1.AddToScheme(scheme.Scheme)).To(Succeed())
@@ -150,13 +159,18 @@ func setupTestEnvironment() *E2EContext {
 	tc.kClient, err = utils.NewClient(tc.hubKubeconfig, scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
+	By("creating fleetconfig namespace")
+	cmd = exec.Command("kubectl", "create", "ns", fcNamespace)
+	_, err = utils.RunCommand(cmd, "", false)
+	Expect(err).NotTo(HaveOccurred())
+
 	By("creating a kubeconfig secret for the spoke's internal kubeconfig")
 	kcfg, err := os.ReadFile(tc.spokeKubeconfigInternal) // #nosec G304
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      spokeSecretName,
-			Namespace: "default",
+			Namespace: "fleetconfig-system",
 		},
 		Data: map[string][]byte{
 			kubeconfigSecretKey: kcfg,
@@ -167,11 +181,6 @@ func setupTestEnvironment() *E2EContext {
 
 	By("creating a kubernetes client for the spoke cluster")
 	tc.kClientSpoke, err = utils.NewClient(tc.spokeKubeconfig, scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	By("creating fleetconfig namespace")
-	cmd = exec.Command("kubectl", "create", "ns", fcNamespace)
-	_, err = utils.RunCommand(cmd, "", false)
 	Expect(err).NotTo(HaveOccurred())
 
 	return tc
@@ -254,7 +263,7 @@ func ensureFleetConfigProvisioned(tc *E2EContext, fc *v1alpha1.FleetConfig, extr
 
 	By("ensuring the FleetConfig is provisioned")
 	EventuallyWithOffset(1, func() error {
-		if err := tc.kClient.Get(tc.ctx, fleetConfigNN, fc); err != nil {
+		if err := tc.kClient.Get(tc.ctx, v1alpha1fleetConfigNN, fc); err != nil {
 			utils.WarnError(err, "FleetConfig not provisioned")
 			return err
 		}
@@ -278,7 +287,7 @@ func ensureFleetConfigProvisioned(tc *E2EContext, fc *v1alpha1.FleetConfig, extr
 // removeSpokeFromHub removes the spoke from the FleetConfig
 func removeSpokeFromHub(tc *E2EContext, fc *v1alpha1.FleetConfig) {
 	By("removing the spoke")
-	if err := tc.kClient.Get(tc.ctx, fleetConfigNN, fc); err != nil {
+	if err := tc.kClient.Get(tc.ctx, v1alpha1fleetConfigNN, fc); err != nil {
 		utils.WarnError(err, "failed to get FleetConfig")
 		ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	}
@@ -402,37 +411,13 @@ func ensureAddonCreated(tc *E2EContext, addonIdx int) {
 	}, 2*time.Minute, 1*time.Second).Should(Succeed())
 }
 
-func updateAddon(tc *E2EContext, fc *v1alpha1.FleetConfig) {
+func updateFleetConfigAddon(tc *E2EContext, fc *v1alpha1.FleetConfig) {
 	By("creating a configmap containing the source manifests")
-	EventuallyWithOffset(1, func() error {
-		projDir, err := utils.GetProjectDir()
-		if err != nil {
-			return err
-		}
-		path := filepath.Join(projDir, "test", "data", "addon-2-cm.yaml")
-		cmYaml, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		cm := &corev1.ConfigMap{}
-		err = yaml.Unmarshal(cmYaml, cm)
-		if err != nil {
-			utils.WarnError(err, "failed to unmarshal configmap")
-			return err
-		}
-		cm.Namespace = fcNamespace
-		err = tc.kClient.Create(tc.ctx, cm)
-		if err != nil {
-			utils.WarnError(err, "failed to create configmap")
-			return err
-		}
-		return nil
-
-	}, 1*time.Minute, 1*time.Second).Should(Succeed())
+	EventuallyWithOffset(1, createAddOnConfigMap(tc), 1*time.Minute, 1*time.Second).Should(Succeed())
 
 	By("adding a new version of test-addon")
 	addon := addonData[1]
-	if err := tc.kClient.Get(tc.ctx, fleetConfigNN, fc); err != nil {
+	if err := tc.kClient.Get(tc.ctx, v1alpha1fleetConfigNN, fc); err != nil {
 		utils.WarnError(err, "failed to get FleetConfig")
 		ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	}
@@ -443,4 +428,110 @@ func updateAddon(tc *E2EContext, fc *v1alpha1.FleetConfig) {
 	})
 
 	ExpectWithOffset(1, tc.kClient.Update(tc.ctx, fc)).NotTo(HaveOccurred())
+}
+
+func updateHubAddon(tc *E2EContext, hub *v1beta1.Hub) {
+	By("creating a configmap containing the source manifests")
+	EventuallyWithOffset(1, createAddOnConfigMap(tc), 1*time.Minute, 1*time.Second).Should(Succeed())
+
+	By("adding a new version of test-addon")
+	addon := addonData[1]
+	if err := tc.kClient.Get(tc.ctx, v1beta1hubNN, hub); err != nil {
+		utils.WarnError(err, "failed to get FleetConfig")
+		ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	}
+	hub.Spec.AddOnConfigs = append(hub.Spec.AddOnConfigs, v1beta1.AddOnConfig{
+		Name:      addon.name,
+		Version:   addon.version,
+		Overwrite: true,
+	})
+
+	ExpectWithOffset(1, tc.kClient.Update(tc.ctx, hub)).NotTo(HaveOccurred())
+}
+
+func createAddOnConfigMap(tc *E2EContext) error {
+	projDir, err := utils.GetProjectDir()
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(projDir, "test", "data", "addon-2-cm.yaml")
+	cmYaml, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	cm := &corev1.ConfigMap{}
+	err = yaml.Unmarshal(cmYaml, cm)
+	if err != nil {
+		utils.WarnError(err, "failed to unmarshal configmap")
+		return err
+	}
+	cm.Namespace = fcNamespace
+	err = tc.kClient.Create(tc.ctx, cm)
+	if err != nil {
+		utils.WarnError(err, "failed to create configmap")
+		return err
+	}
+	return nil
+}
+
+// ensureHubAndSpokesProvisioned checks that the Hub and Spokes are properly provisioned with expected conditions
+func ensureHubAndSpokesProvisioned(tc *E2EContext, hub *v1beta1.Hub, spokes []*v1beta1.Spoke, extraExpectedConditions map[string]metav1.ConditionStatus) {
+	hubExpectedConditions := map[string]metav1.ConditionStatus{
+		"HubInitialized":   metav1.ConditionTrue,
+		"CleanupFailed":    metav1.ConditionFalse,
+		"AddonsConfigured": metav1.ConditionTrue,
+	}
+	spokeExpectedConditions := map[string]metav1.ConditionStatus{
+		"SpokeJoined":      metav1.ConditionTrue,
+		"CleanupFailed":    metav1.ConditionFalse,
+		"AddonsConfigured": metav1.ConditionTrue,
+	}
+	for k, v := range extraExpectedConditions {
+		hubExpectedConditions[k] = v
+		spokeExpectedConditions[k] = v
+	}
+
+	By("ensuring the Hub and Spokes are provisioned")
+	EventuallyWithOffset(1, func() error {
+		// Check Hub
+		if err := tc.kClient.Get(tc.ctx, v1beta1hubNN, hub); err != nil {
+			utils.WarnError(err, "Hub not provisioned")
+			return err
+		}
+		hubConditions := make([]metav1.Condition, len(hub.Status.Conditions))
+		for i, c := range hub.Status.Conditions {
+			hubConditions[i] = c.Condition
+		}
+		if err := utils.AssertConditions(hubConditions, hubExpectedConditions); err != nil {
+			utils.WarnError(err, "Hub not provisioned")
+			return err
+		}
+		if hub.Status.Phase != "Running" {
+			err := fmt.Errorf("expected %s, got %s", "Running", hub.Status.Phase)
+			utils.WarnError(err, "Hub not provisioned")
+			return err
+		}
+
+		// Check each Spoke
+		for _, spoke := range spokes {
+			if err := tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Name: spoke.Name, Namespace: spoke.Namespace}, spoke); err != nil {
+				utils.WarnError(err, "Spoke %s not provisioned", spoke.Name)
+				return err
+			}
+			spokeConditions := make([]metav1.Condition, len(spoke.Status.Conditions))
+			for i, c := range spoke.Status.Conditions {
+				spokeConditions[i] = c.Condition
+			}
+			if err := utils.AssertConditions(spokeConditions, spokeExpectedConditions); err != nil {
+				utils.WarnError(err, "Spoke %s not provisioned", spoke.Name)
+				return err
+			}
+			if spoke.Status.Phase != "Running" {
+				err := fmt.Errorf("expected %s, got %s", "Running", spoke.Status.Phase)
+				utils.WarnError(err, "Spoke %s not provisioned", spoke.Name)
+				return err
+			}
+		}
+		return nil
+	}, 20*time.Minute, 10*time.Second).Should(Succeed())
 }
