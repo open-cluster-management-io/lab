@@ -6,7 +6,7 @@ kind: Hub
 metadata:
   annotations:
     helm.sh/resource-policy: keep
-  name: fleetconfig
+  name: {{ .Values.fleetConfig.hub.name }}
   namespace: {{ $releaseNamespace }}
 spec:
   timeout: {{ .Values.fleetConfig.timeout }}
@@ -61,10 +61,6 @@ spec:
   {{- end }}
   hubAddOns: {{- toYaml .Values.fleetConfig.hub.hubAddOns | nindent 4 }}
 {{- range .Values.fleetConfig.spokes }}
-{{- $hubNamespace := $releaseNamespace -}}
-{{- if .hubRef.namespace }}
-{{- $hubNamespace = .hubRef.namespace -}}
-{{- end }}
 ---
 apiVersion: fleetconfig.open-cluster-management.io/v1beta1
 kind: Spoke
@@ -76,7 +72,7 @@ metadata:
 spec:
   hubRef:
     name: {{ .hubRef.name }}
-    namespace: {{ $hubNamespace }}
+    namespace: {{ $releaseNamespace }}
   createNamespace: {{ .createNamespace }}
   syncLabels: {{ .syncLabels }}
   {{- with .kubeconfig }}

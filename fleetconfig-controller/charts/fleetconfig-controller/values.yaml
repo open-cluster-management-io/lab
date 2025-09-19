@@ -60,6 +60,8 @@ fleetConfig:
     autoApprovedARNPatterns: []
   ## Configuration for the Hub cluster.
   hub:
+    ## @param fleetConfig.hub.name Name of the Hub resource which will manage the spoke cluster.
+    name: hub
     ## @param fleetConfig.hub.addOnConfigs Global add-on configuration for the hub cluster.
     addOnConfigs: []
     # - name: ""                # Name of the add-on.

@@ -18,6 +18,9 @@ fleetConfig:
       overwrite: false
   spokes:
   - name: hub-as-spoke
+    hubRef:
+      name: hub
+      namespace: fleetconfig-system
     createNamespace: true
     syncLabels: false
     kubeconfig:
@@ -29,6 +32,9 @@ fleetConfig:
       forceInternalEndpointLookupManaged: false
       singleton: false
   - name: spoke
+    hubRef:
+      name: hub
+      namespace: fleetconfig-system
     addOns:
     - configName: test-addon
     createNamespace: true
@@ -37,7 +43,6 @@ fleetConfig:
       # secret is provisioned during E2E test setup
       secretReference:
         name: "test-fleetconfig-kubeconfig"
-        namespace: "default"
         kubeconfigKey: "value"
     klusterlet:
       annotations:
