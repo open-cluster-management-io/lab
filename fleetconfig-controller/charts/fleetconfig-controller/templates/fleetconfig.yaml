@@ -1,6 +1,6 @@
+{{- if index .Values "fleetConfig" "enabled" }}
 {{- $releaseNamespace := .Release.Namespace }}
 {{- $spokeFeatureGates := .Values.fleetConfig.spokeFeatureGates }}
-{{- if index .Values "fleetConfig" "enabled" }}
 apiVersion: fleetconfig.open-cluster-management.io/v1beta1
 kind: Hub
 metadata:
@@ -60,18 +60,18 @@ spec:
   {{- end }}
   {{- end }}
   hubAddOns: {{- toYaml .Values.fleetConfig.hub.hubAddOns | nindent 4 }}
----
 {{- range .Values.fleetConfig.spokes }}
 {{- $hubNamespace := $releaseNamespace -}}
 {{- if .hubRef.namespace }}
 {{- $hubNamespace = .hubRef.namespace -}}
-{{- end -}}
+{{- end }}
+---
 apiVersion: fleetconfig.open-cluster-management.io/v1beta1
 kind: Spoke
 metadata:
   annotations:
     helm.sh/resource-policy: keep
-  name: fleetconfig
+  name: {{ .name }}
   namespace: {{ $releaseNamespace }}    
 spec:
   hubRef:
@@ -125,6 +125,5 @@ spec:
   {{- if .addOns }}
   addOns: {{- toYaml .addOns | nindent 4 }}
   {{- end }}
----
 {{- end }}
 {{- end }}

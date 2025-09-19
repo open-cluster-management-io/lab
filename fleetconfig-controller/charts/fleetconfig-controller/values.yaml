@@ -176,6 +176,8 @@ fleetConfig:
         setString: []
   ## Configuration for Spoke clusters.
   ## @param fleetConfig.spokes[0].name Name of the spoke cluster.
+  ## @param fleetConfig.spokes[0].hubRef.name Name of the Hub resource which will manage the spoke cluster.
+  ## @param fleetConfig.spokes[0].hubRef.namespace Namespace of the Hub resource which will manage the spoke cluster.
   ## @param fleetConfig.spokes[0].createNamespace If true, create open-cluster-management namespace and agent namespace (open-cluster-management-agent for Default mode, <klusterlet-name> for Hosted mode), otherwise use existing one. Do not edit this name if you are using the default hub-as-spoke mode.
   ## @param fleetConfig.spokes[0].syncLabels If true, sync the labels from klusterlet to all agent resources.
   ## @param fleetConfig.spokes[0].clusterARN The ARN of the spoke cluster. This is only required if configuring an EKS FleetConfig. Example: "arn:aws:eks:us-west-2:<SPOKE_AWS_ACCOUNT_ID>:cluster/<SPOKE_CLUSTER_NAME>".
