@@ -17,15 +17,16 @@ vars:
   FLEETCONFIG_ENABLED:
     value: true
 
+# profiles are used to set the fleetconfig-controller values for the different versions of the fleetconfig-controller API
 profiles:
   - name: v1alpha1
     patches:
-      - path: values.fleetConfig.enabled
+      - path: vars.FLEETCONFIG_ENABLED.value
         op: replace
         value: false
   - name: v1beta1
     patches:
-      - path: values.fleetConfig.enabled
+      - path: vars.FLEETCONFIG_ENABLED.value
         op: replace
         value: true
 
@@ -110,6 +111,8 @@ deployments:
       chart:
         name: ${CONTEXT}/charts/fleetconfig-controller
       values:
+        fleetConfig:
+          enabled: ${FLEETCONFIG_ENABLED}
         image:
           repository: ${IMAGE_REPOSITORY}-local
           tag: local

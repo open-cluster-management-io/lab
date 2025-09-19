@@ -1,9 +1,6 @@
 fleetConfig:
   timeout: 300
   logVerbosity: 5
-  spokeAnnotations:
-    foo: "not-bar"
-    baz: "quux"
   hub:
     addOnConfigs:
     - name: test-addon
@@ -28,6 +25,9 @@ fleetConfig:
     kubeconfig:
       inCluster: true
     klusterlet:
+      annotations:
+        foo: "not-bar"
+        baz: "quux"
       mode: "Default"
       purgeOperator: true
       forceInternalEndpointLookup: true
@@ -48,6 +48,7 @@ fleetConfig:
         kubeconfigKey: "value"
     klusterlet:
       annotations:
+        baz: "quux"
         foo: "bar"
       mode: "Default"
       purgeOperator: true

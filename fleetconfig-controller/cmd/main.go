@@ -140,7 +140,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	podNamespace := os.Getenv("POD_NAMESPACE")
 	if err = (&controllerv1alpha1.FleetConfigReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("FleetConfig"),
@@ -151,10 +150,9 @@ func main() {
 	}
 
 	if err := (&controllerv1beta1.HubReconciler{
-		Client:       mgr.GetClient(),
-		Log:          ctrl.Log.WithName("controllers").WithName("Hub"),
-		PodNamespace: podNamespace,
-		Scheme:       mgr.GetScheme(),
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("Hub"),
+		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Hub")
 		os.Exit(1)
@@ -164,7 +162,6 @@ func main() {
 		Client:               mgr.GetClient(),
 		Log:                  ctrl.Log.WithName("controllers").WithName("Spoke"),
 		ConcurrentReconciles: spokeConcurrentReconciles,
-		PodNamespace:         podNamespace,
 		Scheme:               mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Spoke")

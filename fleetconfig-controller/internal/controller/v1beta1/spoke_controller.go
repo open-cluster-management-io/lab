@@ -66,7 +66,6 @@ type SpokeReconciler struct {
 	Log                  logr.Logger
 	Scheme               *runtime.Scheme
 	ConcurrentReconciles int
-	PodNamespace         string
 }
 
 // +kubebuilder:rbac:groups=fleetconfig.open-cluster-management.io,resources=spokes,verbs=get;list;watch;create;update;patch;delete
@@ -842,7 +841,7 @@ func (r *SpokeReconciler) mergeKlusterletValues(ctx context.Context, spoke *v1be
 
 	if spoke.Spec.Klusterlet.ValuesFrom != nil {
 		cm := &corev1.ConfigMap{}
-		nn := types.NamespacedName{Name: spoke.Spec.Klusterlet.ValuesFrom.Name, Namespace: r.PodNamespace}
+		nn := types.NamespacedName{Name: spoke.Spec.Klusterlet.ValuesFrom.Name, Namespace: spoke.Namespace}
 		err := r.Get(ctx, nn, cm)
 		if err != nil {
 			if kerrs.IsNotFound(err) {

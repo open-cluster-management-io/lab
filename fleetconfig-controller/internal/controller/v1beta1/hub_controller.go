@@ -54,9 +54,8 @@ import (
 // HubReconciler reconciles a Hub object
 type HubReconciler struct {
 	client.Client
-	Log          logr.Logger
-	PodNamespace string
-	Scheme       *runtime.Scheme
+	Log    logr.Logger
+	Scheme *runtime.Scheme
 }
 
 // +kubebuilder:rbac:groups=fleetconfig.open-cluster-management.io,resources=hubs,verbs=get;list;watch;create;update;patch;delete
@@ -226,7 +225,7 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub, hubKubec
 	hubCopy := hub.DeepCopy()
 	hubCopy.Spec.AddOnConfigs = nil
 	hubCopy.Spec.HubAddOns = nil
-	_, err = handleAddonConfig(ctx, r.Client, addonC, hubCopy, r.PodNamespace)
+	_, err = handleAddonConfig(ctx, r.Client, addonC, hubCopy)
 	if err != nil {
 		return err
 	}
@@ -311,7 +310,7 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub, hubKube
 		v1beta1.HubInitialized, v1beta1.HubInitialized, metav1.ConditionTrue, metav1.ConditionTrue,
 	))
 
-	addonConfigChanged, err := handleAddonConfig(ctx, r.Client, addonC, hub, r.PodNamespace)
+	addonConfigChanged, err := handleAddonConfig(ctx, r.Client, addonC, hub)
 	if err != nil && addonConfigChanged {
 		hub.SetConditions(true, v1beta1.NewCondition(
 			err.Error(), v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionTrue,

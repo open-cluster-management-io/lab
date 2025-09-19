@@ -82,7 +82,7 @@ func getHubAddOns(ctx context.Context, addonC *addonapi.Clientset) ([]string, er
 	return hubAddons, nil
 }
 
-func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addonapi.Clientset, hub *v1beta1.Hub, ctrlNamespace string) (bool, error) {
+func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addonapi.Clientset, hub *v1beta1.Hub) (bool, error) {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("handleAddOnConfig")
 
@@ -134,7 +134,7 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 		return true, err
 	}
 
-	err = handleAddonCreate(ctx, kClient, hub, addonsToCreate, ctrlNamespace)
+	err = handleAddonCreate(ctx, kClient, hub, addonsToCreate)
 	if err != nil {
 		return true, err
 	}
@@ -142,7 +142,7 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 	return true, nil
 }
 
-func handleAddonCreate(ctx context.Context, kClient client.Client, hub *v1beta1.Hub, addons []v1beta1.AddOnConfig, ctrlNamespace string) error {
+func handleAddonCreate(ctx context.Context, kClient client.Client, hub *v1beta1.Hub, addons []v1beta1.AddOnConfig) error {
 	if len(addons) == 0 {
 		return nil
 	}
@@ -155,7 +155,7 @@ func handleAddonCreate(ctx context.Context, kClient client.Client, hub *v1beta1.
 		// look up manifests CM for the addon
 		cm := corev1.ConfigMap{}
 		cmName := fmt.Sprintf("%s-%s-%s", v1beta1.AddonConfigMapNamePrefix, a.Name, a.Version)
-		err := kClient.Get(ctx, types.NamespacedName{Name: cmName, Namespace: ctrlNamespace}, &cm)
+		err := kClient.Get(ctx, types.NamespacedName{Name: cmName, Namespace: hub.Namespace}, &cm)
 		if err != nil {
 			return errors.Wrapf(err, "could not load configuration for add-on %s version %s", a.Name, a.Version)
 		}

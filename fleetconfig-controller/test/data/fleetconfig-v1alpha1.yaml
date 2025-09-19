@@ -53,6 +53,7 @@ spec:
     klusterlet:
       annotations:
         foo: "bar"
+        baz: "quux"
       mode: "Default"
       purgeOperator: true
       forceInternalEndpointLookup: true
