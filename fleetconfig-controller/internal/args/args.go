@@ -30,20 +30,25 @@ func PrepareKubeconfig(ctx context.Context, rawKubeconfig []byte, context string
 
 // PrepareResources returns resource-related flags
 func PrepareResources(resources ResourceSpec) []string {
-	flags := []string{
-		"--resource-qos-class", resources.GetQosClass(),
+	qos := resources.GetQosClass()
+	if qos == "" {
+		qos = "Default"
 	}
-
-	if req := resources.GetRequests(); req != nil && !reflect.ValueOf(req).IsNil() {
-		requests := resources.GetRequests().String()
-		if requests != "" {
-			flags = append(flags, "--resource-requests", requests)
+	flags := []string{"--resource-qos-class", qos}
+	if req := resources.GetRequests(); req != nil {
+		rv := reflect.ValueOf(req)
+		if rv.Kind() != reflect.Ptr || !rv.IsNil() {
+			if s := req.String(); s != "" {
+				flags = append(flags, "--resource-requests", s)
+			}
 		}
 	}
-	if lim := resources.GetLimits(); lim != nil && !reflect.ValueOf(lim).IsNil() {
-		limits := resources.GetLimits().String()
-		if limits != "" {
-			flags = append(flags, "--resource-limits", limits)
+	if lim := resources.GetLimits(); lim != nil {
+		rv := reflect.ValueOf(lim)
+		if rv.Kind() != reflect.Ptr || !rv.IsNil() {
+			if s := lim.String(); s != "" {
+				flags = append(flags, "--resource-limits", s)
+			}
 		}
 	}
 	return flags

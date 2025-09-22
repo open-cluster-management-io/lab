@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -39,6 +40,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	fleetconfigopenclustermanagementiov1beta1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/test"
 	// +kubebuilder:scaffold:imports
 )
@@ -47,13 +50,14 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	ctx        context.Context
-	cancel     context.CancelFunc
-	k8sClient  client.Client
-	cfg        *rest.Config
-	testEnv    *envtest.Environment
-	testConfig *test.Config
-	err        error
+	ctx               context.Context
+	cancel            context.CancelFunc
+	k8sClient         client.Client
+	cfg               *rest.Config
+	testEnv           *envtest.Environment
+	testConfig        *test.Config
+	err               error
+	kubeconfigCleanup func()
 )
 
 func TestAPIs(t *testing.T) {
@@ -119,6 +123,16 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
+	// Generate, save, and configure kubeconfig so in-cluster client lookups succeed
+	var kubeconfigPath string
+	raw, err := kube.RawFromRestConfig(cfg)
+	Expect(err).ShouldNot(HaveOccurred())
+	kubeconfigPath, kubeconfigCleanup, err = file.TmpFile(raw, "kubeconfig")
+	Expect(err).ShouldNot(HaveOccurred())
+
+	Expect(os.Setenv("KUBECONFIG", kubeconfigPath)).To(Succeed())
+	logf.Log.Info("Kubeconfig", "path", kubeconfigPath)
+
 	err = SetupSpokeWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -151,4 +165,5 @@ var _ = AfterSuite(func() {
 	cancel()
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
+	kubeconfigCleanup()
 })
