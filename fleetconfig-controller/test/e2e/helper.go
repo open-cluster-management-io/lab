@@ -160,9 +160,9 @@ func setupTestEnvironment() *E2EContext {
 	Expect(err).NotTo(HaveOccurred())
 
 	By("creating fleetconfig namespace")
-	cmd = exec.Command("kubectl", "create", "ns", fcNamespace)
-	_, err = utils.RunCommand(cmd, "", false)
-	Expect(err).NotTo(HaveOccurred())
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: fcNamespace}}
+	err = tc.kClient.Create(tc.ctx, ns)
+	Expect(client.IgnoreAlreadyExists(err)).NotTo(HaveOccurred())
 
 	By("creating a kubeconfig secret for the spoke's internal kubeconfig")
 	kcfg, err := os.ReadFile(tc.spokeKubeconfigInternal) // #nosec G304
@@ -413,7 +413,7 @@ func ensureAddonCreated(tc *E2EContext, addonIdx int) {
 
 func updateFleetConfigAddon(tc *E2EContext, fc *v1alpha1.FleetConfig) {
 	By("creating a configmap containing the source manifests")
-	EventuallyWithOffset(1, createAddOnConfigMap(tc), 1*time.Minute, 1*time.Second).Should(Succeed())
+	EventuallyWithOffset(1, func() error { return createAddOnConfigMap(tc) }, 1*time.Minute, 1*time.Second).Should(Succeed())
 
 	By("adding a new version of test-addon")
 	addon := addonData[1]
@@ -432,7 +432,7 @@ func updateFleetConfigAddon(tc *E2EContext, fc *v1alpha1.FleetConfig) {
 
 func updateHubAddon(tc *E2EContext, hub *v1beta1.Hub) {
 	By("creating a configmap containing the source manifests")
-	EventuallyWithOffset(1, createAddOnConfigMap(tc), 1*time.Minute, 1*time.Second).Should(Succeed())
+	EventuallyWithOffset(1, func() error { return createAddOnConfigMap(tc) }, 1*time.Minute, 1*time.Second).Should(Succeed())
 
 	By("adding a new version of test-addon")
 	addon := addonData[1]
@@ -467,7 +467,7 @@ func createAddOnConfigMap(tc *E2EContext) error {
 	}
 	cm.Namespace = fcNamespace
 	err = tc.kClient.Create(tc.ctx, cm)
-	if err != nil {
+	if err != nil && !kerrs.IsNotFound(err) {
 		utils.WarnError(err, "failed to create configmap")
 		return err
 	}
