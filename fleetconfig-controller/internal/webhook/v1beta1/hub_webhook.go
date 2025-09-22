@@ -92,6 +92,11 @@ func (v *HubCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Obj
 		)
 	}
 
+	if hub.Spec.ClusterManager != nil && hub.Spec.SingletonControlPlane != nil {
+		allErrs = append(allErrs, field.Invalid(
+			field.NewPath("hub"), hub.Spec, "only one of hub.clusterManager or hub.singletonControlPlane may be specified"),
+		)
+	}
 	allErrs = append(allErrs, validateHubAddons(ctx, v.client, nil, hub, v.addonC)...)
 
 	if len(allErrs) > 0 {
