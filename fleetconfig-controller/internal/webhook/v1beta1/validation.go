@@ -86,7 +86,7 @@ func allowHubUpdate(oldHub, newHub *v1beta1.Hub) error {
 		newHubCopy.Kubeconfig = v1beta1.Kubeconfig{}
 
 		if !reflect.DeepEqual(oldHubCopy, newHubCopy) {
-			return errors.New("only changes to hub.spec.clusterManager.source.*, hub.spec.hubAddOns, hub.spec.addOnConfigs, hub.spec.logVerbosity, hub.spec.timeout, and hub.spec.registrationAuth are allowed when updating the hub")
+			return errors.New("only changes to spec.apiServer, spec.clusterManager.source.*, spec.hubAddOns, spec.addOnConfigs, spec.logVerbosity, spec.timeout, and spec.registrationAuth are allowed when updating the hub")
 		}
 	}
 	return nil
@@ -118,7 +118,7 @@ func allowSpokeUpdate(oldSpoke, newSpoke *v1beta1.Spoke) error {
 		newSpokeCopy.Timeout = 0
 
 		if !reflect.DeepEqual(oldSpokeCopy, newSpokeCopy) {
-			return errors.New("spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.source.*, spec.klusterlet.values, spec.kubeconfig, and spec.addOns are allowed when updating a spoke")
+			return errors.New("spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.source.*, spec.klusterlet.values, spec.kubeconfig, spec.addOns, spec.timeout, and spec.logVerbosity are allowed when updating a spoke")
 		}
 	}
 
