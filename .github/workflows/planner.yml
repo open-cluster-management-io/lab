@@ -1,9 +1,8 @@
 name: Planner
 
 on:
-  pull_request:
   pull_request_target:
-    types: [unlabeled]
+    types: [opened, labeled, unlabeled, reopened, synchronize, ready_for_review]
   workflow_dispatch:
 
 concurrency:
