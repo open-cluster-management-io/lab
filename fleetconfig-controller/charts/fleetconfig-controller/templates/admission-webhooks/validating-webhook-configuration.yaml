@@ -39,6 +39,7 @@ webhooks:
 - admissionReviewVersions:
   - v1
   clientConfig:
+    caBundle: Cg==
     service:
       name: {{ template "chart.fullname" . }}-webhook
       namespace: {{ .Release.Namespace }}
@@ -64,6 +65,7 @@ webhooks:
 - admissionReviewVersions:
   - v1
   clientConfig:
+    caBundle: Cg==
     service:
       name: {{ template "chart.fullname" . }}-webhook
       namespace: {{ .Release.Namespace }}

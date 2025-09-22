@@ -118,7 +118,7 @@ func allowSpokeUpdate(oldSpoke, newSpoke *v1beta1.Spoke) error {
 		newSpokeCopy.Timeout = 0
 
 		if !reflect.DeepEqual(oldSpokeCopy, newSpokeCopy) {
-			return errors.New("spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.source.*, spec.klusterlet.values, spec.kubeconfig, spec.addOns, spec.timeout, and spec.logVerbosity are allowed when updating a spoke")
+			return errors.New("spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.values, spec.kubeconfig, spec.addOns, spec.timeout, and spec.logVerbosity are allowed when updating a spoke")
 		}
 	}
 

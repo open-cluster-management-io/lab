@@ -96,8 +96,11 @@ jobs:
     name: extract-label-filter
     needs: generate-matrix
     runs-on: ubuntu-latest
+    outputs:
+      ginkgoLabelFilter: ${{ steps.extract-label-filter.outputs.ginkgoLabelFilter }}
     steps:
     - name: Extract label filter
+      id: extract-label-filter
       run: |
         set -e
         # Find labels that start with 'ginkgo-filter:'
