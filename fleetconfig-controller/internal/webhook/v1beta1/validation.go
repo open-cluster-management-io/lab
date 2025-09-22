@@ -14,8 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
-	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"open-cluster-management.io/api/client/addon/clientset/versioned"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -127,7 +126,7 @@ func allowSpokeUpdate(oldSpoke, newSpoke *v1beta1.Spoke) error {
 
 // validateHubAddons checks that each addOnConfig specifies a valid source of manifests
 // and validates uniqueness constraints between HubAddOns and AddOnConfigs
-func validateHubAddons(ctx context.Context, cli client.Client, oldObject, newObject *v1beta1.Hub) field.ErrorList {
+func validateHubAddons(ctx context.Context, cli client.Client, oldObject, newObject *v1beta1.Hub, addonC *versioned.Clientset) field.ErrorList {
 	errs := field.ErrorList{}
 
 	// Validate uniqueness and cross-references
@@ -138,7 +137,7 @@ func validateHubAddons(ctx context.Context, cli client.Client, oldObject, newObj
 
 	// Validate removal constraints
 	if oldObject != nil {
-		errs = append(errs, validateAddonRemovalConstraints(ctx, oldObject, newObject)...)
+		errs = append(errs, validateAddonRemovalConstraints(ctx, oldObject, newObject, addonC)...)
 	}
 
 	return errs
@@ -247,13 +246,13 @@ func validateManifestURL(index int, addon v1beta1.AddOnConfig, manifestsURL stri
 }
 
 // validateAddonRemovalConstraints validates that removed addons are not still in use
-func validateAddonRemovalConstraints(ctx context.Context, oldObject, newObject *v1beta1.Hub) field.ErrorList {
+func validateAddonRemovalConstraints(ctx context.Context, oldObject, newObject *v1beta1.Hub, addonC *versioned.Clientset) field.ErrorList {
 	errs := field.ErrorList{}
 
 	// Check AddOnConfigs removal constraints
 	removedAddOnConfigs := getRemovedAddOnConfigs(oldObject, newObject)
 	if len(removedAddOnConfigs) > 0 {
-		if removalErrs := validateAddonNotInUse(ctx, removedAddOnConfigs, "addOnConfigs"); len(removalErrs) > 0 {
+		if removalErrs := validateAddonNotInUse(ctx, removedAddOnConfigs, "addOnConfigs", addonC); len(removalErrs) > 0 {
 			errs = append(errs, removalErrs...)
 		}
 	}
@@ -261,7 +260,7 @@ func validateAddonRemovalConstraints(ctx context.Context, oldObject, newObject *
 	// Check HubAddOns removal constraints
 	removedHubAddOns := getRemovedHubAddOns(oldObject, newObject)
 	if len(removedHubAddOns) > 0 {
-		if removalErrs := validateAddonNotInUse(ctx, removedHubAddOns, "hubAddOns"); len(removalErrs) > 0 {
+		if removalErrs := validateAddonNotInUse(ctx, removedHubAddOns, "hubAddOns", addonC); len(removalErrs) > 0 {
 			errs = append(errs, removalErrs...)
 		}
 	}
@@ -316,10 +315,10 @@ func getRemovedHubAddOns(oldObject, newObject *v1beta1.Hub) []string {
 }
 
 // validateAddonNotInUse validates that removed addons are not still referenced by ManagedClusterAddOns
-func validateAddonNotInUse(ctx context.Context, removedAddons []string, fieldPath string) field.ErrorList {
+func validateAddonNotInUse(ctx context.Context, removedAddons []string, fieldPath string, addonC *versioned.Clientset) field.ErrorList {
 	errs := field.ErrorList{}
 
-	mcAddOns, err := getManagedClusterAddOns(ctx)
+	mcAddOns, err := addonC.AddonV1alpha1().ManagedClusterAddOns(metav1.NamespaceAll).List(ctx, metav1.ListOptions{LabelSelector: v1beta1.ManagedBySelector.String()})
 	if err != nil {
 		errs = append(errs, field.InternalError(field.NewPath(fieldPath), err))
 		return errs
@@ -327,7 +326,7 @@ func validateAddonNotInUse(ctx context.Context, removedAddons []string, fieldPat
 
 	var inUseAddons []string
 	for _, removedAddon := range removedAddons {
-		if isAddondEnabled(mcAddOns, removedAddon) {
+		if isAddondEnabled(mcAddOns.Items, removedAddon) {
 			inUseAddons = append(inUseAddons, removedAddon)
 		}
 	}
@@ -341,7 +340,7 @@ func validateAddonNotInUse(ctx context.Context, removedAddons []string, fieldPat
 }
 
 // validates that any addon which is enabled on a spoke is configured
-func validateAddons(ctx context.Context, cli client.Client, newObject *v1beta1.Spoke) (admission.Warnings, field.ErrorList) {
+func validateAddons(ctx context.Context, cli client.Client, newObject *v1beta1.Spoke, addonC *versioned.Clientset) (admission.Warnings, field.ErrorList) {
 	errs := field.ErrorList{}
 
 	// try to get hub, if not present or not ready, log a warning that addons cant be properly validated
@@ -361,12 +360,12 @@ func validateAddons(ctx context.Context, cli client.Client, newObject *v1beta1.S
 		return admission.Warnings{warnHubNotFound}, nil
 	}
 
-	cmaList, err := getClusterManagementAddOns(ctx)
+	cmaList, err := addonC.AddonV1alpha1().ClusterManagementAddOns().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, field.ErrorList{field.InternalError(field.NewPath("spec").Child("addOns"), err)}
 	}
-	cmaNames := make([]string, len(cmaList))
-	for i, cma := range cmaList {
+	cmaNames := make([]string, len(cmaList.Items))
+	for i, cma := range cmaList.Items {
 		cmaNames[i] = cma.Name
 	}
 
@@ -389,37 +388,4 @@ func isAddondEnabled(mcAddOns []addonv1alpha1.ManagedClusterAddOn, removedAddon 
 		}
 	}
 	return false
-}
-
-// getManagedClusterAddOns lists all ManagedClusterAddOns in all namespaces.
-func getManagedClusterAddOns(ctx context.Context) ([]addonv1alpha1.ManagedClusterAddOn, error) {
-	restConfig, err := ctrl.GetConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get rest config: %w", err)
-	}
-	addonC, err := addonapi.NewForConfig(restConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create addon clientset: %w", err)
-	}
-	addonList, err := addonC.AddonV1alpha1().ManagedClusterAddOns(metav1.NamespaceAll).List(ctx, metav1.ListOptions{LabelSelector: v1beta1.ManagedBySelector.String()})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list ManagedClusterAddOns: %w", err)
-	}
-	return addonList.Items, nil
-}
-
-func getClusterManagementAddOns(ctx context.Context) ([]addonv1alpha1.ClusterManagementAddOn, error) {
-	restConfig, err := ctrl.GetConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get rest config: %w", err)
-	}
-	addonC, err := addonapi.NewForConfig(restConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create addon clientset: %w", err)
-	}
-	addonList, err := addonC.AddonV1alpha1().ClusterManagementAddOns().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list ManagedClusterAddOns: %w", err)
-	}
-	return addonList.Items, nil
 }
