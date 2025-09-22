@@ -101,9 +101,38 @@ jobs:
     - name: Extract label filter
       run: |
         set -e
-        # Extract all labels that start with "e2e-label: " and format as a comma-separated list
-        label_filter=$(jq -r '.pull_request.labels[]?.name | select(startswith("e2e-label: ")) | sub("^e2e-label: "; "")' <<<"${{ toJson(github.event) }}" | paste -sd, - || echo "")
-        echo "labelFilter=$label_filter" >> $GITHUB_OUTPUT
+        # Find labels that start with 'ginkgo-filter:'
+        LABELS="${{ join(github.event.pull_request.labels.*.name, ',') }}"
+
+        # Array to collect all filters
+        FILTERS=()
+
+        # Extract all ginkgo filters
+        for label in $(echo $LABELS | tr ',' '\n'); do
+          if [[ $label == ginkgo-filter:* ]]; then
+            # Extract the filter part after the prefix
+            FILTER="${label#ginkgo-filter:}"
+            echo "Found Ginkgo filter in label: $FILTER"
+            FILTERS+=("$FILTER")
+          fi
+        done
+
+        # If we have filters, combine them with OR operator
+        if [ ${#FILTERS[@]} -gt 0 ]; then
+          COMBINED_FILTER=""
+
+          # OR each filter
+          for i in "${!FILTERS[@]}"; do
+            if [ $i -eq 0 ]; then
+              COMBINED_FILTER="(${FILTERS[$i]})"
+            else
+              COMBINED_FILTER="$COMBINED_FILTER||(${FILTERS[$i]})"
+            fi
+          done
+
+          echo "Final ginkgo label filter: $COMBINED_FILTER"
+          echo "ginkgoLabelFilter=$COMBINED_FILTER" >> $GITHUB_OUTPUT
+        fi
 
   call-test:
     name: test
@@ -132,5 +161,5 @@ jobs:
     with:
       repo: ${{ matrix.repo }}
       artifacts: ${{ fromJson(needs.generate-matrix.outputs.artifacts)[matrix.repo] }}
-      labelFilter: ${{ needs.extract-label-filter.outputs.labelFilter }}
+      ginkgoLabelFilter: ${{ needs.extract-label-filter.outputs.ginkgoLabelFilter }}
     secrets: inherit

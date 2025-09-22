@@ -9,7 +9,7 @@ on:
         artifacts:
           required: false
           type: string
-        labelFilter:
+        ginkgoLabelFilter:
           required: false
           type: string
 
