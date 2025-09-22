@@ -37,8 +37,8 @@ jobs:
       - name: Test E2E
         run: |
           cd ${{ inputs.repo }}
-          if [ -n "${{ inputs.labelFilter }}" ]; then
-            LABEL_FILTER=${{ inputs.labelFilter }} make test-e2e
+          if [ -n "${{ inputs.ginkgoLabelFilter }}" ]; then
+            LABEL_FILTER=${{ inputs.ginkgoLabelFilter }} make test-e2e
           else
             make test-e2e
           fi
