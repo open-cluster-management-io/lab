@@ -9,6 +9,9 @@ on:
         artifacts:
           required: false
           type: string
+        labelFilter:
+          required: false
+          type: string
 
 env:
   GO_REQUIRED_MIN_VERSION: ''
@@ -33,7 +36,12 @@ jobs:
 
       - name: Test E2E
         run: |
-          cd ${{ inputs.repo }} && make test-e2e
+          cd ${{ inputs.repo }}
+          if [ -n "${{ inputs.labelFilter }}" ]; then
+            LABEL_FILTER=${{ inputs.labelFilter }} make test-e2e
+          else
+            make test-e2e
+          fi
 
       - name: Upload Artifacts
         if: |

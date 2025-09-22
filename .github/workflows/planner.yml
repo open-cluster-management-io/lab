@@ -92,6 +92,18 @@ jobs:
 
         echo "Matrix: $matrixJson"
         echo "Artifacts: $artifacts_json"
+        
+  extract-label-filter:
+    name: extract-label-filter
+    needs: generate-matrix
+    runs-on: ubuntu-latest
+    steps:
+    - name: Extract label filter
+      run: |
+        set -e
+        # Extract all labels that start with "e2e-label: " and format as a comma-separated list
+        label_filter=$(jq -r '.pull_request.labels[]?.name | select(startswith("e2e-label: ")) | sub("^e2e-label: "; "")' <<<"${{ toJson(github.event) }}" | paste -sd, - || echo "")
+        echo "labelFilter=$label_filter" >> $GITHUB_OUTPUT
 
   call-test:
     name: test
@@ -108,7 +120,9 @@ jobs:
 
   call-e2e:
     name: e2e
-    needs: generate-matrix
+    needs: 
+      - generate-matrix
+      - extract-label-filter
     if: |
       needs.generate-matrix.outputs.matrix != ''
     strategy:
@@ -118,4 +132,5 @@ jobs:
     with:
       repo: ${{ matrix.repo }}
       artifacts: ${{ fromJson(needs.generate-matrix.outputs.artifacts)[matrix.repo] }}
+      labelFilter: ${{ needs.extract-label-filter.outputs.labelFilter }}
     secrets: inherit
