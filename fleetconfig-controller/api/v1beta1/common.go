@@ -40,20 +40,6 @@ type SecretReference struct {
 	KubeconfigKey string `json:"kubeconfigKey,omitempty"`
 }
 
-// OCMSource is the configuration for an OCM source.
-type OCMSource struct {
-	// The version of predefined compatible image versions (e.g. v0.6.0). Defaults to the latest released version.
-	// You can also set "latest" to install the latest development version.
-	// +kubebuilder:default:="default"
-	// +optional
-	BundleVersion string `json:"bundleVersion,omitempty"`
-
-	// The name of the image registry serving OCM images, which will be used for all OCM components."
-	// +kubebuilder:default:="quay.io/open-cluster-management"
-	// +optional
-	Registry string `json:"registry,omitempty"`
-}
-
 // ResourceSpec defines resource limits and requests for all managed clusters.
 type ResourceSpec struct {
 	// The resource limits of all the containers managed by the Cluster Manager or Klusterlet operators.
