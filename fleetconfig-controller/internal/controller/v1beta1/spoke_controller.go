@@ -882,7 +882,7 @@ func (r *SpokeReconciler) mergeKlusterletValues(ctx context.Context, spoke *v1be
 	}
 
 	merged := &v1beta1.KlusterletChartConfig{}
-	err = yaml.Unmarshal(mergedBytes, &merged)
+	err = yaml.Unmarshal(mergedBytes, merged)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal merged values into KlusterletChartConfig for spoke %s: %w", spoke.Name, err)
 	}
