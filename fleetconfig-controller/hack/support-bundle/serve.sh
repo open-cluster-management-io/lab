@@ -141,7 +141,7 @@ if [[ -n "$local_bundle" ]]; then
         # Bundle is exactly the fleetconfig-support-bundle directory
         echo "Bundle is already in the expected location"
     else
-        # Bundle is outside fleetconfig-support-bundle-support-bundle, create symlink
+        # Bundle is outside fleetconfig-support-bundle, create symlink
         if [[ -d "fleetconfig-support-bundle" ]]; then
             rm -rf fleetconfig-support-bundle
         fi

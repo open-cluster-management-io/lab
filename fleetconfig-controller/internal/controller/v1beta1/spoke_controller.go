@@ -128,7 +128,7 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 
 		if slices.Contains(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) {
-			if err := r.cleanup(ctx, spoke, spokeKubeconfig); err != nil {
+			if err := r.cleanup(ctx, spoke, spokeKubeconfig, hubMeta); err != nil {
 				spoke.SetConditions(true, v1beta1.NewCondition(
 					err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
 				))
@@ -210,14 +210,8 @@ func setDefaults(ctx context.Context, spoke *v1beta1.Spoke, hubMeta hubMeta) {
 }
 
 // cleanup cleans up a Spoke and its associated resources.
-func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke, spokeKubeconfig []byte) error {
+func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke, spokeKubeconfig []byte, hubMeta hubMeta) error {
 	logger := log.FromContext(ctx)
-
-	hubMeta, err := r.getHubMeta(ctx, spoke.Spec.HubRef)
-	if err != nil {
-		// TODO
-		return err
-	}
 
 	clusterC, err := common.ClusterClient(hubMeta.kubeconfig)
 	if err != nil {
@@ -454,7 +448,7 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 
 	hub := hubMeta.hub
 
-	if hubMeta.hub == nil {
+	if hub == nil {
 		return errors.New("hub not found")
 	}
 	// dont start join until the hub is ready

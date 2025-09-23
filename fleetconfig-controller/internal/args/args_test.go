@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -74,21 +75,21 @@ users:
 		defer cleanup()
 
 		if err != nil {
-			t.Fatalf("PrepareKubeconfig() error = %v", err)
+			t.Errorf("PrepareKubeconfig() error = %v", err)
 		}
 
 		// Check that kubeconfig flag is added
-		if !contains(resultArgs, "--kubeconfig") {
+		if !slices.Contains(resultArgs, "--kubeconfig") {
 			t.Error("PrepareKubeconfig() should add --kubeconfig flag")
 		}
 
 		// Check that context flag is added
-		if !contains(resultArgs, "--context") {
+		if !slices.Contains(resultArgs, "--context") {
 			t.Error("PrepareKubeconfig() should add --context flag")
 		}
 
 		// Check that the kubeconfig file exists
-		kubeconfigIndex := indexOf(resultArgs, "--kubeconfig")
+		kubeconfigIndex := slices.Index(resultArgs, "--kubeconfig")
 		if kubeconfigIndex == -1 || kubeconfigIndex+1 >= len(resultArgs) {
 			t.Fatal("PrepareKubeconfig() should add kubeconfig path")
 		}
@@ -104,15 +105,15 @@ users:
 		defer cleanup()
 
 		if err != nil {
-			t.Fatalf("PrepareKubeconfig() error = %v", err)
+			t.Errorf("PrepareKubeconfig() error = %v", err)
 		}
 
 		// Check that kubeconfig flag is added but context is not
-		if !contains(resultArgs, "--kubeconfig") {
+		if !slices.Contains(resultArgs, "--kubeconfig") {
 			t.Error("PrepareKubeconfig() should add --kubeconfig flag")
 		}
 
-		if contains(resultArgs, "--context") {
+		if slices.Contains(resultArgs, "--context") {
 			t.Error("PrepareKubeconfig() should not add --context flag when context is empty")
 		}
 	})
@@ -216,23 +217,4 @@ func TestMockResourceValues_String(t *testing.T) {
 			}
 		})
 	}
-}
-
-// Helper functions
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
-
-func indexOf(slice []string, item string) int {
-	for i, s := range slice {
-		if s == item {
-			return i
-		}
-	}
-	return -1
 }
