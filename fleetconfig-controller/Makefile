@@ -126,7 +126,7 @@ test-e2e: kind kubectl ginkgo support-bundle ## Run e2e tests in the top-level t
 	$(GINKGO) run -vv \
 		--cover \
 		--coverpkg=./... \
-		--label-filter="$(LABEL_FILTER)" \
+		--label-filter="$(if $(LABEL_FILTER),$(LABEL_FILTER),v1beta1)" \
 		--output-dir=$(COVER_DIR)/e2e \
 		--timeout 20m \
 		./test/e2e/
