@@ -246,7 +246,7 @@ func (r *SpokeReconciler) SetupWithManagerForHub(mgr ctrl.Manager) error {
 
 // SetupWithManagerForSpoke sets up the controller with the Manager to run on a Spoke cluster.
 func (r *SpokeReconciler) SetupWithManagerForSpoke(mgr ctrl.Manager) error {
-	spokeName := os.Getenv(v1beta1.SpokeNameEnvVar)
+	spokeName := os.Getenv(v1beta1.SpokeNameEnvVar) // we know this is set, because the mgr setup would have failed otherwise
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1beta1.Spoke{},
 			builder.WithPredicates(predicate.NewPredicateFuncs(

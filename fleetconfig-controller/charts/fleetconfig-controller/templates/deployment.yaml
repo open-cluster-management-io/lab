@@ -36,9 +36,9 @@ spec:
         - "--use-webhook=true"
         - "--webhook-port={{ .Values.webhookService.port }}"
         - "--webhook-cert-dir={{ .Values.admissionWebhooks.certificate.mountPath }}"
+        {{- end }}
         - "--spoke-concurrent-reconciles={{ .Values.spokeConcurrentReconciles }}"
         - "--cluster-type=hub"
-        {{- end }}
         command:
         - /manager
         env:

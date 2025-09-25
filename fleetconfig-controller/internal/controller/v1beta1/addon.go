@@ -410,7 +410,7 @@ func patchFCCMca(ctx context.Context, spokeName string, addonC *addonapi.Clients
 	if err != nil {
 		return fmt.Errorf("failed to configure fleetconfig-controller-manager: %v", err)
 	}
-	mca.Spec.Configs = append(mca.Spec.Configs, addonv1alpha1.AddOnConfig{
+	desired := addonv1alpha1.AddOnConfig{
 		ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
 			Group:    addonv1alpha1.GroupName,
 			Resource: AddOnDeploymentConfigsKind,
@@ -419,26 +419,30 @@ func patchFCCMca(ctx context.Context, spokeName string, addonC *addonapi.Clients
 			Name:      v1beta1.FCCAddOnName,
 			Namespace: spokeName,
 		},
-	})
-
+	}
+	if slices.ContainsFunc(mca.Spec.Configs, func(c addonv1alpha1.AddOnConfig) bool {
+		return c.Group == desired.Group &&
+			c.Resource == desired.Resource &&
+			c.Name == desired.Name &&
+			c.Namespace == desired.Namespace
+	}) {
+		return nil
+	}
+	mca.Spec.Configs = append(mca.Spec.Configs, desired)
 	patchBytes, err := json.Marshal(map[string]any{
-		"spec": map[string]any{
-			"configs": mca.Spec.Configs,
-		},
+		"spec": map[string]any{"configs": mca.Spec.Configs},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to marshal patch for fleetconfig-controller-manager: %v", err)
 	}
-	_, err = addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).Patch(
+	if _, err = addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).Patch(
 		ctx,
 		v1beta1.FCCAddOnName,
 		types.MergePatchType,
 		patchBytes,
 		metav1.PatchOptions{},
-	)
-	if err != nil {
+	); err != nil {
 		return fmt.Errorf("failed to patch fleetconfig-controller-manager: %v", err)
-
 	}
 	return nil
 }

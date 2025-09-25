@@ -24,8 +24,8 @@ This is how you can work with it:
 
 If you wish to run the fleetconfig controller manager in debug mode with delve, run:
   \`${COLOR_CYAN}${DEBUG_CMD}${COLOR_RESET}\`
-  Wait until the \`${COLOR_CYAN}API server listening at: [::]:2344${COLOR_RESET}\` message appears
-  Start the \"Debug (localhost:2344)\" configuration in VSCode to connect your debugger session.
+  Wait until the \`${COLOR_CYAN}API server listening at: [::]:2345${COLOR_RESET}\` message appears
+  Start the \"Debug (localhost:2345)\" configuration in VSCode to connect your debugger session.
   ${COLOR_CYAN}Note:${COLOR_RESET} fleetconfig controller manager won't start until you connect with the debugger.
   ${COLOR_CYAN}Note:${COLOR_RESET} fleetconfig controller manager will be stopped once you detach your debugger session.
 

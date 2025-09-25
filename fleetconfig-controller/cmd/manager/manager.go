@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -181,7 +180,17 @@ func ForSpoke(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 	}
 
 	spokeNamespace := os.Getenv(apiv1beta1.SpokeNamespaceEnvVar)
+	if spokeNamespace == "" {
+		err = fmt.Errorf("CLUSTER_NAMESPACE environment variable must be set")
+		setupLog.Error(err, "unable to create controller", "controller", "Spoke")
+		return nil, err
+	}
 	hubNamespace := os.Getenv(apiv1beta1.HubNamespaceEnvVar)
+	if hubNamespace == "" {
+		err = fmt.Errorf("HUB_NAMESPACE environment variable must be set")
+		setupLog.Error(err, "unable to create controller", "controller", "Spoke")
+		return nil, err
+	}
 
 	mgr, err := ctrl.NewManager(hubRestCfg, ctrl.Options{
 		Scheme: opts.Scheme,
@@ -269,7 +278,7 @@ func getHubRestConfig() (*rest.Config, error) {
 		hubKubeconfigPath = apiv1beta1.DefaultHubKubeconfigPath
 	}
 
-	basePath := strings.TrimSuffix(hubKubeconfigPath, "kubeconfig")
+	basePath := filepath.Dir(hubKubeconfigPath)
 	certPath := filepath.Join(basePath, "tls.crt")
 	keyPath := filepath.Join(basePath, "tls.key")
 

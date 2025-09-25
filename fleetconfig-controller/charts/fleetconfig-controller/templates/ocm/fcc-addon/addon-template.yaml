@@ -47,6 +47,7 @@ spec:
               - args:
                 - "--leader-elect"
                 - "--health-probe-bind-address=:{{ .Values.healthCheck.port }}"
+                - "--use-webhook=false"
                 - "--spoke-concurrent-reconciles=1"
                 - "--cluster-type=spoke"
                 command:
@@ -84,7 +85,6 @@ spec:
         apiVersion: rbac.authorization.k8s.io/v1
         metadata:
           name: {{ include "chart.fullname" . }}-manager-spoke-role
-          namespace: {{ .Release.Namespace }}
         rules:
         - apiGroups: [""]
           resources: ["namespaces"]
@@ -150,7 +150,6 @@ spec:
           apiGroup: rbac.authorization.k8s.io
           kind: Role
           name: {{ include "chart.fullname" . }}-leader-election-role
-          namespace: {{ .Release.Namespace }}
         subjects:
         - kind: ServiceAccount
           name: {{ include "chart.fullname" . }}-manager

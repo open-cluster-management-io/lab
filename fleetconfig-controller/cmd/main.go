@@ -64,8 +64,8 @@ func main() {
 	flag.BoolVar(&mOpts.EnableHTTP2, "enable-http2", false, "If set, HTTP/2 will be enabled for the metrics and webhook servers.")
 
 	flag.BoolVar(&mOpts.UseWebhook, "use-webhook", mOpts.UseWebhook, "Enable admission webhooks")
-	flag.StringVar(&mOpts.CertDir, "webhook-cert-dir", mOpts.CertDir, "Admission webhook cert/key dir")
-	flag.IntVar(&mOpts.WebhookPort, "webhook-port", mOpts.WebhookPort, "Admission webhook port")
+	flag.StringVar(&mOpts.CertDir, "webhook-cert-dir", "/etc/k8s-webhook-certs", "Admission webhook cert/key dir")
+	flag.IntVar(&mOpts.WebhookPort, "webhook-port", 9443, "Admission webhook port")
 
 	flag.IntVar(&mOpts.SpokeConcurrentReconciles, "spoke-concurrent-reconciles", apiv1beta1.SpokeDefaultMaxConcurrentReconciles, fmt.Sprintf("Maximum number of Spoke resources that may be reconciled in parallel. Defaults to %d.", apiv1beta1.SpokeDefaultMaxConcurrentReconciles))
 	flag.StringVar(&mOpts.ClusterType, "cluster-type", apiv1beta1.ClusterTypeHub, "The type of cluster that this controller instance is installed in.")

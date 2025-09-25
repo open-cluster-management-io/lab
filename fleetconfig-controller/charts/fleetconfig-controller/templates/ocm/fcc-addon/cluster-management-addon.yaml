@@ -9,7 +9,7 @@ spec:
     displayName: FleetConfig Controller Addon
     description: |
       fleetconfig-controller-manager is an addon to deploy fleetconfig-controller manager on the managed cluster.
-      It is used to enable decentalized management of spoke clusters.
+      It is used to enable decentralized management of spoke clusters.
   supportedConfigs:
     - group: addon.open-cluster-management.io
       resource: addontemplates
