@@ -71,9 +71,10 @@ var _ = Describe("Spoke Controller", Ordered, func() {
 				Namespace: "default",
 			}
 			spokeReconciler = &SpokeReconciler{
-				Client: k8sClient,
-				Log:    logr.Logger{},
-				Scheme: k8sClient.Scheme(),
+				Client:      k8sClient,
+				Log:         logr.Logger{},
+				Scheme:      k8sClient.Scheme(),
+				ClusterType: v1beta1.ClusterTypeHub,
 			}
 			spoke = &v1beta1.Spoke{
 				ObjectMeta: metav1.ObjectMeta{
@@ -131,6 +132,7 @@ var _ = Describe("Spoke Controller", Ordered, func() {
 				v1beta1.SpokeJoined:      metav1.ConditionFalse,
 				v1beta1.CleanupFailed:    metav1.ConditionFalse,
 				v1beta1.AddonsConfigured: metav1.ConditionFalse,
+				v1beta1.PivotComplete:    metav1.ConditionFalse,
 			})).To(Succeed())
 		})
 

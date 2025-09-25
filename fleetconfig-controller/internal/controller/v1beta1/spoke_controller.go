@@ -148,6 +148,9 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		v1beta1.NewCondition(
 			v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionFalse,
 		),
+		v1beta1.NewCondition(
+			v1beta1.PivotComplete, v1beta1.PivotComplete, metav1.ConditionFalse, metav1.ConditionFalse,
+		),
 	}
 	spoke.SetConditions(false, initConditions...)
 

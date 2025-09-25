@@ -102,7 +102,6 @@ func allowHubUpdate(oldHub, newHub *v1beta1.Hub) error {
 // - spec.addOns
 // - spec.timeout
 // - spec.logVerbosity
-// - spec.hubRed
 func allowSpokeUpdate(oldSpoke, newSpoke *v1beta1.Spoke) error {
 	if !reflect.DeepEqual(newSpoke.Spec, oldSpoke.Spec) {
 		oldSpokeCopy := oldSpoke.Spec.DeepCopy()
@@ -119,11 +118,9 @@ func allowSpokeUpdate(oldSpoke, newSpoke *v1beta1.Spoke) error {
 		newSpokeCopy.LogVerbosity = 0
 		oldSpokeCopy.Timeout = 0
 		newSpokeCopy.Timeout = 0
-		oldSpokeCopy.HubRef = v1beta1.HubRef{}
-		newSpokeCopy.HubRef = v1beta1.HubRef{}
 
 		if !reflect.DeepEqual(oldSpokeCopy, newSpokeCopy) {
-			return errors.New("spoke contains changes which are not allowed; only changes to spec.hubRef, spec.klusterlet.annotations, spec.klusterlet.values, spec.kubeconfig, spec.addOns, spec.timeout, and spec.logVerbosity are allowed when updating a spoke")
+			return errors.New("spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.values, spec.kubeconfig, spec.addOns, spec.timeout, and spec.logVerbosity are allowed when updating a spoke")
 		}
 	}
 

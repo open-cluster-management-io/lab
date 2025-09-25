@@ -63,7 +63,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 		By("loading the fcc image into the spoke cluster")
 		Expect(utils.DevspaceRunPipeline(tc.ctx, tc.spokeKubeconfig, "load-local", fcNamespace, "v1beta1")).To(Succeed())
 
-		By("deploying fleetconfig")
+		By("deploying fleetconfig-controller")
 		Expect(utils.DevspaceRunPipeline(tc.ctx, tc.hubKubeconfig, "deploy-local", fcNamespace, "v1beta1")).To(Succeed())
 	})
 
@@ -71,7 +71,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 		teardownTestEnvironment(tc)
 	})
 
-	// Tests FleetConfig operations with ResourceCleanup feature gate enabled, verifying:
+	// Tests Hub and Spoke operations with ResourceCleanup feature gate enabled, verifying:
 	// 1. Cluster joining (spoke and hub-as-spoke) to the hub
 	// 2. Addon configuration on hub and installation on spoke
 	// 3. ManifestWork creation in hub-as-spoke namespace and namespace creation validation
@@ -83,11 +83,11 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 	Context("deploy and teardown Hub and Spokes with ResourceCleanup feature gate enabled", func() {
 
 		It("should join the spoke and hub-as-spoke clusters to the hub", func() {
-			// NOTE: The FleetConfig CR is created by devspace when the fleetconfig-controller chart is installed.
+			// NOTE: The Hub and Spoke CRs are created by devspace when the fleetconfig-controller chart is installed.
 			//       Its configuration is defined via the fleetConfig values.
 			ensureHubAndSpokesProvisioned(tc, hub, []*v1beta1.Spoke{spoke, hubAsSpoke}, nil)
 
-			By("cloning the FleetConfig resources for further scenarios")
+			By("cloning the Hub and Spoke resources for further scenarios")
 			err := utils.CloneHub(hub, hubClone)
 			Expect(err).NotTo(HaveOccurred())
 			err = utils.CloneSpoke(spoke, spokeClone)
@@ -129,7 +129,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 			}, 2*time.Minute, 10*time.Second).Should(Succeed())
 		})
 
-		It("should not allow changes to the FleetConfig resource", func() {
+		It("should not allow changes to the Hub resource", func() {
 
 			By("failing to patch the Hub's feature gates")
 			hub, err := utils.GetHub(tc.ctx, tc.kClient, v1beta1hubNN)
@@ -203,12 +203,12 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 			ExpectWithOffset(1, tc.kClient.Delete(tc.ctx, hubClone)).To(Succeed())
 			EventuallyWithOffset(1, func() error {
 				if err := tc.kClient.Get(tc.ctx, v1beta1hubNN, hubClone); err != nil {
-					utils.WarnError(err, "failed to get FleetConfig")
+					utils.WarnError(err, "failed to get Hub")
 					return err
 				}
 				if hubClone.Status.Phase != v1beta1.Deleting {
 					err := fmt.Errorf("expected %s, got %s", v1beta1.Deleting, hubClone.Status.Phase)
-					utils.WarnError(err, "FleetConfig deletion not started")
+					utils.WarnError(err, "Hub deletion not started")
 					return err
 				}
 				conditions := make([]metav1.Condition, len(hubClone.Status.Conditions))

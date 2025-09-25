@@ -24,8 +24,11 @@ const (
 	// CleanupFailed means that a failure occurred during cleanup.
 	CleanupFailed = "CleanupFailed"
 
-	// SpokeJoined means that the spoke has successfully joined the Hub.
+	// SpokeJoined means that the Spoke has successfully joined the Hub.
 	SpokeJoined = "SpokeJoined"
+
+	// PivotComplete means that the spoke cluster has successfully started managing itself.
+	PivotComplete = "PivotComplete"
 )
 
 // Hub and Spoke condition reasons

@@ -426,7 +426,8 @@ func TestAllowSpokeUpdate(t *testing.T) {
 					},
 				},
 			},
-			wantErr: false,
+			wantErr: true,
+			errMsg:  "spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.values, spec.kubeconfig, spec.addOns, spec.timeout, and spec.logVerbosity are allowed when updating a spoke",
 		},
 		{
 			name: "disallowed - CreateNamespace change",
@@ -441,7 +442,7 @@ func TestAllowSpokeUpdate(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsg:  "spoke contains changes which are not allowed; only changes to spec.hubRef, spec.klusterlet.annotations, spec.klusterlet.values, spec.kubeconfig, spec.addOns, spec.timeout, and spec.logVerbosity are allowed when updating a spoke",
+			errMsg:  "spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.values, spec.kubeconfig, spec.addOns, spec.timeout, and spec.logVerbosity are allowed when updating a spoke",
 		},
 		{
 			name: "disallowed - klusterlet mode change",
@@ -460,7 +461,7 @@ func TestAllowSpokeUpdate(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsg:  "spoke contains changes which are not allowed; only changes to spec.hubRef, spec.klusterlet.annotations, spec.klusterlet.values, spec.kubeconfig, spec.addOns, spec.timeout, and spec.logVerbosity are allowed when updating a spoke",
+			errMsg:  "spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.values, spec.kubeconfig, spec.addOns, spec.timeout, and spec.logVerbosity are allowed when updating a spoke",
 		},
 		{
 			name: "disallowed - klusterlet feature gates change",
@@ -479,7 +480,7 @@ func TestAllowSpokeUpdate(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsg:  "spoke contains changes which are not allowed; only changes to spec.hubRef, spec.klusterlet.annotations, spec.klusterlet.values, spec.kubeconfig, spec.addOns, spec.timeout, and spec.logVerbosity are allowed when updating a spoke",
+			errMsg:  "spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.values, spec.kubeconfig, spec.addOns, spec.timeout, and spec.logVerbosity are allowed when updating a spoke",
 		},
 		{
 			name: "multiple allowed changes",
