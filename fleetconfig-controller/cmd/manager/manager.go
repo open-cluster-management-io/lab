@@ -251,7 +251,7 @@ func ForSpoke(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 	}
 
 	if err := (&controllerv1beta1.SpokeReconciler{
-		Client:               mgr.GetClient(), // Uses the manager's client which has the correct scheme and hub config
+		Client:               mgr.GetClient(),
 		Log:                  ctrl.Log.WithName("controllers").WithName("Spoke"),
 		ConcurrentReconciles: opts.SpokeConcurrentReconciles,
 		Scheme:               mgr.GetScheme(),

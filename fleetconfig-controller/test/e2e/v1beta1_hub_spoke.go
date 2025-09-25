@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -149,7 +150,6 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 		})
 
 		It("should clean up the hub cluster", func() {
-
 			By("ensuring the spoke is deregistered properly")
 			EventuallyWithOffset(1, func() error {
 				By("ensuring the Spoke resource is deleted")
@@ -196,8 +196,45 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 					utils.WarnError(err, "ManagedCluster namespace still exists")
 					return err
 				}
+
+				By("ensuring the spoke agent is uninstalled and ocm resources are cleaned up")
+				deploy := &appsv1.Deployment{}
+				err = tc.kClientSpoke.Get(tc.ctx, v1beta1fccAddOnAgentNN, deploy)
+				if err != nil {
+					if !kerrs.IsNotFound(err) {
+						return err
+					}
+					utils.Info("fleetconfig-controller addon agent deleted successfully")
+				} else {
+					err := errors.New("fleetconfig-controller addon agent not deleted yet")
+					utils.WarnError(err, "fleetconfig-controller addon agent still exists")
+					return err
+				}
+
+				namespacesToDelete := []string{
+					"open-cluster-management-agent",
+					"open-cluster-management-agent-addon",
+					"open-cluster-management",
+					fcNamespace,
+				}
+				for _, n := range namespacesToDelete {
+					spokeNs := &corev1.Namespace{}
+					err = tc.kClientSpoke.Get(tc.ctx, ktypes.NamespacedName{Name: n}, spokeNs)
+					if err != nil {
+						if !kerrs.IsNotFound(err) {
+							return err
+						}
+						utils.Info(fmt.Sprintf("namespace %s deleted successfully", n))
+					} else {
+						err := fmt.Errorf("namespace %s not deleted yet", n)
+						utils.WarnError(err, "namespace still exists")
+						return err
+					}
+
+				}
+
 				return nil
-			})
+			}, 5*time.Minute, 10*time.Second).Should(Succeed())
 
 			By("deleting the Hub and ensuring that it isn't deleted until the ManifestWork is deleted")
 			ExpectWithOffset(1, tc.kClient.Delete(tc.ctx, hubClone)).To(Succeed())

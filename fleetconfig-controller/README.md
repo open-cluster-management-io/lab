@@ -40,7 +40,7 @@ Support for orchestration of OCM multi-clusters varies based on the Kubernetes d
 
 ### Onboarding
 
-To familiarize yourself with the `FleetConfig` API and the `fleetconfig-controller`, we recommend doing one or more of the following onboarding steps.
+To familiarize yourself with the `Hub` and `Spoke` APIs and the `fleetconfig-controller`, we recommend doing one or more of the following onboarding steps.
 
 1. Step through a [smoke test](./docs/smoketests.md)
 1. Invoke the [end-to-end tests](./test/e2e/fleetconfig.go) and inspect the content of the kind clusters that the E2E suite automatically creates

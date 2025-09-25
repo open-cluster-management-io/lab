@@ -54,6 +54,8 @@ var (
 	v1beta1spokeNN      = ktypes.NamespacedName{Name: "spoke", Namespace: fcNamespace}
 	v1beta1hubAsSpokeNN = ktypes.NamespacedName{Name: "hub-as-spoke", Namespace: fcNamespace}
 
+	v1beta1fccAddOnAgentNN = ktypes.NamespacedName{Name: "fleetconfig-controller-manager", Namespace: fcNamespace}
+
 	// global test variables
 	klusterletNN = ktypes.NamespacedName{Name: "klusterlet"}
 

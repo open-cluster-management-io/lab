@@ -164,10 +164,6 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 	spoke.SetConditions(true, v1beta1.NewCondition(
 		"Joined", v1beta1.SpokeJoined, metav1.ConditionTrue, metav1.ConditionTrue,
 	))
-	// do not mark the Spoke "Running" until the spoke fcc agent has begun managing it
-	spoke.SetConditions(true, v1beta1.NewCondition(
-		"WaitingForSpokeAgent", v1beta1.PivotComplete, metav1.ConditionFalse, metav1.ConditionTrue,
-	))
 
 	// Label the spoke ManagedCluster if in hub-as-spoke mode.
 	// This allows the 'spoke' ManagedClusterSet to omit the hub-as-spoke cluster from its list
@@ -312,7 +308,7 @@ func (r *SpokeReconciler) doSpokeWork(ctx context.Context, spoke *v1beta1.Spoke,
 	spoke.Status.KlusterletHash = currKlusterletHash
 
 	spoke.SetConditions(true, v1beta1.NewCondition(
-		"WaitingForSpokeAgent", v1beta1.PivotComplete, metav1.ConditionTrue, metav1.ConditionTrue,
+		v1beta1.PivotComplete, v1beta1.PivotComplete, metav1.ConditionTrue, metav1.ConditionTrue,
 	))
 	return nil
 }
@@ -472,6 +468,9 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 	}
 
 	// "self-destruct" any remaining namespaces/resources
+	// TODO - instead of deleting the namespace etc, can we delete the appliedManifestWork?
+	// name: 43967cf4fa7b6c9c1f4014eb104077ac73d86aabc3d2c4ae6c51babdf5898540-addon-fleetconfig-controller-manager-deploy-0
+	// no labels, no owner ref
 	operatorClient, err := common.OperatorClient(spokeKubeconfig)
 	if err != nil {
 		return err
