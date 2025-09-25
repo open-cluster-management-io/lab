@@ -3,10 +3,13 @@ package v1beta1
 import "k8s.io/apimachinery/pkg/labels"
 
 const (
-	// HubCleanupFinalizer is the finalizer for Hub cleanup.
+	// HubCleanupPreflightFinalizer is the finalizer for cleanup preflight checks hub cluster's controller instance. Used to signal to the spoke's controller than unjoin can proceed.
+	HubCleanupPreflightFinalizer = "fleetconfig.open-cluster-management.io/hub-cleanup-preflight"
+
+	// HubCleanupFinalizer is the finalizer for cleanup by the hub cluster's controller instance.
 	HubCleanupFinalizer = "fleetconfig.open-cluster-management.io/hub-cleanup"
 
-	// SpokeCleanupFinalizer is the finalizer for Spoke cleanup.
+	// SpokeCleanupFinalizer is the finalizer for cleanup by the spoke cluster's controller instance.
 	SpokeCleanupFinalizer = "fleetconfig.open-cluster-management.io/spoke-cleanup"
 )
 
@@ -64,6 +67,41 @@ const (
 	// ManagedClusterTypeHubAsSpoke is the type of managed cluster that is both a hub and a spoke.
 	ManagedClusterTypeHubAsSpoke = "hub-as-spoke"
 )
+
+const (
+	// ClusterTypeHub indicates that the controller is running in a Hub cluster.
+	ClusterTypeHub = "hub"
+
+	// ClusterTypeSpoke indicates that the controller is running in a Spoke cluster.
+	ClusterTypeSpoke = "spoke"
+
+	// HubKubeconfigEnvVar is the environment variable containing the path to the mounted Hub kubeconfig.
+	HubKubeconfigEnvVar = "HUB_KUBECONFIG"
+
+	// HubKubeconfigFallbackPath is the path of the mounted kubeconfig when the controller is running in a Spoke cluster. Used if the environment variable is not set.
+	HubKubeconfigFallbackPath = "/managed/hub-kubeconfig/kubeconfig"
+
+	// SpokeNameEnvVar is the environment variable containing the name of the Spoke resource.
+	SpokeNameEnvVar = "CLUSTER_NAME"
+
+	// SpokeNamespaceEnvVar is the environment variable containing the namespace of the Spoke resource.
+	SpokeNamespaceEnvVar = "CLUSTER_NAMESPACE"
+
+	// HubNamespaceEnvVar is the environment variable containing the namespace of the Spoke resource.
+	HubNamespaceEnvVar = "HUB_NAMESPACE"
+
+	// ControllerNamespaceEnvVar is the environment variable containing the namespace that the controller is deployed to.
+	ControllerNamespaceEnvVar = "CONTROLLER_NAMESPACE"
+
+	// FCCAddOnName is the name of the fleetconfig-controller-addon
+	FCCAddOnName = "fleetconfig-controller-manager"
+)
+
+// SupportedClusterTypes are the valid cluster types that the controller can be installed in.
+var SupportedClusterTypes = []string{
+	ClusterTypeHub,
+	ClusterTypeSpoke,
+}
 
 // FleetConfig labels
 const (

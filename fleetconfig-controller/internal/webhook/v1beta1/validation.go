@@ -21,7 +21,10 @@ import (
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 )
 
-const warnHubNotFound = "hub not found, cannot validate spoke addons"
+const (
+	warnHubNotFound = "hub not found, cannot validate spoke addons"
+	fccAddOnName    = "fleetconfig-controller-manager"
+)
 
 func isKubeconfigValid(kubeconfig v1beta1.Kubeconfig) (bool, string) {
 	if kubeconfig.SecretReference == nil && !kubeconfig.InCluster {
@@ -99,6 +102,7 @@ func allowHubUpdate(oldHub, newHub *v1beta1.Hub) error {
 // - spec.addOns
 // - spec.timeout
 // - spec.logVerbosity
+// - spec.hubRed
 func allowSpokeUpdate(oldSpoke, newSpoke *v1beta1.Spoke) error {
 	if !reflect.DeepEqual(newSpoke.Spec, oldSpoke.Spec) {
 		oldSpokeCopy := oldSpoke.Spec.DeepCopy()
@@ -115,9 +119,11 @@ func allowSpokeUpdate(oldSpoke, newSpoke *v1beta1.Spoke) error {
 		newSpokeCopy.LogVerbosity = 0
 		oldSpokeCopy.Timeout = 0
 		newSpokeCopy.Timeout = 0
+		oldSpokeCopy.HubRef = v1beta1.HubRef{}
+		newSpokeCopy.HubRef = v1beta1.HubRef{}
 
 		if !reflect.DeepEqual(oldSpokeCopy, newSpokeCopy) {
-			return errors.New("spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.values, spec.kubeconfig, spec.addOns, spec.timeout, and spec.logVerbosity are allowed when updating a spoke")
+			return errors.New("spoke contains changes which are not allowed; only changes to spec.hubRef, spec.klusterlet.annotations, spec.klusterlet.values, spec.kubeconfig, spec.addOns, spec.timeout, and spec.logVerbosity are allowed when updating a spoke")
 		}
 	}
 
@@ -342,6 +348,20 @@ func validateAddonNotInUse(ctx context.Context, removedAddons []string, fieldPat
 // validates that any addon which is enabled on a spoke is configured
 func validateAddons(ctx context.Context, cli client.Client, newObject *v1beta1.Spoke, addonC *versioned.Clientset) (admission.Warnings, field.ErrorList) {
 	errs := field.ErrorList{}
+
+	if newObject.IsHubAsSpoke() {
+		if slices.ContainsFunc(newObject.Spec.AddOns, func(a v1beta1.AddOn) bool {
+			return a.ConfigName == fccAddOnName
+		}) {
+			errs = append(errs, field.Invalid(field.NewPath("spec").Child("addOns"), newObject.Spec.AddOns, "hub-as-spoke Spoke cannot enable fleetconfig-controller-manager addon"))
+		}
+	} else {
+		if !slices.ContainsFunc(newObject.Spec.AddOns, func(a v1beta1.AddOn) bool {
+			return a.ConfigName == fccAddOnName
+		}) {
+			errs = append(errs, field.Invalid(field.NewPath("spec").Child("addOns"), newObject.Spec.AddOns, "Spoke must enable fleetconfig-controller-manager addon"))
+		}
+	}
 
 	// try to get hub, if not present or not ready, log a warning that addons cant be properly validated
 	hub := &v1beta1.Hub{}

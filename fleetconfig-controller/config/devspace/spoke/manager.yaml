@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleetconfig-controller-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: fleetconfig-controller
+      app.kubernetes.io/name: fleetconfig-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: fleetconfig-controller
+        app.kubernetes.io/name: fleetconfig-controller
+    spec:
+      serviceAccountName: fleetconfig-controller-manager
+      containers:
+        - name: fleetconfig-controller-manager
+          env:                                                                                                                                                                                                                        
+          - name: KUBERNETES_CLUSTER_DOMAIN                                                                                                                                                                                           
+            value: cluster.local                                                                                                                                                                                                      
+          - name: CLUSTER_NAMESPACE                                                                                                                                                                                                   
+            value: fleetconfig-system                                                                                                                                                                                                 
+          - name: HUB_KUBECONFIG                                                                                                                                                                                                      
+            value: /managed/hub-kubeconfig/kubeconfig                                                                                                                                                                                 
+          - name: CLUSTER_NAME                                                                                                                                                                                                        
+            value: spoke-1                                                                                                                                                                                                            
+          - name: INSTALL_NAMESPACE                                                                                                                                                                                                   
+            value: fleetconfig-system
+          - name: HUB_NAMESPACE                                                                                                                                                                                                 
+            value: default
+          - name: CONTROLLER_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          command:
+            - /bin/bash
+            - -c
+            - --
+          args:
+            - while true; do sleep 30; done;
+          image: quay.io/open-cluster-management/fleetconfig-controller:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9440
+              name: healthz
+              protocol: TCP
+          volumeMounts:                                                                                                                                                                                                               
+          - mountPath: /managed/hub-kubeconfig                                                                                                                                                                                        
+            name: hub-kubeconfig
+      volumes:                                                                                                                                                                                                                      
+      - name: hub-kubeconfig                                                                                                                                                                                                        
+        secret:                                                                                                                                                                                                                     
+          defaultMode: 420                                                                                                                                                                                                          
+          secretName: fleetconfig-controller-manager-hub-kubeconfig

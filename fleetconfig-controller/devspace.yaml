@@ -9,8 +9,10 @@ vars:
     value: "."
   IMAGE_REPOSITORY: quay.io/open-cluster-management/fleetconfig-controller
   IMAGE_TAG: latest
-  PORT:
+  HUB_PORT:
     value: "2344"
+  SPOKE_PORT:
+    value: "2345"
   PROVIDER:
     value: "production" # production (generic), eks, gke
   DEVSPACE_ENV_FILE: './hack/.versions.env'
@@ -37,7 +39,7 @@ pipelines:
     create_deployments cert-manager
     kubectl apply -f ./hack/dev/cluster-issuer.yaml
     create_deployments fleetconfig-controller-dev
-    start_dev --all
+    start_dev fleetconfig-controller-dev-hub
   deploy: |-
     run_dependencies --all
     create_deployments cert-manager
@@ -55,7 +57,13 @@ pipelines:
     build_images fleetconfig-controller-dev
     kubectl -n fleetconfig-system delete deployment fleetconfig-controller-manager
     create_deployments debug
-    start_dev --all
+    start_dev fleetconfig-controller-dev-hub
+  debug-spoke: |-
+    run_dependencies --all
+    build_images fleetconfig-controller-dev
+    kubectl -n fleetconfig-system delete deployment fleetconfig-controller-manager
+    create_deployments debug-spoke
+    start_dev fleetconfig-controller-dev-spoke
 
 images:
   fleetconfig-controller-dev:
@@ -103,6 +111,8 @@ deployments:
         name: ${CONTEXT}/charts/fleetconfig-controller
       values:
         devspaceEnabled: true
+        fleetConfig:
+          enabled: ${FLEETCONFIG_ENABLED}
       valuesFiles:
       - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
 
@@ -124,7 +134,13 @@ deployments:
   debug:
     kubectl:
       manifests:
-      - ${CONTEXT}/config/devspace/
+      - ${CONTEXT}/config/devspace/hub
+    updateImageTags: false
+
+  debug-spoke:
+    kubectl:
+      manifests:
+      - ${CONTEXT}/config/devspace/spoke
     updateImageTags: false
 
   cert-manager:
@@ -144,15 +160,15 @@ hooks:
   events: ["before:deploy"]
 
 dev:
-  fleetconfig-controller-dev:
+  fleetconfig-controller-dev-hub:
     imageSelector: ${IMAGE_REPOSITORY}
     terminal:
       enabled: true
       disableReplace: true
       workDir: /workspace
-      command: ./devspace-start.sh
+      command: ./hack/dev/devspace-start-hub.sh
     ports:
-    - port: ${PORT}
+    - port: ${HUB_PORT}
     sync:
     - path: .:/workspace
       excludePaths:
@@ -164,8 +180,41 @@ dev:
         - '!/dependencymagnet'
         - '!/internal'
         - '!/pkg'
-        - '!/devspace-start.sh'
+        - '!/hack/dev/devspace-start-hub.sh'
         - '!/hack'
         - '!/go.mod'
         - '!/go.sum'
         - 'Makefile'
+    - path: ./hack/dev:/workspace
+      excludePaths:
+        - '**'
+        - '!devspace-start-hub.sh'
+
+  fleetconfig-controller-dev-spoke:
+    imageSelector: ${IMAGE_REPOSITORY}
+    terminal:
+      enabled: true
+      disableReplace: true
+      workDir: /workspace
+      command: ./devspace-start-spoke.sh
+    ports:
+    - port: ${SPOKE_PORT}
+    sync:
+    - path: .:/workspace
+      excludePaths:
+        - '**'
+        - '!/api'
+        - '!/charts'
+        - '!/cmd'
+        - '!/config'
+        - '!/dependencymagnet'
+        - '!/internal'
+        - '!/pkg'
+        - '!/hack'
+        - '!/go.mod'
+        - '!/go.sum'
+        - 'Makefile'
+    - path: ./hack/dev:/workspace
+      excludePaths:
+        - '**'
+        - '!devspace-start-spoke.sh'

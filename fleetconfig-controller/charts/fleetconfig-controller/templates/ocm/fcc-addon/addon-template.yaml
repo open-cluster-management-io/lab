@@ -1,0 +1,192 @@
+# yaml-language-server: $schema=https://datreeio.github.io/CRDs-catalog/addon.open-cluster-management.io/addontemplate_v1alpha1.json
+
+apiVersion: addon.open-cluster-management.io/v1alpha1
+kind: AddOnTemplate
+metadata:
+  name: fleetconfig-controller-manager
+spec:
+  addonName: fleetconfig-controller-manager
+  agentSpec:
+    workload:
+      manifests:
+      - kind: Namespace
+        apiVersion: v1
+        metadata:
+          name: {{ .Release.Namespace }}
+      - kind: Deployment
+        apiVersion: apps/v1
+        metadata:
+          name: {{ include "chart.fullname" . }}-manager
+          namespace: {{ .Release.Namespace }}
+          labels:
+            control-plane: controller-manager
+          {{- include "chart.labels" . | nindent 12 }}
+        spec:
+          replicas: {{ .Values.replicas }}
+          selector:
+            matchLabels:
+              control-plane: controller-manager
+              {{- include "chart.selectorLabels" . | nindent 14 }}
+          template:
+            metadata:
+              labels:
+                control-plane: controller-manager
+                {{- include "chart.selectorLabels" . | nindent 16 }}
+              annotations:
+                kubectl.kubernetes.io/default-container: manager
+            spec:
+              {{- with .Values.imagePullSecrets }}
+              imagePullSecrets:
+              {{- toYaml . | nindent 16 }}
+              {{- end }}
+              securityContext:
+              {{- toYaml .Values.podSecurityContext | nindent 16 }}
+              serviceAccountName: {{ include "chart.fullname" . }}-manager
+              terminationGracePeriodSeconds: 10
+              containers:
+              - args:
+                - "--leader-elect"
+                - "--health-probe-bind-address=:{{ .Values.healthCheck.port }}"
+                - "--spoke-concurrent-reconciles=1"
+                - "--cluster-type=spoke"
+                command:
+                - /manager
+                env:
+                - name: KUBERNETES_CLUSTER_DOMAIN
+                  value: {{ quote .Values.kubernetesClusterDomain }}
+                - name: CLUSTER_NAMESPACE
+                  value: '{{ `{{CLUSTER_NAMESPACE}}` }}'
+                - name: HUB_NAMESPACE
+                  value: '{{ `{{HUB_NAMESPACE}}` }}'
+                - name: CONTROLLER_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                image: quay.io/open-cluster-management/fleetconfig-controller:local # TODO @arturshadnik - use the actual image
+                # image: {{ include "controller.image" . }}
+                imagePullPolicy: {{ quote .Values.image.pullPolicy }}
+                name: manager
+                resources:
+                {{- toYaml .Values.resources | nindent 18 }}
+                securityContext:
+                {{- toYaml .Values.containerSecurityContext | nindent 18 }}
+                ports:
+                - containerPort: {{ .Values.healthCheck.port }}
+                  name: healthz
+                  protocol: TCP
+                livenessProbe: {{- toYaml .Values.livenessProbe | nindent 18 }}
+                readinessProbe: {{- toYaml .Values.readinessProbe | nindent 18 }}
+      - kind: ServiceAccount
+        apiVersion: v1
+        metadata:
+          name: {{ include "chart.fullname" . }}-manager
+          namespace: {{ .Release.Namespace }}
+      - kind: ClusterRole
+        apiVersion: rbac.authorization.k8s.io/v1
+        metadata:
+          name: {{ include "chart.fullname" . }}-manager-spoke-role
+          namespace: {{ .Release.Namespace }}
+        rules:
+        - apiGroups: [""]
+          resources: ["namespaces"]
+          verbs: ["get", "list", "watch", "delete"]
+        - apiGroups: [""]
+          resources: ["pods", "serviceaccounts"]
+          verbs: ["get", "list", "watch"]
+        - apiGroups: ["apps"]
+          resources: ["deployments"]
+          verbs: ["get", "list", "watch"]
+        - apiGroups: ["rbac.authorization.k8s.io"]
+          resources: ["clusterrolebindings", "clusterroles"]
+          verbs: ["get", "list", "watch"]
+        - apiGroups: ["operator.open-cluster-management.io"]
+          resources: ["klusterlets"]
+          verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+        - apiGroups: ["work.open-cluster-management.io"]
+          resources: ["appliedmanifestworks"]
+          verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+        - apiGroups: ["cluster.open-cluster-management.io"]
+          resources: ["clusterclaims"]
+          verbs: ["get", "list", "watch"]
+        - apiGroups: ["apiextensions.k8s.io"]
+          resources: ["customresourcedefinitions"]
+          verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      - kind: ClusterRoleBinding
+        apiVersion: rbac.authorization.k8s.io/v1
+        metadata:
+          name: {{ include "chart.fullname" . }}-manager-spoke-rolebinding
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: {{ include "chart.fullname" . }}-manager-spoke-role
+        subjects:
+          - kind: ServiceAccount
+            name: {{ include "chart.fullname" . }}-manager
+            namespace: {{ .Release.Namespace }}
+      - kind: Role
+        apiVersion: rbac.authorization.k8s.io/v1
+        metadata:
+          name: {{ include "chart.fullname" . }}-leader-election-role
+          namespace: {{ .Release.Namespace }}
+          labels:
+          {{- include "chart.labels" . | nindent 12 }}
+        rules:
+        - apiGroups: [""]
+          resources: [configmaps]
+          verbs: [get, list, watch, create, update, patch, delete]
+        - apiGroups: [coordination.k8s.io]
+          resources: [leases]
+          verbs: [get, list, watch, create, update, patch, delete]
+        - apiGroups: [""]
+          resources: [events]
+          verbs: [create, patch]
+      - kind: RoleBinding
+        apiVersion: rbac.authorization.k8s.io/v1
+        metadata:
+          name: {{ include "chart.fullname" . }}-leader-election-rolebinding
+          namespace: {{ .Release.Namespace }}
+          labels:
+          {{- include "chart.labels" . | nindent 12 }}
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: Role
+          name: {{ include "chart.fullname" . }}-leader-election-role
+          namespace: {{ .Release.Namespace }}
+        subjects:
+        - kind: ServiceAccount
+          name: {{ include "chart.fullname" . }}-manager
+          namespace: {{ .Release.Namespace }}
+  registration: # optional
+    # kubeClient or custom signer, if kubeClient, user and group is in a certain format.
+    # user is "system:open-cluster-management:cluster:{clusterName}:addon:{addonName}:agent:{agentName}"
+    # group is ["system:open-cluster-management:cluster:{clusterName}:addon:{addonName}",
+    #           "system:open-cluster-management:addon:{addonName}", "system:authenticated"]
+    - type: KubeClient
+      kubeClient:
+        hubPermissions:
+          # this isnt suffcient, but any other permissions need to set by fcc, because we cant template the namespace
+          - type: CurrentCluster
+            currentCluster:
+              clusterRoleName: {{ include "chart.fullname" . }}-manager-role
+          # - type: SingleNamespace
+          #   singleNamespace:
+          #     # TODO @arturshadnik - figure out how to set this per-cluster's hubRef - probably needs to be done by fcc
+          #     namespace: {{ .Release.Namespace }}
+          #     # namespace: {{ `{{HUB_CLUSTER_NAMESPACE}}` }}
+          #     roleRef:
+          #       apiGroup: rbac.authorization.k8s.io
+          #       kind: ClusterRole
+          #       name: {{ include "chart.fullname" . }}-manager-role
+          # - type: SingleNamespace
+          #   singleNamespace:
+          #     # namespace: {{ .Release.Namespace }} # TODO @arturshadnik - figure out how to set this per-cluster
+          #     # namespace: {{ `{{CLUSTER_NAMESPACE}}` }}
+          #     namespace: default
+          #     roleRef:
+          #       apiGroup: rbac.authorization.k8s.io
+          #       kind: ClusterRole
+          #       # should be created by user; the addon manager will grant the permission to the agent, so if the
+          #       # role/clusterRole contains some permissions that the addon manager doesn't have, user needs to grant
+          #       # the permission to the addon-manager (service account open-cluster-management-hub/addon-manager-controller-sa),
+          #       # otherwise the addon manager will fail to grant the permission to the agent
+          #       name: {{ include "chart.fullname" . }}-manager-role

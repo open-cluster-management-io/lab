@@ -98,6 +98,11 @@ func (s *Spoke) IsManagedBy(om metav1.ObjectMeta) bool {
 	return s.Spec.HubRef.Name == om.Name && s.Spec.HubRef.Namespace == om.Namespace
 }
 
+// IsHubAsSpoke returns true if the cluster is a hub-as-spoke. Determined either by name `hub-as-spoke` or an InCluster kubeconfig
+func (s *Spoke) IsHubAsSpoke() bool {
+	return s.Name == ManagedClusterTypeHubAsSpoke || s.Spec.Kubeconfig.InCluster
+}
+
 // Klusterlet is the configuration for a klusterlet.
 type Klusterlet struct {
 	// Annotations to apply to the spoke cluster. If not present, the 'agent.open-cluster-management.io/' prefix is added to each key.

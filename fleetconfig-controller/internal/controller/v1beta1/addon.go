@@ -2,6 +2,7 @@ package v1beta1
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os/exec"
@@ -16,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/apimachinery/pkg/types"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
 	workapi "open-cluster-management.io/api/client/work/clientset/versioned"
 	workv1 "open-cluster-management.io/api/work/v1"
@@ -346,7 +348,7 @@ func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke *v
 	}
 
 	// Enable new addons and updated addons
-	newEnabledAddons, err := handleAddonEnable(ctx, spoke, addonsToEnable)
+	newEnabledAddons, err := handleAddonEnable(ctx, spoke, addonsToEnable, addonC)
 	// even if an error is returned, any addon which was successfully enabled is tracked, so append before returning
 	enabledAddons = append(enabledAddons, newEnabledAddons...)
 	if err != nil {
@@ -362,7 +364,7 @@ func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke *v
 	return enabledAddons, nil
 }
 
-func handleAddonEnable(ctx context.Context, spoke *v1beta1.Spoke, addons []v1beta1.AddOn) ([]string, error) {
+func handleAddonEnable(ctx context.Context, spoke *v1beta1.Spoke, addons []v1beta1.AddOn, addonC *addonapi.Clientset) ([]string, error) {
 	if len(addons) == 0 {
 		return nil, nil
 	}
@@ -404,6 +406,16 @@ func handleAddonEnable(ctx context.Context, spoke *v1beta1.Spoke, addons []v1bet
 			enableErrs = append(enableErrs, fmt.Errorf("failed to enable addon: %v, output: %s", err, string(out)))
 			continue
 		}
+		// TODO - do this natively with clusteradm once https://github.com/open-cluster-management-io/clusteradm/issues/501 is resolved.
+		// OR switch to using Placements strategy once https://github.com/open-cluster-management-io/ocm/pull/1123 is merged.
+		if a.ConfigName == v1beta1.FCCAddOnName {
+			err = patchFCCMca(ctx, spoke.Name, addonC)
+			if err != nil {
+				enableErrs = append(enableErrs, err)
+				continue
+			}
+		}
+
 		enabledAddons = append(enabledAddons, a.ConfigName)
 		logger.V(1).Info("enabled addon", "managedcluster", spoke.Name, "addon", a.ConfigName, "output", string(stdout))
 	}
@@ -412,6 +424,44 @@ func handleAddonEnable(ctx context.Context, spoke *v1beta1.Spoke, addons []v1bet
 		return enabledAddons, fmt.Errorf("one or more addons were not enabled: %v", enableErrs)
 	}
 	return enabledAddons, nil
+}
+
+func patchFCCMca(ctx context.Context, spokeName string, addonC *addonapi.Clientset) error {
+	mca, err := addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).Get(ctx, v1beta1.FCCAddOnName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to configure fleetconfig-controller-manager: %v", err)
+	}
+	mca.Spec.Configs = append(mca.Spec.Configs, addonv1alpha1.AddOnConfig{
+		ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
+			Group:    addonv1alpha1.GroupName,
+			Resource: "addondeploymentconfigs", // TODO - no magic string
+		},
+		ConfigReferent: addonv1alpha1.ConfigReferent{
+			Name:      v1beta1.FCCAddOnName,
+			Namespace: spokeName,
+		},
+	})
+
+	patchBytes, err := json.Marshal(map[string]any{
+		"spec": map[string]any{
+			"configs": mca.Spec.Configs,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal patch for fleetconfig-controller-manager: %v", err)
+	}
+	_, err = addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).Patch(
+		ctx,
+		v1beta1.FCCAddOnName,
+		types.MergePatchType,
+		patchBytes,
+		metav1.PatchOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to patch fleetconfig-controller-manager: %v", err)
+
+	}
+	return nil
 }
 
 func handleAddonDisable(ctx context.Context, spoke *v1beta1.Spoke, enabledAddons []string) error {
@@ -654,8 +704,8 @@ func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Client
 			return false, nil
 		}
 
-		// Success condition: no manifestWorks remaining
-		if len(manifestWorks.Items) == 0 {
+		// Success condition: only FCC manifestWork remaining
+		if len(manifestWorks.Items) == 1 { // TODO @arturshadnik .................
 			logger.V(1).Info("addon manifestWorks cleanup completed", "spokeName", spokeName, "remainingManifestWorks", len(manifestWorks.Items))
 			return true, nil
 		}
