@@ -266,7 +266,7 @@ func ForSpoke(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 func getHubRestConfig() (*rest.Config, error) {
 	hubKubeconfigPath := os.Getenv(apiv1beta1.HubKubeconfigEnvVar)
 	if hubKubeconfigPath == "" {
-		hubKubeconfigPath = apiv1beta1.HubKubeconfigFallbackPath
+		hubKubeconfigPath = apiv1beta1.DefaultHubKubeconfigPath
 	}
 
 	basePath := strings.TrimSuffix(hubKubeconfigPath, "kubeconfig")

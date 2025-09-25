@@ -223,10 +223,15 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 }
 
 func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spoke) error {
+	roleName := os.Getenv(v1beta1.RoleNameEnvVar)
+	if roleName == "" {
+		roleName = v1beta1.DefaultFCCManagerRole
+	}
+
 	roleRef := rbacv1.RoleRef{
 		Kind:     "ClusterRole",
 		APIGroup: rbacv1.GroupName,
-		Name:     "fleetconfig-controller-manager-role", // TODO @arturshadnik get this some other way
+		Name:     roleName,
 	}
 
 	err := r.doBind(ctx, roleRef, spoke.Namespace, spoke.Name)
@@ -355,7 +360,7 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 
 	if len(spoke.Status.EnabledAddons) > 0 {
 		// Wait for addon manifestWorks to be fully cleaned up before proceeding with unjoin
-		if err := waitForAddonManifestWorksCleanup(ctx, workC, spoke.Name, addonCleanupTimeout); err != nil {
+		if err := waitForAddonManifestWorksCleanup(ctx, workC, spoke.Name, addonCleanupTimeout, spoke.IsHubAsSpoke()); err != nil {
 			spoke.SetConditions(true, v1beta1.NewCondition(
 				err.Error(), v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionFalse,
 			))
@@ -390,32 +395,30 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 	}
 
 	// at this point, klusterlet-work-agent is uninstalled, so nothing can remove this finalizer. all resources are cleaned up by the spoke's controller, so to prevent a dangling mw/namespace, we remove the finalizer manually
-	mw, err := workC.WorkV1().ManifestWorks(spoke.Name).Get(ctx, "addon-fleetconfig-controller-manager-deploy-0", metav1.GetOptions{}) // TODO @arturshadnik - use a label maybe
-	if err != nil && !kerrs.IsNotFound(err) {
-		return err
-	}
-	mw.Finalizers = slices.DeleteFunc(mw.Finalizers, func(s string) bool {
-		return s == "cluster.open-cluster-management.io/manifest-work-cleanup"
-	})
-
-	patchBytes, err := json.Marshal(map[string]any{
-		"metadata": map[string]any{
-			"finalizers": mw.Finalizers,
-		},
-	})
+	mwList, err := workC.WorkV1().ManifestWorks(spoke.Name).List(ctx, metav1.ListOptions{LabelSelector: fccAddOnManifestWorkLabel})
 	if err != nil {
 		return err
 	}
+	for _, mw := range mwList.Items {
+		patchBytes, err := json.Marshal(map[string]any{
+			"metadata": map[string]any{
+				"finalizers": nil,
+			},
+		})
+		if err != nil {
+			return err
+		}
 
-	_, err = workC.WorkV1().ManifestWorks(spoke.Name).Patch(
-		ctx,
-		"addon-fleetconfig-controller-manager-deploy-0",
-		types.MergePatchType,
-		patchBytes,
-		metav1.PatchOptions{},
-	)
-	if err != nil && !kerrs.IsNotFound(err) {
-		return err
+		_, err = workC.WorkV1().ManifestWorks(spoke.Name).Patch(
+			ctx,
+			mw.Name,
+			types.MergePatchType,
+			patchBytes,
+			metav1.PatchOptions{},
+		)
+		if err != nil && !kerrs.IsNotFound(err) {
+			return err
+		}
 	}
 
 	// remove ManagedCluster
@@ -451,6 +454,7 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 	if err != nil {
 		return err
 	}
+
 	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
 		return s == v1beta1.SpokeCleanupFinalizer
 	})

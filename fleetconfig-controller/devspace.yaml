@@ -166,7 +166,7 @@ dev:
       enabled: true
       disableReplace: true
       workDir: /workspace
-      command: ./hack/dev/devspace-start-hub.sh
+      command: ./devspace-start-hub.sh
     ports:
     - port: ${HUB_PORT}
     sync:
@@ -180,14 +180,10 @@ dev:
         - '!/dependencymagnet'
         - '!/internal'
         - '!/pkg'
-        - '!/hack/dev/devspace-start-hub.sh'
         - '!/hack'
         - '!/go.mod'
         - '!/go.sum'
         - 'Makefile'
-    - path: ./hack/dev:/workspace
-      excludePaths:
-        - '**'
         - '!devspace-start-hub.sh'
 
   fleetconfig-controller-dev-spoke:
@@ -214,7 +210,4 @@ dev:
         - '!/go.mod'
         - '!/go.sum'
         - 'Makefile'
-    - path: ./hack/dev:/workspace
-      excludePaths:
-        - '**'
         - '!devspace-start-spoke.sh'

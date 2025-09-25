@@ -17,7 +17,7 @@ spec:
         name: fleetconfig-controller-manager
   installStrategy:
     type: Manual
-    # TODO - use `Placements`` once ManagedClusters can be labeled immediately during the registration process. See https://github.com/open-cluster-management-io/ocm/issues/1195, https://github.com/open-cluster-management-io/ocm/pull/1123
+    # TODO - use `Placements` once ManagedClusters can be labeled immediately during the registration process. See https://github.com/open-cluster-management-io/ocm/issues/1195, https://github.com/open-cluster-management-io/ocm/pull/1123
     # placements:
     #   - namespace: managed-cluster-set-spokes
     #     name: spokes

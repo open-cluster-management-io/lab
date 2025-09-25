@@ -60,6 +60,9 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 	BeforeAll(func() {
 		tc = setupTestEnvironment()
 
+		By("loading the fcc image into the spoke cluster")
+		Expect(utils.DevspaceRunPipeline(tc.ctx, tc.spokeKubeconfig, "load-local", fcNamespace, "v1beta1")).To(Succeed())
+
 		By("deploying fleetconfig")
 		Expect(utils.DevspaceRunPipeline(tc.ctx, tc.hubKubeconfig, "deploy-local", fcNamespace, "v1beta1")).To(Succeed())
 	})
@@ -248,6 +251,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 					} else if err != nil {
 						utils.WarnError(err, "failed to check if Hub was deleted")
 					}
+					fmt.Println(hubClone.Status)
 					return errors.New("hub still exists")
 				},
 			)

@@ -29,28 +29,6 @@ import (
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
 )
 
-const (
-	// commands
-	addon   = "addon"
-	create  = "create"
-	enable  = "enable"
-	disable = "disable"
-
-	install   = "install"
-	uninstall = "uninstall"
-	hubAddon  = "hub-addon"
-
-	addonArgoCD = "argocd"
-	addonGPF    = "governance-policy-framework"
-
-	managedClusterAddOn = "ManagedClusterAddOn"
-)
-
-var supportedHubAddons = []string{
-	addonArgoCD,
-	addonGPF,
-}
-
 // getManagedClusterAddOns returns the list of ManagedClusterAddOns currently installed on a spoke cluster
 func getManagedClusterAddOns(ctx context.Context, addonC *addonapi.Clientset, spokeName string) ([]string, error) {
 	managedClusterAddOns, err := addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).List(ctx, metav1.ListOptions{
@@ -407,7 +385,8 @@ func handleAddonEnable(ctx context.Context, spoke *v1beta1.Spoke, addons []v1bet
 			continue
 		}
 		// TODO - do this natively with clusteradm once https://github.com/open-cluster-management-io/clusteradm/issues/501 is resolved.
-		// OR switch to using Placements strategy once https://github.com/open-cluster-management-io/ocm/pull/1123 is merged.
+		// When switching to using Placements strategy once https://github.com/open-cluster-management-io/ocm/pull/1123 is merged,
+		// this will still need to be done, just in a different part of the code.
 		if a.ConfigName == v1beta1.FCCAddOnName {
 			err = patchFCCMca(ctx, spoke.Name, addonC)
 			if err != nil {
@@ -434,7 +413,7 @@ func patchFCCMca(ctx context.Context, spokeName string, addonC *addonapi.Clients
 	mca.Spec.Configs = append(mca.Spec.Configs, addonv1alpha1.AddOnConfig{
 		ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
 			Group:    addonv1alpha1.GroupName,
-			Resource: "addondeploymentconfigs", // TODO - no magic string
+			Resource: AddOnDeploymentConfigsKind,
 		},
 		ConfigReferent: addonv1alpha1.ConfigReferent{
 			Name:      v1beta1.FCCAddOnName,
@@ -692,7 +671,7 @@ func isAddonInstalled(ctx context.Context, addonC *addonapi.Clientset, addonName
 
 // waitForAddonManifestWorksCleanup polls for addon-related manifestWorks to be removed
 // after addon disable operation to avoid race conditions during spoke unjoin
-func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Clientset, spokeName string, timeout time.Duration) error {
+func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Clientset, spokeName string, timeout time.Duration, isHubAsSpoke bool) error {
 	logger := log.FromContext(ctx)
 	logger.V(1).Info("waiting for addon manifestWorks cleanup", "spokeName", spokeName, "timeout", timeout)
 
@@ -704,8 +683,14 @@ func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Client
 			return false, nil
 		}
 
-		// Success condition: only FCC manifestWork remaining
-		if len(manifestWorks.Items) == 1 { // TODO @arturshadnik .................
+		// for hub-as-spoke, all addons must be removed.
+		// otherwise, fleetconfig-controller-manager must not be removed.
+		var expectedWorks = 1
+		if isHubAsSpoke {
+			expectedWorks = 0
+		}
+
+		if len(manifestWorks.Items) == expectedWorks {
 			logger.V(1).Info("addon manifestWorks cleanup completed", "spokeName", spokeName, "remainingManifestWorks", len(manifestWorks.Items))
 			return true, nil
 		}

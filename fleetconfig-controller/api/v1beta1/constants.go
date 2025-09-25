@@ -78,8 +78,8 @@ const (
 	// HubKubeconfigEnvVar is the environment variable containing the path to the mounted Hub kubeconfig.
 	HubKubeconfigEnvVar = "HUB_KUBECONFIG"
 
-	// HubKubeconfigFallbackPath is the path of the mounted kubeconfig when the controller is running in a Spoke cluster. Used if the environment variable is not set.
-	HubKubeconfigFallbackPath = "/managed/hub-kubeconfig/kubeconfig"
+	// DefaultHubKubeconfigPath is the path of the mounted kubeconfig when the controller is running in a Spoke cluster. Used if the environment variable is not set.
+	DefaultHubKubeconfigPath = "/managed/hub-kubeconfig/kubeconfig"
 
 	// SpokeNameEnvVar is the environment variable containing the name of the Spoke resource.
 	SpokeNameEnvVar = "CLUSTER_NAME"
@@ -93,8 +93,14 @@ const (
 	// ControllerNamespaceEnvVar is the environment variable containing the namespace that the controller is deployed to.
 	ControllerNamespaceEnvVar = "CONTROLLER_NAMESPACE"
 
+	// RoleNameEnvVar containing the name of the ClusterRole for fleetconfig-controller-manager.
+	RoleNameEnvVar = "ROLE_NAME"
+
 	// FCCAddOnName is the name of the fleetconfig-controller-addon
 	FCCAddOnName = "fleetconfig-controller-manager"
+
+	// DefaultFCCManagerRole is the default name of the fleetconfig-controller-manager ClusterRole
+	DefaultFCCManagerRole = "fleetconfig-controller-manager-role"
 )
 
 // SupportedClusterTypes are the valid cluster types that the controller can be installed in.

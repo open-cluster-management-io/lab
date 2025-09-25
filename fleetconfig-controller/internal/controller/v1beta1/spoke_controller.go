@@ -91,16 +91,28 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		spoke.Status.Phase = v1beta1.Unhealthy
 	}
 
-	// Add finalizers if not already present, set defaults, and requeue
-	if !slices.Contains(spoke.Finalizers, v1beta1.HubCleanupFinalizer) {
-		setDefaults(ctx, spoke, hubMeta)
-		spoke.Finalizers = append(
-			spoke.Finalizers,
-			v1beta1.HubCleanupPreflightFinalizer, // removed by the hub to signal to the spoke that preflight is completed
-			v1beta1.SpokeCleanupFinalizer,        // removed by the spoke to signal to the hub that unjoin succeeded
-			v1beta1.HubCleanupFinalizer,          // removed by the hub after post-unjoin cleanup is finished
-		)
-		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
+	switch r.ClusterType {
+	case v1beta1.ClusterTypeHub:
+		if !slices.Contains(spoke.Finalizers, v1beta1.HubCleanupFinalizer) {
+			setDefaults(ctx, spoke, hubMeta)
+			spoke.Finalizers = append(
+				spoke.Finalizers,
+				v1beta1.HubCleanupPreflightFinalizer, // removed by the hub to signal to the spoke that preflight is completed
+				v1beta1.HubCleanupFinalizer,          // removed by the hub after post-unjoin cleanup is finished
+			)
+			if spoke.IsHubAsSpoke() {
+				spoke.Finalizers = append(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer)
+			}
+			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
+		}
+	case v1beta1.ClusterTypeSpoke:
+		if !slices.Contains(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) && spoke.DeletionTimestamp.IsZero() {
+			spoke.Finalizers = append(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) // removed by the spoke to signal to the hub that unjoin succeeded
+			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
+		}
+	default:
+		// this is guarded against when the manager is initialized. should never reach this point
+		panic(fmt.Sprintf("unknown cluster type %s. Must be one of %v", r.ClusterType, v1beta1.SupportedClusterTypes))
 	}
 
 	// Handle deletion logic with finalizer
