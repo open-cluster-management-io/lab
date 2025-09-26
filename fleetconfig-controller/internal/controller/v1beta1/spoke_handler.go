@@ -483,23 +483,24 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 		return err
 	}
 
-	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
-		return s == v1beta1.SpokeCleanupFinalizer
-	})
-
-	// hub-as-spoke case, no further cleanup needed
+	// hub-as-spoke/failed pivot case, no further cleanup needed - clusteradm unjoin will have handled it all
 	if r.ClusterType == v1beta1.ClusterTypeHub {
+		spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
+			return s == v1beta1.SpokeCleanupFinalizer
+		})
 		return nil
 	}
 
-	// "self-destruct" any remaining namespaces/resources
-	// TODO - instead of deleting the namespace etc, can we delete the appliedManifestWork?
-	// name: 43967cf4fa7b6c9c1f4014eb104077ac73d86aabc3d2c4ae6c51babdf5898540-addon-fleetconfig-controller-manager-deploy-0
-	// no labels, no owner ref
+	// remove all remaining klusterlet resources that unjoin did not remove (because of the remaining AMW)
+	workClient, err := common.WorkClient(spokeKubeconfig)
+	if err != nil {
+		return err
+	}
 	operatorClient, err := common.OperatorClient(spokeKubeconfig)
 	if err != nil {
 		return err
 	}
+
 	if err := operatorClient.OperatorV1().Klusterlets().Delete(ctx, "klusterlet", metav1.DeleteOptions{}); err != nil && !kerrs.IsNotFound(err) {
 		return err
 	}
@@ -508,7 +509,6 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 		"open-cluster-management-agent",
 		"open-cluster-management-agent-addon",
 		"open-cluster-management",
-		os.Getenv(v1beta1.ControllerNamespaceEnvVar),
 	}
 
 	restCfg, err := kube.RestConfigFromKubeconfig(spokeKubeconfig)
@@ -527,6 +527,16 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 		if err := spokeClient.Delete(ctx, ns); err != nil && !kerrs.IsNotFound(err) {
 			return err
 		}
+	}
+
+	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
+		return s == v1beta1.SpokeCleanupFinalizer
+	})
+
+	// self-destruct
+	err = workClient.WorkV1().AppliedManifestWorks().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
+	if err != nil {
+		return err
 	}
 
 	logger.V(1).Info("Klusterlet cleanup complete")

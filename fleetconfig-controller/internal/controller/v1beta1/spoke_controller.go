@@ -233,7 +233,8 @@ func (r *SpokeReconciler) SetupWithManagerForHub(mgr ctrl.Manager) error {
 					if !ok {
 						return false
 					}
-					return sharedFieldsChanged(oldHub.Spec.DeepCopy(), newHub.Spec.DeepCopy())
+					return sharedFieldsChanged(oldHub.Spec.DeepCopy(), newHub.Spec.DeepCopy()) ||
+						!reflect.DeepEqual(oldHub.Status, newHub.Status)
 				},
 				GenericFunc: func(_ event.GenericEvent) bool {
 					return false

@@ -103,7 +103,7 @@ spec:
           verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
         - apiGroups: ["work.open-cluster-management.io"]
           resources: ["appliedmanifestworks"]
-          verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+          verbs: ["get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"]
         - apiGroups: ["cluster.open-cluster-management.io"]
           resources: ["clusterclaims"]
           verbs: ["get", "list", "watch"]

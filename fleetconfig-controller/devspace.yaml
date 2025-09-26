@@ -157,7 +157,7 @@ deployments:
 hooks:
 - name: cert-manager-ns
   command: "kubectl create namespace cert-manager --dry-run=client -o yaml | kubectl apply -f -"
-  events: ["before:deploy"]
+  events: ["before:deploy:cert-manager"]
 
 dev:
   fleetconfig-controller-dev-hub:
