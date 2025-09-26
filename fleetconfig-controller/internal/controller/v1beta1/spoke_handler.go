@@ -284,6 +284,10 @@ func (r *SpokeReconciler) doSpokeWork(ctx context.Context, spoke *v1beta1.Spoke,
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("handleSpoke", "spoke", spoke.Name)
 
+	spoke.SetConditions(true, v1beta1.NewCondition(
+		v1beta1.PivotComplete, v1beta1.PivotComplete, metav1.ConditionTrue, metav1.ConditionTrue,
+	))
+
 	spokeKubeconfig, err := kube.RawFromInClusterRestConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load kubeconfig from inCluster: %v", err)
@@ -307,9 +311,6 @@ func (r *SpokeReconciler) doSpokeWork(ctx context.Context, spoke *v1beta1.Spoke,
 	}
 	spoke.Status.KlusterletHash = currKlusterletHash
 
-	spoke.SetConditions(true, v1beta1.NewCondition(
-		v1beta1.PivotComplete, v1beta1.PivotComplete, metav1.ConditionTrue, metav1.ConditionTrue,
-	))
 	return nil
 }
 
@@ -381,6 +382,7 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 
 	// requeue until unjoin is complete by the spoke's controller
 	if slices.Contains(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) {
+		logger.V(1).Info("Hub preflight complete, waiting for spoke agent to deregister")
 		return nil
 	}
 
@@ -444,8 +446,10 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 }
 
 func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spoke) error {
+	logger := log.FromContext(ctx)
 	// requeue until preflight is complete by the hub's controller
 	if slices.Contains(spoke.Finalizers, v1beta1.HubCleanupPreflightFinalizer) {
+		logger.V(1).Info("Cleanup initiated, waiting for hub to complete preflight")
 		return nil
 	}
 
@@ -504,6 +508,7 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 		}
 	}
 
+	logger.V(1).Info("Klusterlet cleanup complete")
 	return nil
 }
 
