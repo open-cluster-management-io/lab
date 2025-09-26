@@ -32,5 +32,7 @@ const (
 	addonCleanupTimeout      = 1 * time.Minute
 	addonCleanupPollInterval = 2 * time.Second
 
-	fccAddOnManifestWorkLabel = "open-cluster-management.io/addon-name=fleetconfig-controller-manager"
+	manifestWorkAddOnLabelKey = "open-cluster-management.io/addon-name"
+
+	manifestWorkAddOnLabelValueFcc = "fleetconfig-controller-manager"
 )

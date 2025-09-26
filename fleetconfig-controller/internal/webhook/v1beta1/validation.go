@@ -174,9 +174,8 @@ func validateAddonUniqueness(newObject *v1beta1.Hub) field.ErrorList {
 	for i, a := range newObject.Spec.AddOnConfigs {
 		if _, found := addOnConfigNames[a.Name]; found {
 			continue
-		} else {
-			addOnConfigNames[a.Name] = i
 		}
+		addOnConfigNames[a.Name] = i
 	}
 
 	// Validate that HubAddOn names are unique within the HubAddOns list

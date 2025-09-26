@@ -161,10 +161,14 @@ var (
 )
 
 const (
+	// AddonArgoCD is the name of the built-in ArgoCD hub addon.
 	AddonArgoCD = "argocd"
-	AddonGPF    = "governance-policy-framework"
+
+	// AddonGPF is the name of the built-in Governance Policy Framework hub addon.
+	AddonGPF = "governance-policy-framework"
 )
 
+// SupportedHubAddons are the built-in hub addons which clusteradm and fleetconfig-controller support.
 var SupportedHubAddons = []string{
 	AddonArgoCD,
 	AddonGPF,
