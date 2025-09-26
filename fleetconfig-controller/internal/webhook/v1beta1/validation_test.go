@@ -409,7 +409,7 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "allowed - HubRef change",
+			name: "disallowed - HubRef change",
 			oldSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
 					HubRef: v1beta1.HubRef{
@@ -532,6 +532,245 @@ func TestAllowSpokeUpdate(t *testing.T) {
 				}
 			} else if err != nil {
 				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateAddonUniqueness(t *testing.T) {
+	tests := []struct {
+		name     string
+		hub      *v1beta1.Hub
+		wantErrs int
+		errMsgs  []string
+	}{
+		{
+			name: "valid - no addons",
+			hub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{},
+			},
+			wantErrs: 0,
+		},
+		{
+			name: "valid - unique AddOnConfigs with different names",
+			hub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					AddOnConfigs: []v1beta1.AddOnConfig{
+						{Name: "addon1", Version: "v1.0.0"},
+						{Name: "addon2", Version: "v1.0.0"},
+						{Name: "addon3", Version: "v2.0.0"},
+					},
+				},
+			},
+			wantErrs: 0,
+		},
+		{
+			name: "valid - same AddOnConfig name with different versions",
+			hub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					AddOnConfigs: []v1beta1.AddOnConfig{
+						{Name: "addon1", Version: "v1.0.0"},
+						{Name: "addon1", Version: "v2.0.0"},
+						{Name: "addon1", Version: "v3.0.0"},
+					},
+				},
+			},
+			wantErrs: 0,
+		},
+		{
+			name: "valid - unique HubAddOns",
+			hub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					HubAddOns: []v1beta1.HubAddOn{
+						{Name: "argocd"},
+						{Name: "governance-policy-framework"},
+					},
+				},
+			},
+			wantErrs: 0,
+		},
+		{
+			name: "valid - no name conflicts between HubAddOns and AddOnConfigs",
+			hub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					AddOnConfigs: []v1beta1.AddOnConfig{
+						{Name: "addon1", Version: "v1.0.0"},
+						{Name: "addon2", Version: "v2.0.0"},
+					},
+					HubAddOns: []v1beta1.HubAddOn{
+						{Name: "argocd"},
+						{Name: "governance-policy-framework"},
+					},
+				},
+			},
+			wantErrs: 0,
+		},
+		{
+			name: "invalid - duplicate AddOnConfig name-version pairs",
+			hub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					AddOnConfigs: []v1beta1.AddOnConfig{
+						{Name: "addon1", Version: "v1.0.0"},
+						{Name: "addon2", Version: "v2.0.0"},
+						{Name: "addon1", Version: "v1.0.0"}, // duplicate
+					},
+				},
+			},
+			wantErrs: 1,
+			errMsgs:  []string{"duplicate addOnConfig addon1-v1.0.0 (name-version) found at indices"},
+		},
+		{
+			name: "invalid - multiple duplicate AddOnConfig name-version pairs",
+			hub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					AddOnConfigs: []v1beta1.AddOnConfig{
+						{Name: "addon1", Version: "v1.0.0"},
+						{Name: "addon2", Version: "v2.0.0"},
+						{Name: "addon1", Version: "v1.0.0"}, // duplicate
+						{Name: "addon2", Version: "v2.0.0"}, // duplicate
+					},
+				},
+			},
+			wantErrs: 2,
+			errMsgs: []string{
+				"duplicate addOnConfig addon1-v1.0.0 (name-version) found at indices",
+				"duplicate addOnConfig addon2-v2.0.0 (name-version) found at indices",
+			},
+		},
+		{
+			name: "invalid - duplicate HubAddOn names",
+			hub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					HubAddOns: []v1beta1.HubAddOn{
+						{Name: "argocd"},
+						{Name: "governance-policy-framework"},
+						{Name: "argocd"}, // duplicate
+					},
+				},
+			},
+			wantErrs: 1,
+			errMsgs:  []string{"duplicate hubAddOn name argocd found at indices"},
+		},
+		{
+			name: "invalid - multiple duplicate HubAddOn names",
+			hub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					HubAddOns: []v1beta1.HubAddOn{
+						{Name: "argocd"},
+						{Name: "governance-policy-framework"},
+						{Name: "argocd"},                      // duplicate
+						{Name: "governance-policy-framework"}, // duplicate
+					},
+				},
+			},
+			wantErrs: 2,
+			errMsgs: []string{
+				"duplicate hubAddOn name argocd found at indices",
+				"duplicate hubAddOn name governance-policy-framework found at indices",
+			},
+		},
+		{
+			name: "invalid - name conflict between HubAddOn and AddOnConfig",
+			hub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					AddOnConfigs: []v1beta1.AddOnConfig{
+						{Name: "argocd", Version: "v1.0.0"},
+						{Name: "addon2", Version: "v2.0.0"},
+					},
+					HubAddOns: []v1beta1.HubAddOn{
+						{Name: "argocd"}, // conflicts with AddOnConfig
+						{Name: "governance-policy-framework"},
+					},
+				},
+			},
+			wantErrs: 1,
+			errMsgs:  []string{"hubAddOn name argocd clashes with an existing addOnConfig name"},
+		},
+		{
+			name: "invalid - unsupported HubAddOn",
+			hub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					AddOnConfigs: []v1beta1.AddOnConfig{},
+					HubAddOns: []v1beta1.HubAddOn{
+						{Name: "custom-addon"},
+					},
+				},
+			},
+			wantErrs: 1,
+			errMsgs:  []string{"hubAddOn name argocd clashes with an existing addOnConfig name"},
+		},
+		{
+			name: "invalid - all types of conflicts combined",
+			hub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					AddOnConfigs: []v1beta1.AddOnConfig{
+						{Name: "addon1", Version: "v1.0.0"},
+						{Name: "addon2", Version: "v2.0.0"},
+						{Name: "addon1", Version: "v1.0.0"}, // duplicate name-version
+						{Name: "argocd", Version: "v1.0.0"},
+					},
+					HubAddOns: []v1beta1.HubAddOn{
+						{Name: "argocd"},
+						{Name: "argocd"}, // duplicate name, conflicts with AddOnConfig
+					},
+				},
+			},
+			wantErrs: 4,
+			errMsgs: []string{
+				"duplicate addOnConfig addon1-v1.0.0 (name-version) found at indices",
+				"duplicate hubAddOn name argocd found at indices",
+				"hubAddOn name shared-addon clashes with an existing addOnConfig name",
+				"hubAddOn name shared-addon clashes with an existing addOnConfig name",
+			},
+		},
+		{
+			name: "edge case - empty version defaults",
+			hub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					AddOnConfigs: []v1beta1.AddOnConfig{
+						{Name: "addon1"}, // empty version
+						{Name: "addon1"}, // empty version, should be duplicate
+					},
+				},
+			},
+			wantErrs: 1,
+			errMsgs:  []string{"duplicate addOnConfig addon1- (name-version) found at indices"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validateAddonUniqueness(tt.hub)
+
+			if len(errs) != tt.wantErrs {
+				t.Errorf("validateAddonUniqueness() returned %d errors, want %d", len(errs), tt.wantErrs)
+				for i, err := range errs {
+					t.Errorf("  Error %d: %s", i, err.Error())
+				}
+				return
+			}
+
+			// Check that each expected error message is present
+			for _, expectedMsg := range tt.errMsgs {
+				found := false
+				for _, err := range errs {
+					if err.Error() != "" && err.Error() != expectedMsg {
+						// For partial matching since error messages include indices
+						if len(expectedMsg) > 0 && err.Error() != "" {
+							// Check if the error message contains the expected substring
+							if len(err.Error()) >= len(expectedMsg) {
+								found = true
+								break
+							}
+						}
+					} else if err.Error() == expectedMsg {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("Expected error message containing %q not found in errors: %v", expectedMsg, errs)
+				}
 			}
 		})
 	}

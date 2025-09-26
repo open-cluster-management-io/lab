@@ -149,15 +149,33 @@ func validateHubAddons(ctx context.Context, cli client.Client, oldObject, newObj
 func validateAddonUniqueness(newObject *v1beta1.Hub) field.ErrorList {
 	errs := field.ErrorList{}
 
+	for i, ha := range newObject.Spec.HubAddOns {
+		if !slices.ContainsFunc(v1beta1.SupportedHubAddons, func(a string) bool {
+			return ha.Name == a
+		}) {
+			errs = append(errs, field.Invalid(field.NewPath("hubAddOns").Index(i), ha.Name, fmt.Sprintf("invalid hubAddOn name. must be one of %v", v1beta1.SupportedHubAddons)))
+		}
+	}
+
 	// Validate that AddOnConfig names are unique within the AddOnConfigs list
-	addOnConfigNames := make(map[string]int)
+	addOnConfigVersionedNames := make(map[string]int)
 	for i, a := range newObject.Spec.AddOnConfigs {
 		key := fmt.Sprintf("%s-%s", a.Name, a.Version)
-		if existingIndex, found := addOnConfigNames[key]; found {
+		if existingIndex, found := addOnConfigVersionedNames[key]; found {
 			errs = append(errs, field.Invalid(field.NewPath("addOnConfigs").Index(i), key,
 				fmt.Sprintf("duplicate addOnConfig %s (name-version) found at indices %d and %d", key, existingIndex, i)))
 		} else {
-			addOnConfigNames[key] = i
+			addOnConfigVersionedNames[key] = i
+		}
+	}
+
+	// Validate that AddOnConfig names are unique within the AddOnConfigs list
+	addOnConfigNames := make(map[string]int)
+	for i, a := range newObject.Spec.AddOnConfigs {
+		if _, found := addOnConfigNames[a.Name]; found {
+			continue
+		} else {
+			addOnConfigNames[a.Name] = i
 		}
 	}
 

@@ -55,7 +55,7 @@ func getHubAddOns(ctx context.Context, addonC *addonapi.Clientset) ([]string, er
 
 	var hubAddons []string
 	for _, addon := range allClusterManagementAddOns.Items {
-		if slices.Contains(supportedHubAddons, addon.Name) && addon.Labels[v1beta1.LabelAddOnManagedBy] == "" {
+		if slices.Contains(v1beta1.SupportedHubAddons, addon.Name) && addon.Labels[v1beta1.LabelAddOnManagedBy] == "" {
 			hubAddons = append(hubAddons, addon.Name)
 		}
 	}
@@ -650,7 +650,7 @@ func handleHubAddonInstall(ctx context.Context, addonC *addonapi.Clientset, addo
 		}
 		// the argocd pull integration addon logs the entire helm template output including CRDs to stdout.
 		// to prevent flooding the logs, overwrite it.
-		if addon.Name == addonArgoCD {
+		if addon.Name == v1beta1.AddonArgoCD {
 			stdout = []byte("ArgoCD hub addon successfully installed")
 		}
 		logger.V(1).Info("installed hubAddon", "name", addon.Name, "output", string(stdout))

@@ -90,7 +90,7 @@ const (
 	// SpokeNamespaceEnvVar is the environment variable containing the namespace of the Spoke resource.
 	SpokeNamespaceEnvVar = "CLUSTER_NAMESPACE"
 
-	// HubNamespaceEnvVar is the environment variable containing the namespace of the Spoke resource.
+	// HubNamespaceEnvVar is the environment variable containing the namespace of the Hub resource.
 	HubNamespaceEnvVar = "HUB_NAMESPACE"
 
 	// ControllerNamespaceEnvVar is the environment variable containing the namespace that the controller is deployed to.
@@ -159,3 +159,13 @@ var (
 	// ManagedBySelector is a label selector for filtering add-on resources managed fleetconfig-controller.
 	ManagedBySelector = labels.SelectorFromSet(labels.Set(ManagedByLabels))
 )
+
+const (
+	AddonArgoCD = "argocd"
+	AddonGPF    = "governance-policy-framework"
+)
+
+var SupportedHubAddons = []string{
+	AddonArgoCD,
+	AddonGPF,
+}

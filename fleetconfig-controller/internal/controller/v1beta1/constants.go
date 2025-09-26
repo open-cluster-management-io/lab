@@ -26,9 +26,6 @@ const (
 	uninstall = "uninstall"
 	hubAddon  = "hub-addon"
 
-	addonArgoCD = "argocd"
-	addonGPF    = "governance-policy-framework"
-
 	managedClusterAddOn           = "ManagedClusterAddOn"
 	AddOnDeploymentConfigResource = "addondeploymentconfigs"
 
@@ -37,8 +34,3 @@ const (
 
 	fccAddOnManifestWorkLabel = "open-cluster-management.io/addon-name=fleetconfig-controller-manager"
 )
-
-var supportedHubAddons = []string{
-	addonArgoCD,
-	addonGPF,
-}
