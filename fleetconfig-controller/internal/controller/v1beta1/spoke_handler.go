@@ -529,15 +529,17 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 		}
 	}
 
+	// self-destruct as late as possible, so that the controller has enough time to patch the Spoke before being garbage collected
+	defer func() {
+		err = workClient.WorkV1().AppliedManifestWorks().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
+		if err != nil {
+			logger.Error(err, "failed to finalize agent cleanup")
+		}
+	}()
+
 	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
 		return s == v1beta1.SpokeCleanupFinalizer
 	})
-
-	// self-destruct
-	err = workClient.WorkV1().AppliedManifestWorks().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
 
 	logger.V(1).Info("Klusterlet cleanup complete")
 	return nil
