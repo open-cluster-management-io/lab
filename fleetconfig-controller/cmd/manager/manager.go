@@ -128,7 +128,7 @@ func ForHub(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 	}
 
 	// nolint:goconst
-	if (opts.UseWebhook || os.Getenv("ENABLE_WEBHOOKS") != "false") && opts.ClusterType != apiv1beta1.ClusterTypeSpoke {
+	if opts.UseWebhook || os.Getenv("ENABLE_WEBHOOKS") == "true" {
 		if err = apiv1alpha1.SetupFleetConfigWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "FleetConfig")
 			return nil, err

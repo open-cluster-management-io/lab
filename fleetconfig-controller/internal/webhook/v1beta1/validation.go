@@ -169,7 +169,7 @@ func validateAddonUniqueness(newObject *v1beta1.Hub) field.ErrorList {
 		}
 	}
 
-	// Validate that AddOnConfig names are unique within the AddOnConfigs list
+	// Build an index of AddOnConfig names (first occurrence) for cross-set clash checks with HubAddOns
 	addOnConfigNames := make(map[string]int)
 	for i, a := range newObject.Spec.AddOnConfigs {
 		if _, found := addOnConfigNames[a.Name]; found {

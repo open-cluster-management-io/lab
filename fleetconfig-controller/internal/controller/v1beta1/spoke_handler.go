@@ -40,19 +40,21 @@ import (
 func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke, hubKubeconfig []byte) error {
 	switch r.ClusterType {
 	case v1beta1.ClusterTypeHub:
-		err := r.doHubCleanup(ctx, spoke, hubKubeconfig)
+		originalSpoke := ctx.Value(originalSpokeKey).(*v1beta1.Spoke) // use the original object to check conditions/finalizers
+		pivotComplete := originalSpoke.PivotComplete()
+		err := r.doHubCleanup(ctx, spoke, hubKubeconfig, pivotComplete)
 		if err != nil {
 			return err
 		}
-		if spoke.IsHubAsSpoke() {
-			err = r.doSpokeCleanup(ctx, spoke)
+		if spoke.IsHubAsSpoke() || !pivotComplete {
+			err = r.doSpokeCleanup(ctx, spoke, false)
 			if err != nil {
 				return err
 			}
 		}
 		return nil
 	case v1beta1.ClusterTypeSpoke:
-		return r.doSpokeCleanup(ctx, spoke)
+		return r.doSpokeCleanup(ctx, spoke, true)
 	default:
 		// this is guarded against when the manager is initialized. should never reach this point
 		panic(fmt.Sprintf("unknown cluster type %s. Must be one of %v", r.ClusterType, v1beta1.SupportedClusterTypes))
@@ -234,12 +236,12 @@ func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spo
 		Name:     roleName,
 	}
 
-	err := r.doBind(ctx, roleRef, spoke.Namespace, spoke.Name)
+	err := r.createBinding(ctx, roleRef, spoke.Namespace, spoke.Name)
 	if err != nil {
 		return err
 	}
 	if spoke.Spec.HubRef.Namespace != spoke.Namespace {
-		err = r.doBind(ctx, roleRef, spoke.Spec.HubRef.Namespace, spoke.Name)
+		err = r.createBinding(ctx, roleRef, spoke.Spec.HubRef.Namespace, spoke.Name)
 		if err != nil {
 			return err
 		}
@@ -247,10 +249,10 @@ func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spo
 	return nil
 }
 
-func (r *SpokeReconciler) doBind(ctx context.Context, roleRef rbacv1.RoleRef, namespace, spokeName string) error {
+func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.RoleRef, namespace, spokeName string) error {
 	binding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("open-cluster-management:%s:%s:agent-%s",
+			Name: fmt.Sprintf("open-cluster-management:%s:%s:agent-%s", // this is a different naming format than OCM uses for addon agents. we need to append the spoke name to avoid possible conflicts in cases where multiple spokes exist in 1 namespace
 				v1beta1.FCCAddOnName, strings.ToLower(roleRef.Kind), spokeName),
 			Namespace: namespace,
 			Labels: map[string]string{
@@ -314,7 +316,7 @@ func (r *SpokeReconciler) doSpokeWork(ctx context.Context, spoke *v1beta1.Spoke,
 	return nil
 }
 
-func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke, hubKubeconfig []byte) error {
+func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke, hubKubeconfig []byte, pivotComplete bool) error {
 	logger := log.FromContext(ctx)
 	clusterC, err := common.ClusterClient(hubKubeconfig)
 	if err != nil {
@@ -352,8 +354,13 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 	// remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
 	spokeCopy := spoke.DeepCopy()
 	spokeCopy.Spec.AddOns = nil
-	if !spoke.IsHubAsSpoke() {
-		spokeCopy.Spec.AddOns = append(spokeCopy.Spec.AddOns, v1beta1.AddOn{ConfigName: "fleetconfig-controller-manager"}) // disable all except fcc
+
+	// for hub-as-spoke, or if the addon agent never came up, disable all addons
+	// otherwise, leave fleetconfig-controller-manager addon running so that it can do deregistration
+	shouldCleanAll := spoke.IsHubAsSpoke() || !pivotComplete
+
+	if !shouldCleanAll {
+		spokeCopy.Spec.AddOns = append(spokeCopy.Spec.AddOns, v1beta1.AddOn{ConfigName: v1beta1.FCCAddOnName})
 	}
 	if _, err := handleSpokeAddons(ctx, addonC, spokeCopy); err != nil {
 		spoke.SetConditions(true, v1beta1.NewCondition(
@@ -364,7 +371,7 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 
 	if len(spoke.Status.EnabledAddons) > 0 {
 		// Wait for addon manifestWorks to be fully cleaned up before proceeding with unjoin
-		if err := waitForAddonManifestWorksCleanup(ctx, workC, spoke.Name, addonCleanupTimeout, spoke.IsHubAsSpoke()); err != nil {
+		if err := waitForAddonManifestWorksCleanup(ctx, workC, spoke.Name, addonCleanupTimeout, shouldCleanAll); err != nil {
 			spoke.SetConditions(true, v1beta1.NewCondition(
 				err.Error(), v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionFalse,
 			))
@@ -445,7 +452,7 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 	return nil
 }
 
-func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spoke) error {
+func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spoke, pivotComplete bool) error {
 	logger := log.FromContext(ctx)
 	// requeue until preflight is complete by the hub's controller
 	if slices.Contains(spoke.Finalizers, v1beta1.HubCleanupPreflightFinalizer) {
@@ -453,10 +460,21 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 		return nil
 	}
 
-	spokeKubeconfig, err := kube.RawFromInClusterRestConfig()
+	var (
+		spokeKubeconfig []byte
+		err             error
+	)
+
+	// if the addon agent did not come up successfully, try to unjoin the spoke from the hub
+	if pivotComplete {
+		spokeKubeconfig, err = kube.RawFromInClusterRestConfig()
+	} else {
+		spokeKubeconfig, err = kube.KubeconfigFromSecretOrCluster(ctx, r.Client, spoke.Spec.Kubeconfig, spoke.Namespace)
+	}
 	if err != nil {
 		return err
 	}
+
 	err = r.unjoinSpoke(ctx, spoke, spokeKubeconfig)
 	if err != nil {
 		return err
@@ -930,7 +948,7 @@ func (r *SpokeReconciler) mergeKlusterletValues(ctx context.Context, spoke *v1be
 		}
 		fromValues, ok := cm.Data[spoke.Spec.Klusterlet.ValuesFrom.Key]
 		if !ok {
-			logger.V(1).Info("warning: Klusterlet values ConfigMap not found", "spoke", spoke.Name, "configMap", nn, "key", spoke.Spec.Klusterlet.ValuesFrom.Key)
+			logger.V(1).Info("warning: Klusterlet values key not found in ConfigMap", "spoke", spoke.Name, "configMap", nn, "key", spoke.Spec.Klusterlet.ValuesFrom.Key)
 			return spoke.Spec.Klusterlet.Values, nil
 		}
 		fromBytes := []byte(fromValues)

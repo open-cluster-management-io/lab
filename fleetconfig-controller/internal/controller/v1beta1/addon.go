@@ -675,7 +675,7 @@ func isAddonInstalled(ctx context.Context, addonC *addonapi.Clientset, addonName
 
 // waitForAddonManifestWorksCleanup polls for addon-related manifestWorks to be removed
 // after addon disable operation to avoid race conditions during spoke unjoin
-func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Clientset, spokeName string, timeout time.Duration, isHubAsSpoke bool) error {
+func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Clientset, spokeName string, timeout time.Duration, shouldCleanAll bool) error {
 	logger := log.FromContext(ctx)
 	logger.V(1).Info("waiting for addon manifestWorks cleanup", "spokeName", spokeName, "timeout", timeout)
 
@@ -687,11 +687,11 @@ func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Client
 			return false, nil
 		}
 
-		// for hub-as-spoke, all addons must be removed.
+		// for hub-as-spoke, or if the pivot failed, all addons must be removed.
 		// otherwise, fleetconfig-controller-manager must not be removed.
-		var expectedWorks = 1
-		if isHubAsSpoke {
-			expectedWorks = 0
+		var expectedWorks = 0
+		if !shouldCleanAll {
+			expectedWorks = 1
 		}
 
 		if len(manifestWorks.Items) == expectedWorks {

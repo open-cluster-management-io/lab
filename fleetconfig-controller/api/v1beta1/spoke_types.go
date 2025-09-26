@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -101,6 +102,19 @@ func (s *Spoke) IsManagedBy(om metav1.ObjectMeta) bool {
 // IsHubAsSpoke returns true if the cluster is a hub-as-spoke. Determined either by name `hub-as-spoke` or an InCluster kubeconfig
 func (s *Spoke) IsHubAsSpoke() bool {
 	return s.Name == ManagedClusterTypeHubAsSpoke || s.Spec.Kubeconfig.InCluster
+}
+
+// PivotComplete return true if the spoke's agent has successfully started managing day 2 operations.
+func (s *Spoke) PivotComplete() bool {
+	jc := s.GetCondition(SpokeJoined)
+	if jc == nil || jc.Status != metav1.ConditionTrue {
+		return false
+	}
+	pc := s.GetCondition(PivotComplete)
+	if pc == nil || pc.Status != metav1.ConditionTrue {
+		return false
+	}
+	return slices.Contains(s.Finalizers, SpokeCleanupFinalizer)
 }
 
 // Klusterlet is the configuration for a klusterlet.
