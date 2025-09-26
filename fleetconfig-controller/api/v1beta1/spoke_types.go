@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
-	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -111,10 +110,7 @@ func (s *Spoke) PivotComplete() bool {
 		return false
 	}
 	pc := s.GetCondition(PivotComplete)
-	if pc == nil || pc.Status != metav1.ConditionTrue {
-		return false
-	}
-	return slices.Contains(s.Finalizers, SpokeCleanupFinalizer)
+	return pc != nil && pc.Status == metav1.ConditionTrue
 }
 
 // Klusterlet is the configuration for a klusterlet.

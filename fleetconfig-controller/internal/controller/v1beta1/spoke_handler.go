@@ -40,7 +40,10 @@ import (
 func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke, hubKubeconfig []byte) error {
 	switch r.ClusterType {
 	case v1beta1.ClusterTypeHub:
-		originalSpoke := ctx.Value(originalSpokeKey).(*v1beta1.Spoke) // use the original object to check conditions/finalizers
+		originalSpoke, ok := ctx.Value(originalSpokeKey).(*v1beta1.Spoke) // use the original object to check conditions/finalizers
+		if !ok {
+			originalSpoke = spoke.DeepCopy()
+		}
 		pivotComplete := originalSpoke.PivotComplete()
 		err := r.doHubCleanup(ctx, spoke, hubKubeconfig, pivotComplete)
 		if err != nil {
