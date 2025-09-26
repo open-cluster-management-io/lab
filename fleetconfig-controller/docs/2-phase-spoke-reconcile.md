@@ -102,6 +102,7 @@ sequenceDiagram
     SpokeK8s->>HubK8s: Join request
     HubController->>HubK8s: Run clusteradm accept
     HubController->>HubK8s: Wait for ManagedClusterJoined condition
+    HubController->>HubController: Spoke Joined
 
     Note over HubK8s, SpokeK8s: Addon Flow
     HubController->>HubK8s: Set up AddOnDeploymentConfigs for FCC-agent
@@ -109,7 +110,6 @@ sequenceDiagram
     HubK8s->>SpokeK8s: Install FCC-agent (initiates pivot)
 
     Note over HubK8s, SpokeController: Day 2 Flow - Pivot Complete
-    HubK8s->>SpokeController: Spoke Joined
     SpokeController->>HubK8s: Add SpokeCleanupFinalizer
     SpokeController->>HubK8s: Set PivotComplete condition
     SpokeController->>HubK8s: Get Hub, klusterlet values

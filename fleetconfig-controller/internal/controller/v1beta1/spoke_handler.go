@@ -91,6 +91,7 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 	}
 }
 
+// doHubWork handles hub-side work such as joins and addons
 func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, hubMeta hubMeta, klusterletValues *v1beta1.KlusterletChartConfig) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("handleSpoke", "spoke", spoke.Name)
@@ -227,6 +228,7 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 	return nil
 }
 
+// bindAddonAgent creates the necessary bindings for fcc agent to access hub resources
 func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spoke) error {
 	roleName := os.Getenv(v1beta1.RoleNameEnvVar)
 	if roleName == "" {
@@ -252,6 +254,7 @@ func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spo
 	return nil
 }
 
+// createBinding creates a binding for a given role
 func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.RoleRef, namespace, spokeName string) error {
 	binding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -285,6 +288,7 @@ func clusterAddonGroup(clusterName, addonName string) string {
 	return fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, addonName)
 }
 
+// doSpokeWork handles spoke-side work such as upgrades
 func (r *SpokeReconciler) doSpokeWork(ctx context.Context, spoke *v1beta1.Spoke, hub *v1beta1.Hub, klusterletValues *v1beta1.KlusterletChartConfig) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("handleSpoke", "spoke", spoke.Name)
@@ -319,6 +323,7 @@ func (r *SpokeReconciler) doSpokeWork(ctx context.Context, spoke *v1beta1.Spoke,
 	return nil
 }
 
+// doHubCleanup handles all the required cleanup of a hub cluster when deregistering a Spoke
 func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke, hubKubeconfig []byte, pivotComplete bool) error {
 	logger := log.FromContext(ctx)
 	clusterC, err := common.ClusterClient(hubKubeconfig)
@@ -455,6 +460,7 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 	return nil
 }
 
+// doHubCleanup handles all the required cleanup of a spoke cluster when deregistering a Spoke
 func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spoke, pivotComplete bool) error {
 	logger := log.FromContext(ctx)
 	// requeue until preflight is complete by the hub's controller
@@ -918,6 +924,7 @@ func getToken(ctx context.Context, hubMeta hubMeta) (*tokenMeta, error) {
 	return tokenMeta, nil
 }
 
+// getHubMeta retrieves the Hub resource and it's associated kubeconfig
 func (r *SpokeReconciler) getHubMeta(ctx context.Context, hubRef v1beta1.HubRef) (hubMeta, error) {
 	hub := &v1beta1.Hub{}
 	hubMeta := hubMeta{}
@@ -938,6 +945,7 @@ func (r *SpokeReconciler) getHubMeta(ctx context.Context, hubRef v1beta1.HubRef)
 	return hubMeta, nil
 }
 
+// mergeKlusterletValues merges klusterlet values from a configmap in the Spoke namespace, and from the Spoke's spec. Spec takes precedence.
 func (r *SpokeReconciler) mergeKlusterletValues(ctx context.Context, spoke *v1beta1.Spoke) (*v1beta1.KlusterletChartConfig, error) {
 	logger := log.FromContext(ctx)
 
