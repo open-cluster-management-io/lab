@@ -219,7 +219,7 @@ func TestAllowHubUpdate(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsg:  "only changes to spec.apiServer, spec.clusterManager.source.*, spec.hubAddOns, spec.addOnConfigs, spec.logVerbosity, spec.timeout, and spec.registrationAuth are allowed when updating the hub",
+			errMsg:  "only changes to spec.apiServer, spec.clusterManager.source.*, spec.hubAddOns, spec.addOnConfigs, spec.logVerbosity, spec.timeout, spec.registrationAuth, and spec.kubeconfig are allowed when updating the hub",
 		},
 		{
 			name: "disallowed - Force change",
@@ -234,7 +234,7 @@ func TestAllowHubUpdate(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsg:  "only changes to spec.apiServer, spec.clusterManager.source.*, spec.hubAddOns, spec.addOnConfigs, spec.logVerbosity, spec.timeout, and spec.registrationAuth are allowed when updating the hub",
+			errMsg:  "only changes to spec.apiServer, spec.clusterManager.source.*, spec.hubAddOns, spec.addOnConfigs, spec.logVerbosity, spec.timeout, spec.registrationAuth, and spec.kubeconfig are allowed when updating the hub",
 		},
 		{
 			name: "disallowed - ClusterManager non-source change",
@@ -253,7 +253,7 @@ func TestAllowHubUpdate(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsg:  "only changes to spec.apiServer, spec.clusterManager.source.*, spec.hubAddOns, spec.addOnConfigs, spec.logVerbosity, spec.timeout, and spec.registrationAuth are allowed when updating the hub",
+			errMsg:  "only changes to spec.apiServer, spec.clusterManager.source.*, spec.hubAddOns, spec.addOnConfigs, spec.logVerbosity, spec.timeout, spec.registrationAuth, and spec.kubeconfig are allowed when updating the hub",
 		},
 		{
 			name: "multiple allowed changes",

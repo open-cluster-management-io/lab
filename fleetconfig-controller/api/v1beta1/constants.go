@@ -3,7 +3,7 @@ package v1beta1
 import "k8s.io/apimachinery/pkg/labels"
 
 const (
-	// HubCleanupPreflightFinalizer is the finalizer for cleanup preflight checks hub cluster's controller instance. Used to signal to the spoke's controller than unjoin can proceed.
+	// HubCleanupPreflightFinalizer is the finalizer for cleanup preflight checks hub cluster's controller instance. Used to signal to the spoke's controller that unjoin can proceed.
 	HubCleanupPreflightFinalizer = "fleetconfig.open-cluster-management.io/hub-cleanup-preflight"
 
 	// HubCleanupFinalizer is the finalizer for cleanup by the hub cluster's controller instance.

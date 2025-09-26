@@ -87,7 +87,7 @@ func allowHubUpdate(oldHub, newHub *v1beta1.Hub) error {
 		newHubCopy.Kubeconfig = v1beta1.Kubeconfig{}
 
 		if !reflect.DeepEqual(oldHubCopy, newHubCopy) {
-			return errors.New("only changes to spec.apiServer, spec.clusterManager.source.*, spec.hubAddOns, spec.addOnConfigs, spec.logVerbosity, spec.timeout, and spec.registrationAuth are allowed when updating the hub")
+			return errors.New("only changes to spec.apiServer, spec.clusterManager.source.*, spec.hubAddOns, spec.addOnConfigs, spec.logVerbosity, spec.timeout, spec.registrationAuth, and spec.kubeconfig are allowed when updating the hub")
 		}
 	}
 	return nil
@@ -364,21 +364,21 @@ func validateAddons(ctx context.Context, cli client.Client, newObject *v1beta1.S
 	err := cli.Get(ctx, types.NamespacedName{Name: newObject.Spec.HubRef.Name, Namespace: newObject.Spec.HubRef.Namespace}, hub)
 	if err != nil {
 		if !kerrs.IsNotFound(err) {
-			return nil, field.ErrorList{field.InternalError(field.NewPath("spec").Child("addOns"), err)}
+			errs = append(errs, field.InternalError(field.NewPath("spec").Child("addOns"), err))
+			return nil, errs
 		}
-		// warn instead of an error, so we don't block creating spokes and hub at the same time
-		return admission.Warnings{warnHubNotFound}, nil
+		return admission.Warnings{warnHubNotFound}, errs
 	}
 
 	initCond := hub.GetCondition(v1beta1.HubInitialized)
 	if initCond == nil || initCond.Status != metav1.ConditionTrue {
-		// warn instead of an error, so we don't block creating spokes and hub at the same time
-		return admission.Warnings{warnHubNotFound}, nil
+		return admission.Warnings{warnHubNotFound}, errs
 	}
 
 	cmaList, err := addonC.AddonV1alpha1().ClusterManagementAddOns().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return nil, field.ErrorList{field.InternalError(field.NewPath("spec").Child("addOns"), err)}
+		errs = append(errs, field.InternalError(field.NewPath("spec").Child("addOns"), err))
+		return nil, errs
 	}
 	cmaNames := make([]string, len(cmaList.Items))
 	for i, cma := range cmaList.Items {

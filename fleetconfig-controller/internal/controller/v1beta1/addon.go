@@ -413,7 +413,7 @@ func patchFCCMca(ctx context.Context, spokeName string, addonC *addonapi.Clients
 	desired := addonv1alpha1.AddOnConfig{
 		ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
 			Group:    addonv1alpha1.GroupName,
-			Resource: AddOnDeploymentConfigsKind,
+			Resource: AddOnDeploymentConfigResource,
 		},
 		ConfigReferent: addonv1alpha1.ConfigReferent{
 			Name:      v1beta1.FCCAddOnName,

@@ -44,8 +44,7 @@ type Options struct {
 	Scheme                    *runtime.Scheme
 }
 
-// ForHub configures a manager instance for a Hub cluster.
-func ForHub(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
+func setupServer(opts Options, setupLog logr.Logger) (webhook.Server, []func(*tls.Config)) {
 	// if the EnableHTTP2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
 	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
@@ -67,7 +66,12 @@ func ForHub(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 		Port:    opts.WebhookPort,
 		TLSOpts: tlsOpts,
 	})
+	return webhookServer, tlsOpts
+}
 
+// ForHub configures a manager instance for a Hub cluster.
+func ForHub(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
+	webhookServer, tlsOpts := setupServer(opts, setupLog)
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: opts.Scheme,
 		Metrics: metricsserver.Options{
@@ -143,27 +147,7 @@ func ForHub(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 
 // ForSpoke configures a manager instance for a Spoke cluster.
 func ForSpoke(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
-	// if the EnableHTTP2 flag is false (the default), http/2 should be disabled
-	// due to its vulnerabilities. More specifically, disabling http/2 will
-	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
-	// Rapid Reset CVEs. For more information see:
-	// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
-	// - https://github.com/advisories/GHSA-4374-p667-p6c8
-	disableHTTP2 := func(c *tls.Config) {
-		setupLog.Info("disabling http/2")
-		c.NextProtos = []string{"http/1.1"}
-	}
-
-	tlsOpts := []func(*tls.Config){}
-	if !opts.EnableHTTP2 {
-		tlsOpts = append(tlsOpts, disableHTTP2)
-	}
-
-	webhookServer := webhook.NewServer(webhook.Options{
-		CertDir: opts.CertDir,
-		Port:    opts.WebhookPort,
-		TLSOpts: tlsOpts,
-	})
+	_, tlsOpts := setupServer(opts, setupLog)
 
 	// enables watching resources in the hub cluster
 	hubRestCfg, err := getHubRestConfig()
@@ -238,7 +222,7 @@ func ForSpoke(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 			},
 		},
 
-		WebhookServer:          webhookServer,
+		WebhookServer:          nil,
 		HealthProbeBindAddress: opts.ProbeAddr,
 		LeaderElection:         opts.EnableLeaderElection,
 		LeaderElectionConfig:   localRestCfg, // use local restConfig. alternatively, we can disable leader election if HA is not a concern.

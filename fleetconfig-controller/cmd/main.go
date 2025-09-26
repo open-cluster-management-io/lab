@@ -97,7 +97,7 @@ func main() {
 			os.Exit(1)
 		}
 	default:
-		setupLog.Info("unable to create controller for unknown cluster type", "controller", "Spoke", "clusterType", mOpts.ClusterType, "allowed", apiv1beta1.SupportedClusterTypes)
+		setupLog.Info("unable to create controller for unknown cluster type", "clusterType", mOpts.ClusterType, "allowed", apiv1beta1.SupportedClusterTypes)
 		os.Exit(1)
 	}
 

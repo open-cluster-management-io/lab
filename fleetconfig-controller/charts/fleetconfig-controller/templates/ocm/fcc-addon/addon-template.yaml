@@ -161,4 +161,3 @@ spec:
           - type: CurrentCluster
             currentCluster:
               clusterRoleName: {{ include "chart.fullname" . }}-manager-role
-

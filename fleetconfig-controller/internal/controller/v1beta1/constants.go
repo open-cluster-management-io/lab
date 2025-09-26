@@ -29,8 +29,8 @@ const (
 	addonArgoCD = "argocd"
 	addonGPF    = "governance-policy-framework"
 
-	managedClusterAddOn        = "ManagedClusterAddOn"
-	AddOnDeploymentConfigsKind = "addondeploymentconfigs"
+	managedClusterAddOn           = "ManagedClusterAddOn"
+	AddOnDeploymentConfigResource = "addondeploymentconfigs"
 
 	addonCleanupTimeout      = 1 * time.Minute
 	addonCleanupPollInterval = 2 * time.Second

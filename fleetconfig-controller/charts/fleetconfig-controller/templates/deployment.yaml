@@ -57,8 +57,8 @@ spec:
         {{- toYaml .Values.resources | nindent 10 }}
         securityContext:
         {{- toYaml .Values.containerSecurityContext | nindent 10 }}
-      {{- if .Values.admissionWebhooks.enabled }}
         ports:
+        {{- if .Values.admissionWebhooks.enabled }}
         - containerPort: {{ .Values.webhookService.port }}
           name: webhook-server
           protocol: TCP
