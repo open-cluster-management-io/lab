@@ -16,24 +16,28 @@ mkdir -p $TARGET_DIR
    export KUBECONFIG=$TARGET_DIR/ocm-hub-as-spoke.kubeconfig
    ```
 
-1. Build & load the `fleetconfig-controller:latest` image
+2. Build & load the `fleetconfig-controller:latest` image
 
    ```bash
-   IMAGE_FLAVOURS="fleetconfig-controller:./build/Dockerfile.base" make images && \
+   IMAGE_FLAVOURS="base:./build/Dockerfile.base" make images && \
      kind load docker-image quay.io/open-cluster-management/fleetconfig-controller:latest \
        --name ocm-hub-as-spoke
    ```
 
-1. Install the `fleetconfig-controller`
+3. Install the `fleetconfig-controller`
 
    ```bash
    devspace deploy -n fleetconfig-system
    ```
 
-1. Verify that the `FleetConfig` is reconciled successfully
+4. Verify that the `Hub` and `Spoke` are reconciled successfully
 
    ```bash
-   kubectl wait --for=jsonpath='{.status.phase}'=Running fleetconfig/fleetconfig \
+   kubectl wait --for=jsonpath='{.status.phase}'=Running hub/hub \
+     -n fleetconfig-system \
+     --timeout=10m
+   
+   kubectl wait --for=jsonpath='{.status.phase}'=Running spoke/hub-as-spoke \
      -n fleetconfig-system \
      --timeout=10m
    ```
@@ -48,32 +52,43 @@ mkdir -p $TARGET_DIR
    export KUBECONFIG=$TARGET_DIR/ocm-hub.kubeconfig
    ```
 
-1. Generate an internal kubeconfig for the `ocm-spoke` cluster and upload it to the `ocm-hub` cluster
+2. Generate an internal kubeconfig for the `ocm-spoke` cluster and upload it to the `ocm-hub` cluster
 
    ```bash
    kind get kubeconfig --name ocm-spoke --internal > $TARGET_DIR/ocm-spoke-internal.kubeconfig
-   kubectl create secret generic test-fleetconfig-kubeconfig \
+   kubectl create namespace fleetconfig-system
+   kubectl -n fleetconfig-system create secret generic test-spoke-kubeconfig \
      --from-file=value=$TARGET_DIR/ocm-spoke-internal.kubeconfig
    ```
 
-1. Build & load the `fleetconfig-controller:local` image
+3. Build & load the `fleetconfig-controller:local` image
 
    ```bash
-   IMAGE_FLAVOURS="fleetconfig-controller:./build/Dockerfile.base" IMAGE_TAG=local make images && \
-     kind load docker-image quay.io/open-cluster-management/fleetconfig-controller:local \
-       --name ocm-hub
+   IMAGE_FLAVOURS="base:./build/Dockerfile.base" IMAGE_REPO=fleetconfig-controller-local IMAGE_TAG=local make images && \
+     kind load docker-image quay.io/open-cluster-management/fleetconfig-controller-local:local \
+       --name ocm-hub && \
+     kind load docker-image quay.io/open-cluster-management/fleetconfig-controller-local:local \
+       --name ocm-spoke
    ```
 
-1. Install the `fleetconfig-controller` on the hub using the `deploy-local` pipeline
+4. Install the `fleetconfig-controller` on the hub using the `deploy-local` pipeline
 
    ```bash
    devspace run-pipeline deploy-local -n fleetconfig-system --skip-build
    ```
 
-1. Verify that the `FleetConfig` is reconciled successfully
+5. Verify that the `Hub` and `Spoke` are reconciled successfully
 
    ```bash
-   kubectl wait --for=jsonpath='{.status.phase}'=Running fleetconfig/fleetconfig \
+   kubectl wait --for=jsonpath='{.status.phase}'=Running hub/hub \
+     -n fleetconfig-system \
+     --timeout=10m
+   
+   kubectl wait --for=jsonpath='{.status.phase}'=Running spoke/hub-as-spoke \
+     -n fleetconfig-system \
+     --timeout=10m
+   
+   kubectl wait --for=jsonpath='{.status.phase}'=Running spoke/spoke \
      -n fleetconfig-system \
      --timeout=10m
    ```

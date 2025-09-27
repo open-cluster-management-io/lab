@@ -45,7 +45,7 @@ fleetConfig:
     kubeconfig:
       # secret is provisioned during E2E test setup
       secretReference:
-        name: "test-fleetconfig-kubeconfig"
+        name: "test-spoke-kubeconfig"
         kubeconfigKey: "value"
     klusterlet:
       annotations:

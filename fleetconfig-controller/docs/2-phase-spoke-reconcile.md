@@ -1,6 +1,6 @@
 # Spoke Reconciler Walkthrough
 
-For the purposes of this document `Hub controller` refers to the `SpokeReconciler` running on the hub cluster, and `Spoke controller` refers to the `SpokeReconciler` running on the spoke cluster. This is different from the `HubReconciler`, which is a hub-only controller for reconciling the Hub resource.
+For the purposes of this document, `Spoke controller` refers to the `SpokeReconciler` running on the spoke cluster, and `Hub controller` refers to the `SpokeReconciler` running on the hub cluster. This is different from the `HubReconciler`, which is a hub-only controller for reconciling the Hub resource.
 
 The Spoke reconciler runs in two different modes depending on where it's deployed:
 

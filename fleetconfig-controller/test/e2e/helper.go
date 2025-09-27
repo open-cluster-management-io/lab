@@ -35,7 +35,7 @@ import (
 
 const (
 	fcNamespace                = "fleetconfig-system"
-	spokeSecretName            = "test-fleetconfig-kubeconfig"
+	spokeSecretName            = "test-spoke-kubeconfig"
 	klusterletAnnotationPrefix = "agent.open-cluster-management.io"
 	kubeconfigSecretKey        = "value"
 	hubAsSpokeName             = v1alpha1.ManagedClusterTypeHubAsSpoke
