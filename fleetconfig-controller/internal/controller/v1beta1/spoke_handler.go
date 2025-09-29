@@ -320,7 +320,7 @@ func (r *SpokeReconciler) doSpokeWork(ctx context.Context, spoke *v1beta1.Spoke,
 	if err != nil {
 		return fmt.Errorf("failed to compute hash of spoke %s klusterlet values: %w", spoke.Name, err)
 	}
-	if hub != nil && hub.Spec.ClusterManager.Source.BundleVersion != "" {
+	if hub != nil && hub.Spec.ClusterManager != nil && hub.Spec.ClusterManager.Source.BundleVersion != "" {
 		upgrade, err := r.spokeNeedsUpgrade(ctx, spoke, currKlusterletHash, hub.Spec.ClusterManager.Source, spokeKubeconfig)
 		if err != nil {
 			return fmt.Errorf("failed to check if spoke cluster needs upgrade: %w", err)
