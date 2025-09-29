@@ -126,7 +126,7 @@ sequenceDiagram
 
 ```
 
-#### Day 2 - Maintanance
+#### Day 2 - Maintenance
 ```mermaid
 sequenceDiagram
     participant HubK8s as Hub Cluster API Server

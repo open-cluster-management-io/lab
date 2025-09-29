@@ -68,8 +68,12 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke, hub
 func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke, hubMeta hubMeta) error {
 	klusterletValues, err := r.mergeKlusterletValues(ctx, spoke)
 	if err != nil {
+		spoke.SetConditions(true, v1beta1.NewCondition(
+			err.Error(), v1beta1.KlusterletSynced, metav1.ConditionFalse, metav1.ConditionTrue,
+		))
 		return err
 	}
+
 	switch r.ClusterType {
 	case v1beta1.ClusterTypeHub:
 		err = r.doHubWork(ctx, spoke, hubMeta, klusterletValues)
@@ -79,12 +83,22 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 		if spoke.IsHubAsSpoke() { // hub-as-spoke
 			err = r.doSpokeWork(ctx, spoke, hubMeta.hub, klusterletValues)
 			if err != nil {
+				spoke.SetConditions(true, v1beta1.NewCondition(
+					err.Error(), v1beta1.KlusterletSynced, metav1.ConditionFalse, metav1.ConditionTrue,
+				))
 				return err
 			}
 		}
 		return nil
 	case v1beta1.ClusterTypeSpoke:
-		return r.doSpokeWork(ctx, spoke, hubMeta.hub, klusterletValues)
+		err = r.doSpokeWork(ctx, spoke, hubMeta.hub, klusterletValues)
+		if err != nil {
+			spoke.SetConditions(true, v1beta1.NewCondition(
+				err.Error(), v1beta1.KlusterletSynced, metav1.ConditionFalse, metav1.ConditionTrue,
+			))
+			return err
+		}
+		return nil
 	default:
 		// this is guarded against when the manager is initialized. should never reach this point
 		panic(fmt.Sprintf("unknown cluster type %s. Must be one of %v", r.ClusterType, v1beta1.SupportedClusterTypes))
@@ -319,6 +333,10 @@ func (r *SpokeReconciler) doSpokeWork(ctx context.Context, spoke *v1beta1.Spoke,
 		}
 	}
 	spoke.Status.KlusterletHash = currKlusterletHash
+
+	spoke.SetConditions(true, v1beta1.NewCondition(
+		v1beta1.KlusterletSynced, v1beta1.KlusterletSynced, metav1.ConditionTrue, metav1.ConditionTrue,
+	))
 
 	return nil
 }

@@ -137,6 +137,9 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		v1beta1.NewCondition(
 			v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionFalse,
 		),
+		v1beta1.NewCondition(
+			v1beta1.HubUpgradeFailed, v1beta1.HubUpgradeFailed, metav1.ConditionFalse, metav1.ConditionFalse,
+		),
 	}
 	hub.SetConditions(false, initConditions...)
 
@@ -336,11 +339,23 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub, hubKube
 	if hub.Spec.ClusterManager != nil {
 		upgrade, err := r.hubNeedsUpgrade(ctx, hub, operatorC)
 		if err != nil {
+			hub.SetConditions(true, v1beta1.NewCondition(
+				err.Error(), v1beta1.HubUpgradeFailed, metav1.ConditionTrue, metav1.ConditionFalse,
+			))
 			return fmt.Errorf("failed to check if hub needs upgrade: %w", err)
 		}
 		if upgrade {
-			return r.upgradeHub(ctx, hub)
+			err = r.upgradeHub(ctx, hub)
+			if err != nil {
+				hub.SetConditions(true, v1beta1.NewCondition(
+					err.Error(), v1beta1.HubUpgradeFailed, metav1.ConditionTrue, metav1.ConditionFalse,
+				))
+				return fmt.Errorf("failed to upgrade hub: %w", err)
+			}
 		}
+		hub.SetConditions(true, v1beta1.NewCondition(
+			v1beta1.HubUpgradeFailed, v1beta1.HubUpgradeFailed, metav1.ConditionFalse, metav1.ConditionFalse,
+		))
 	}
 
 	return nil

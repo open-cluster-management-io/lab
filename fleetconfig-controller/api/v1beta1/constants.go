@@ -29,6 +29,12 @@ const (
 
 	// PivotComplete means that the spoke cluster has successfully started managing itself.
 	PivotComplete = "PivotComplete"
+
+	// KlusterletSynced means that Klusterlet's OCM bundle version and values are up to date.
+	KlusterletSynced = "KlusterletSynced"
+
+	// HubUpgradeFailed means that the ClusterManager version upgrade failed.
+	HubUpgradeFailed = "HubUpgradeFailed"
 )
 
 // Hub and Spoke condition reasons
