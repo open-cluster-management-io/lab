@@ -101,6 +101,8 @@ deployments:
         image:
           repository: ${IMAGE_REPOSITORY}
           tag: ${IMAGE_TAG}
+        fleetConfig:
+          enabled: ${FLEETCONFIG_ENABLED}
       valuesFiles:
       - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
     updateImageTags: false
