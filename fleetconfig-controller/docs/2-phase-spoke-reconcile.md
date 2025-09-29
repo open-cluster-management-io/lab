@@ -88,7 +88,8 @@ This allows for an "escape hatch" if the spoke agent never came up. This is the 
 - SpokeK8s: Spoke cluster Kubernetes API server
 - Spoke Reconciler (Spoke): Spoke-side instance of the fleetconfig-controller-agent SpokeReconciler
 - Klusterlet CR: Klusterlet resource in the spoke cluster
-- Klusterlet Controllers: Klusterlet Controllers installed on the spoke cluster
+- RegAgent: OCM Klusterlet Registration Agent
+- WorkAgent: OCM Klusterlet Work Agent
 
 #### Day 1 - Join
 
@@ -99,6 +100,8 @@ sequenceDiagram
     participant HubController as Spoke Reconciler (Hub)
     participant SpokeK8s as Spoke Cluster API Server
     participant KlusterletCtrl as Klusterlet Controllers
+    participant RegAgent as Registration Agent
+    participant WorkAgent as Work Agent
 
     Note over User, HubController: Initialization
 
@@ -112,7 +115,7 @@ sequenceDiagram
     HubController->>HubController: Check if ManagedCluster exists
     alt ManagedCluster does not exist
         HubController->>SpokeK8s: Create Klusterlet and controllers (clusteradm join)
-        KlusterletCtrl->>HubK8s: Create CSR
+        RegAgent->>HubK8s: Create CSR
         HubController->>HubK8s: Accept CSR (clusteradm accept)
         HubController->>HubK8s: Wait for ManagedClusterJoined condition
         HubController->>HubController: Spoke Joined
@@ -121,8 +124,8 @@ sequenceDiagram
     Note over HubK8s, SpokeK8s: Addon Flow
     HubController->>HubK8s: Set up AddOnDeploymentConfigs for FCC-agent
     HubController->>HubK8s: Enable addons
-    KlusterletCtrl->>HubK8s: Work agent pulls addon ManifestWork
-    KlusterletCtrl->>SpokeK8s: Deploy FCC-agent addon (initiates pivot)
+    WorkAgent->>HubK8s: Pull FCC-agent addon ManifestWork
+    WorkAgent->>SpokeK8s: Deploy FCC-agent addon (initiates pivot)
 
 ```
 
