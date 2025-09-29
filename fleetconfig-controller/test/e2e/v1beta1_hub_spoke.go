@@ -256,6 +256,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 					v1beta1.HubInitialized:   metav1.ConditionTrue,
 					v1beta1.CleanupFailed:    metav1.ConditionTrue,
 					v1beta1.AddonsConfigured: metav1.ConditionTrue,
+					v1beta1.HubUpgradeFailed: metav1.ConditionFalse,
 				}); err != nil {
 					utils.WarnError(err, "Hub deletion not blocked")
 					return err

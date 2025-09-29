@@ -482,12 +482,14 @@ func ensureHubAndSpokesProvisioned(tc *E2EContext, hub *v1beta1.Hub, spokes []*v
 		"HubInitialized":   metav1.ConditionTrue,
 		"CleanupFailed":    metav1.ConditionFalse,
 		"AddonsConfigured": metav1.ConditionTrue,
+		"HubUpgradeFailed": metav1.ConditionFalse,
 	}
 	spokeExpectedConditions := map[string]metav1.ConditionStatus{
 		"SpokeJoined":      metav1.ConditionTrue,
 		"CleanupFailed":    metav1.ConditionFalse,
 		"AddonsConfigured": metav1.ConditionTrue,
 		"PivotComplete":    metav1.ConditionTrue,
+		"KlusterletSynced": metav1.ConditionTrue,
 	}
 	for k, v := range extraExpectedConditions {
 		hubExpectedConditions[k] = v

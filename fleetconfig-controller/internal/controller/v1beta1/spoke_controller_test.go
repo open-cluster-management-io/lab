@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	v1beta1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 )
 
 var (
@@ -133,6 +133,7 @@ var _ = Describe("Spoke Controller", Ordered, func() {
 				v1beta1.CleanupFailed:    metav1.ConditionFalse,
 				v1beta1.AddonsConfigured: metav1.ConditionFalse,
 				v1beta1.PivotComplete:    metav1.ConditionFalse,
+				v1beta1.KlusterletSynced: metav1.ConditionFalse,
 			})).To(Succeed())
 		})
 
