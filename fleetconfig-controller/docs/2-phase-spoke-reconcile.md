@@ -87,20 +87,20 @@ This allows for an "escape hatch" if the spoke agent never came up. This is the 
 - Spoke Reconciler (Hub): Hub-side instance of the fleetconfig-controller-manager SpokeReconciler
 - SpokeK8s: Spoke cluster Kubernetes API server
 - Spoke Reconciler (Spoke): Spoke-side instance of the fleetconfig-controller-agent SpokeReconciler
-- Klusterlet: Klusterlet CR and related controllers installed on the spoke cluster
+- Klusterlet CR: Klusterlet resource in the spoke cluster
+- Klusterlet Controllers: Klusterlet Controllers installed on the spoke cluster
 
 #### Day 1 - Join
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant HubK8s
+    participant HubK8s as Hub Cluster API Server
     participant HubController as Spoke Reconciler (Hub)
-    participant SpokeK8s
-    participant SpokeController as Spoke Reconciler (Spoke)
-    participant Klusterlet
+    participant SpokeK8s as Spoke Cluster API Server
+    participant KlusterletCtrl as Klusterlet Controllers
 
-    Note over User, SpokeController: Initialization
+    Note over User, HubController: Initialization
 
     User->>HubK8s: Create Spoke resource
     HubK8s->>HubController: Spoke resource created
@@ -108,11 +108,11 @@ sequenceDiagram
     HubController->>HubK8s: Add HubCleanupFinalizer
     HubController->>HubK8s: Add SpokeCleanupFinalizer (hub-as-spoke only)
     
-    Note over HubController, SpokeController: Join Process
+    Note over HubController, KlusterletCtrl: Join Process
     HubController->>HubController: Check if ManagedCluster exists
     alt ManagedCluster does not exist
-        HubController->>Klusterlet: Create Klusterlet controllers (clusteradm join)
-        Klusterlet->>HubK8s: Create CSR
+        HubController->>SpokeK8s: Create Klusterlet and controllers (clusteradm join)
+        KlusterletCtrl->>HubK8s: Create CSR
         HubController->>HubK8s: Accept CSR (clusteradm accept)
         HubController->>HubK8s: Wait for ManagedClusterJoined condition
         HubController->>HubController: Spoke Joined
@@ -121,16 +121,18 @@ sequenceDiagram
     Note over HubK8s, SpokeK8s: Addon Flow
     HubController->>HubK8s: Set up AddOnDeploymentConfigs for FCC-agent
     HubController->>HubK8s: Enable addons
-    HubK8s->>SpokeK8s: ClusterManager installs FCC-agent (initiates pivot)
+    KlusterletCtrl->>HubK8s: Work agent pulls addon ManifestWork
+    KlusterletCtrl->>SpokeK8s: Deploy FCC-agent addon (initiates pivot)
 
 ```
 
 #### Day 2 - Maintanance
 ```mermaid
 sequenceDiagram
-    participant HubK8s
+    participant HubK8s as Hub Cluster API Server
     participant SpokeController as Spoke Reconciler (Spoke)
-    participant Klusterlet
+    participant SpokeK8s as Spoke Cluster API Server
+    participant Klusterlet as Klusterlet CR
 
     Note over HubK8s, Klusterlet: Mainenance Flow
     SpokeController->>HubK8s: Add SpokeCleanupFinalizer
@@ -138,7 +140,7 @@ sequenceDiagram
     SpokeController->>HubK8s: Get Hub, klusterlet helm values
     SpokeController->>Klusterlet: Check klusterlet upgrade needed
     alt Upgrade needed
-        SpokeController->>Klusterlet: Run clusteradm upgrade klusterlet
+        SpokeController->>SpokeK8s: Run clusteradm upgrade klusterlet
     end
 ```
 #### Day 2 - Cleanup
@@ -146,13 +148,12 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant User
-    participant HubK8s
+    participant HubK8s as Hub Cluster API Server
     participant HubController as Spoke Reconciler (Hub)
-    participant SpokeK8s
+    participant SpokeK8s as Spoke Cluster API Server
     participant SpokeController as Spoke Reconciler (Spoke)
-    participant Klusterlet
 
-    Note over User, Klusterlet: Cleanup Flow
+    Note over User, SpokeController: Cleanup Flow
 
     User->>HubK8s: Delete Spoke resource
     HubK8s->>HubController: Spoke deletion requested
@@ -163,15 +164,15 @@ sequenceDiagram
     alt Active ManifestWorks
         HubController->>HubController: Requeue with error
     end
-    HubController->>HubK8s: Disable addons (keep fleetconfig-controller-agent)
+    HubController->>HubK8s: Disable addons (except fleetconfig-controller-agent)
     HubController->>HubK8s: Remove HubCleanupPreflightFinalizer
     
-    Note over SpokeK8s, SpokeController: Spoke Cleanup Phase
+    Note over HubK8s, SpokeController: Spoke Cleanup Phase
     SpokeController->>HubK8s: HubCleanupPreflightFinalizer removed?
     alt Not Removed
         SpokeController->>SpokeController: Requeue
     end
-    SpokeController->>Klusterlet: Remove Klusterlet and OCM namespaces (clusteradm unjoin)
+    SpokeController->>SpokeK8s: Remove Klusterlet and OCM namespaces (clusteradm unjoin)
     SpokeController->>HubK8s: Remove SpokeCleanupFinalizer
     SpokeController->>SpokeK8s: Remove AppliedManifestWork (which removes FCC-agent)
 
@@ -180,12 +181,12 @@ sequenceDiagram
     alt Not Removed
         HubController->>HubController: Requeue
     end
-    HubController->>HubK8s: Clean up CSRs, AddOn ManifestWork Finalizer, ManagedCluster, namespace
+    HubController->>HubK8s: Clean up CSR, FCC-agent AddOn ManifestWork Finalizer, ManagedCluster, namespace
     HubController->>HubK8s: Remove HubCleanupFinalizer
     
     HubK8s->>User: Spoke resource deleted
 
-    Note over HubController, SpokeController: Special Cases
+    Note over HubK8s, HubController: Special Cases
     Note right of HubK8s: Hub-as-spoke: Hub does both hub and spoke cleanup
     Note right of HubK8s: Failed Pivot: Hub does spoke cleanup if agent never came up
 ```
@@ -202,11 +203,10 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant User
-    participant HubK8s
+    participant HubK8s as Hub Cluster API Server
     participant HubReconciler as Hub Reconciler
-    participant ClusterManager
 
-    Note over User, ClusterManager: Hub Deletion
+    Note over User, HubReconciler: Hub Deletion
 
     User->>HubK8s: Delete Hub resource
     HubK8s->>HubReconciler: Hub deletion requested
@@ -221,7 +221,7 @@ sequenceDiagram
 
     Note over HubK8s, ClusterManager: Hub Cleanup Phase
     HubReconciler->>HubK8s: Delete all AddOns managed by FCC
-    HubReconciler->>ClusterManager: Delete ClusterManager, OCM namespaces (clusteradm clean)
+    HubReconciler->>HubK8s: Delete ClusterManager, OCM namespaces (clusteradm clean)
     HubReconciler->>HubK8s: Remove HubCleanupFinalizer
 
 ```
