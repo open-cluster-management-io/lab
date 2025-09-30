@@ -30,6 +30,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ktypes "k8s.io/apimachinery/pkg/types"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
+	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/pkg/common"
@@ -115,6 +117,65 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 				}
 				return nil
 			}, 1*time.Minute, 1*time.Second).Should(Succeed())
+		})
+
+		It("should successfully upgrade spoke Klusterlet, with no kubeconfig secret", func() {
+			By("deleting the secret")
+			EventuallyWithOffset(1, func() error {
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      spokeSecretName,
+						Namespace: fcNamespace,
+					},
+				}
+				err := tc.kClient.Delete(tc.ctx, secret)
+				if err != nil {
+					return client.IgnoreNotFound(err)
+				}
+				return nil
+			}, 1*time.Minute, 1*time.Second).Should(Succeed())
+
+			By("updating the klusterlet values and verifying that the upgrade is successful")
+			EventuallyWithOffset(1, func() error {
+				err := tc.kClient.Get(tc.ctx, v1beta1spokeNN, spokeClone)
+				if err != nil {
+					utils.WarnError(err, "failed to get spoke")
+					return err
+				}
+				newDuration := 5 * time.Second
+				spokeClone.Spec.Klusterlet.Values = &v1beta1.KlusterletChartConfig{
+					KlusterletChartConfig: chart.KlusterletChartConfig{
+						Klusterlet: chart.KlusterletConfig{
+							WorkConfiguration: operatorv1.WorkAgentConfiguration{
+								StatusSyncInterval: &metav1.Duration{
+									Duration: newDuration,
+								},
+							},
+						},
+					},
+				}
+				err = tc.kClient.Update(tc.ctx, spokeClone)
+				if err != nil {
+					utils.WarnError(err, "failed to patch spoke")
+					return err
+				}
+				klusterlet := &operatorv1.Klusterlet{}
+				if err := tc.kClientSpoke.Get(tc.ctx, klusterletNN, klusterlet); err != nil {
+					utils.WarnError(err, "failed to get klusterlet")
+					return err
+				}
+				if klusterlet.Spec.WorkConfiguration == nil || klusterlet.Spec.WorkConfiguration.StatusSyncInterval == nil {
+					err = errors.New("klusterlet status sync interval is nil")
+					utils.WarnError(err, "klusterlet not upgraded")
+					return err
+				}
+				if klusterlet.Spec.WorkConfiguration.StatusSyncInterval.Duration != newDuration {
+					err = fmt.Errorf("wrong status sync interval found on Klusterlet. want: %s, got: %s", newDuration, klusterlet.Spec.WorkConfiguration.StatusSyncInterval.Duration)
+					utils.WarnError(err, "failed to upgrade klusterlet")
+					return err
+				}
+				return nil
+			}, 3*time.Minute, 5*time.Second).Should(Succeed())
 		})
 
 		It("should successfully create a namespace in the hub-as-spoke cluster", func() {

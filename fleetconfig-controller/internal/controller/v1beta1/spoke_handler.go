@@ -954,12 +954,14 @@ func (r *SpokeReconciler) getHubMeta(ctx context.Context, hubRef v1beta1.HubRef)
 		return hubMeta, client.IgnoreNotFound(err)
 	}
 	hubMeta.hub = hub
-	// if found, load the hub's kubeconfig
-	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig, hub.Namespace)
-	if err != nil {
-		return hubMeta, err
+	// load the hub's kubeconfig. only needed on the hub's reconciler instance - the spoke's instance can access the hub using its default client
+	if r.ClusterType != v1beta1.ClusterTypeSpoke {
+		hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig, hub.Namespace)
+		if err != nil {
+			return hubMeta, err
+		}
+		hubMeta.kubeconfig = hubKubeconfig
 	}
-	hubMeta.kubeconfig = hubKubeconfig
 	return hubMeta, nil
 }
 
