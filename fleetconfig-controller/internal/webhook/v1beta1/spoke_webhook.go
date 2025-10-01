@@ -41,7 +41,7 @@ import (
 var spokelog = logf.Log.WithName("spoke-resource")
 
 // SetupSpokeWebhookWithManager registers the webhook for Spoke in the manager.
-func SetupSpokeWebhookWithManager(mgr ctrl.Manager) error {
+func SetupSpokeWebhookWithManager(mgr ctrl.Manager, instanceType string) error {
 	kubeconfig, err := kube.RawFromInClusterRestConfig()
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func SetupSpokeWebhookWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 	return ctrl.NewWebhookManagedBy(mgr).For(&v1beta1.Spoke{}).
-		WithValidator(&SpokeCustomValidator{client: mgr.GetClient(), addonC: addonC}).
+		WithValidator(&SpokeCustomValidator{client: mgr.GetClient(), addonC: addonC, instanceType: instanceType}).
 		Complete()
 }
 
@@ -65,8 +65,9 @@ func SetupSpokeWebhookWithManager(mgr ctrl.Manager) error {
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
 // as this struct is used only for temporary operations and does not need to be deeply copied.
 type SpokeCustomValidator struct {
-	client client.Client
-	addonC *versioned.Clientset
+	client       client.Client
+	addonC       *versioned.Clientset
+	instanceType string
 }
 
 var _ webhook.CustomValidator = &SpokeCustomValidator{}
@@ -102,7 +103,7 @@ func (v *SpokeCustomValidator) ValidateCreate(ctx context.Context, obj runtime.O
 		)
 	}
 
-	warn, errs := validateAddons(ctx, v.client, spoke, v.addonC)
+	warn, errs := v.validateAddons(ctx, v.client, spoke)
 	allErrs = append(allErrs, errs...)
 
 	if len(allErrs) > 0 {
@@ -137,7 +138,7 @@ func (v *SpokeCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newOb
 		)
 	}
 
-	warn, valErrs := validateAddons(ctx, v.client, spoke, v.addonC)
+	warn, valErrs := v.validateAddons(ctx, v.client, spoke)
 	allErrs = append(allErrs, valErrs...)
 
 	if len(allErrs) > 0 {

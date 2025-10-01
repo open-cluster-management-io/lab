@@ -39,7 +39,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	fleetconfigopenclustermanagementiov1beta1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/test"
@@ -76,7 +76,7 @@ var _ = BeforeSuite(func() {
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	var err error
-	err = fleetconfigopenclustermanagementiov1beta1.AddToScheme(scheme.Scheme)
+	err = v1beta1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
@@ -133,7 +133,7 @@ var _ = BeforeSuite(func() {
 	Expect(os.Setenv("KUBECONFIG", kubeconfigPath)).To(Succeed())
 	logf.Log.Info("Kubeconfig", "path", kubeconfigPath)
 
-	err = SetupSpokeWebhookWithManager(mgr)
+	err = SetupSpokeWebhookWithManager(mgr, v1beta1.InstanceTypeManager)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = SetupHubWebhookWithManager(mgr)

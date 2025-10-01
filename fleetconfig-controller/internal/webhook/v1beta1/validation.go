@@ -364,7 +364,7 @@ func validateAddonNotInUse(ctx context.Context, removedAddons []string, fieldPat
 }
 
 // validates that any addon which is enabled on a spoke is configured
-func validateAddons(ctx context.Context, cli client.Client, newObject *v1beta1.Spoke, addonC *versioned.Clientset) (admission.Warnings, field.ErrorList) {
+func (v *SpokeCustomValidator) validateAddons(ctx context.Context, cli client.Client, newObject *v1beta1.Spoke) (admission.Warnings, field.ErrorList) {
 	errs := field.ErrorList{}
 
 	if newObject.IsHubAsSpoke() {
@@ -373,7 +373,7 @@ func validateAddons(ctx context.Context, cli client.Client, newObject *v1beta1.S
 		}) {
 			errs = append(errs, field.Invalid(field.NewPath("spec").Child("addOns"), newObject.Spec.AddOns, "hub-as-spoke Spoke cannot enable fleetconfig-controller-agent addon"))
 		}
-	} else {
+	} else if v.instanceType != v1beta1.InstanceTypeUnified { // fcc-agent MUST be enabled when using manager-agent (addon), MUST NOT be enabled when using unified mode
 		if !slices.ContainsFunc(newObject.Spec.AddOns, func(a v1beta1.AddOn) bool {
 			return a.ConfigName == v1beta1.FCCAddOnName
 		}) {
@@ -397,7 +397,7 @@ func validateAddons(ctx context.Context, cli client.Client, newObject *v1beta1.S
 		return admission.Warnings{warnHubNotFound}, errs
 	}
 
-	cmaList, err := addonC.AddonV1alpha1().ClusterManagementAddOns().List(ctx, metav1.ListOptions{})
+	cmaList, err := v.addonC.AddonV1alpha1().ClusterManagementAddOns().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		errs = append(errs, field.InternalError(field.NewPath("spec").Child("addOns"), err))
 		return nil, errs

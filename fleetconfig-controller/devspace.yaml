@@ -18,6 +18,8 @@ vars:
   DEVSPACE_ENV_FILE: './hack/.versions.env'
   FLEETCONFIG_ENABLED:
     value: true
+  ADDON_MODE:
+    value: true
 
 # profiles are used to set the fleetconfig-controller values for the different versions of the fleetconfig-controller API
 profiles:
@@ -25,12 +27,17 @@ profiles:
     patches:
       - path: vars.FLEETCONFIG_ENABLED.value
         op: replace
-        value: false
+        value: false 
   - name: v1beta1
     patches:
       - path: vars.FLEETCONFIG_ENABLED.value
         op: replace
         value: true
+  - name: unified
+    patches:
+      - path: vars.ADDON_MODE.value
+        op: replace
+        value: false
 
 pipelines:
   dev: |-
@@ -103,6 +110,7 @@ deployments:
           tag: ${IMAGE_TAG}
         fleetConfig:
           enabled: ${FLEETCONFIG_ENABLED}
+        addonMode: ${ADDON_MODE}
       valuesFiles:
       - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
     updateImageTags: false
@@ -115,6 +123,7 @@ deployments:
         devspaceEnabled: true
         fleetConfig:
           enabled: ${FLEETCONFIG_ENABLED}
+        addonMode: ${ADDON_MODE}
       valuesFiles:
       - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
 
@@ -128,6 +137,7 @@ deployments:
         image:
           repository: ${IMAGE_REPOSITORY}-local
           tag: local
+        addonMode: ${ADDON_MODE}
       valuesFiles:
       - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
       - ${CONTEXT}/test/data/fleetconfig-values.yaml

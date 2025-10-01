@@ -137,7 +137,7 @@ func ForHub(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Hub")
 			return nil, err
 		}
-		if err := webhookv1beta1.SetupSpokeWebhookWithManager(mgr); err != nil {
+		if err := webhookv1beta1.SetupSpokeWebhookWithManager(mgr, opts.InstanceType); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Spoke")
 			return nil, err
 		}
