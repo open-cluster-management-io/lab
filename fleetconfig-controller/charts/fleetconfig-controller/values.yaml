@@ -274,7 +274,6 @@ topologyResources:
 spokeConcurrentReconciles: 5
 
 ## @param addonMode Whether to run fleetconfig-controller in addon mode. Addon mode allows for decentralized day 2 management of spoke clusters. Not supported when kubernetesProvider is EKS.
-
 addonMode: true
 
 ## @param kubernetesProvider Kubernetes provider of the cluster that fleetconfig-controller will be installed on. Valid values are "Generic", "EKS", "GKE-Ingress".

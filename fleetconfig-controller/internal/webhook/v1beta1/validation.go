@@ -371,13 +371,13 @@ func validateAddons(ctx context.Context, cli client.Client, newObject *v1beta1.S
 		if slices.ContainsFunc(newObject.Spec.AddOns, func(a v1beta1.AddOn) bool {
 			return a.ConfigName == v1beta1.FCCAddOnName
 		}) {
-			errs = append(errs, field.Invalid(field.NewPath("spec").Child("addOns"), newObject.Spec.AddOns, "hub-as-spoke Spoke cannot enable fleetconfig-controller-manager addon"))
+			errs = append(errs, field.Invalid(field.NewPath("spec").Child("addOns"), newObject.Spec.AddOns, "hub-as-spoke Spoke cannot enable fleetconfig-controller-agent addon"))
 		}
 	} else {
 		if !slices.ContainsFunc(newObject.Spec.AddOns, func(a v1beta1.AddOn) bool {
 			return a.ConfigName == v1beta1.FCCAddOnName
 		}) {
-			errs = append(errs, field.Invalid(field.NewPath("spec").Child("addOns"), newObject.Spec.AddOns, "Spoke must enable fleetconfig-controller-manager addon"))
+			errs = append(errs, field.Invalid(field.NewPath("spec").Child("addOns"), newObject.Spec.AddOns, "Spoke must enable fleetconfig-controller-agent addon"))
 		}
 	}
 

@@ -410,7 +410,7 @@ func handleAddonEnable(ctx context.Context, spoke *v1beta1.Spoke, addons []v1bet
 func patchFCCMca(ctx context.Context, spokeName string, addonC *addonapi.Clientset) error {
 	mca, err := addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).Get(ctx, v1beta1.FCCAddOnName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to configure fleetconfig-controller-manager: %v", err)
+		return fmt.Errorf("failed to configure %s: %v", v1beta1.FCCAddOnName, err)
 	}
 	desired := addonv1alpha1.AddOnConfig{
 		ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
@@ -435,7 +435,7 @@ func patchFCCMca(ctx context.Context, spokeName string, addonC *addonapi.Clients
 		"spec": map[string]any{"configs": mca.Spec.Configs},
 	})
 	if err != nil {
-		return fmt.Errorf("failed to marshal patch for fleetconfig-controller-manager: %v", err)
+		return fmt.Errorf("failed to marshal patch for %s: %v", v1beta1.FCCAddOnName, err)
 	}
 	if _, err = addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).Patch(
 		ctx,
@@ -444,7 +444,7 @@ func patchFCCMca(ctx context.Context, spokeName string, addonC *addonapi.Clients
 		patchBytes,
 		metav1.PatchOptions{},
 	); err != nil {
-		return fmt.Errorf("failed to patch fleetconfig-controller-manager: %v", err)
+		return fmt.Errorf("failed to patch %S: %v", v1beta1.FCCAddOnName, err)
 	}
 	return nil
 }
@@ -690,7 +690,7 @@ func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Client
 		}
 
 		// for hub-as-spoke, or if the pivot failed, all addons must be removed.
-		// otherwise, fleetconfig-controller-manager must not be removed.
+		// otherwise, fleetconfig-controller-agent must not be removed.
 		var expectedWorks = 0
 		if !shouldCleanAll {
 			expectedWorks = 1

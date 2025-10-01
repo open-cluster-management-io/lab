@@ -34,5 +34,5 @@ const (
 
 	manifestWorkAddOnLabelKey = "open-cluster-management.io/addon-name"
 
-	manifestWorkAddOnLabelValueFcc = "fleetconfig-controller-manager"
+	manifestWorkAddOnLabelValueFcc = "fleetconfig-controller-agent"
 )

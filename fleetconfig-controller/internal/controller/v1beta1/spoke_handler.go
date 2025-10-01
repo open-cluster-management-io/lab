@@ -219,7 +219,7 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 	if !spoke.IsHubAsSpoke() {
 		adc := &addonv1alpha1.AddOnDeploymentConfig{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "fleetconfig-controller-manager",
+				Name:      v1beta1.FCCAddOnName,
 				Namespace: spoke.Name,
 			},
 			Spec: addonv1alpha1.AddOnDeploymentConfigSpec{
@@ -339,7 +339,7 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 	spokeCopy.Spec.AddOns = nil
 
 	// for hub-as-spoke, or if the addon agent never came up, disable all addons
-	// otherwise, leave fleetconfig-controller-manager addon running so that it can do deregistration
+	// otherwise, leave fleetconfig-controller-agent addon running so that it can do deregistration
 	shouldCleanAll := spoke.IsHubAsSpoke() || !pivotComplete
 
 	if !shouldCleanAll {

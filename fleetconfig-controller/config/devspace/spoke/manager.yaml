@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: fleetconfig-controller-manager
+  name: fleetconfig-controller-agent
 spec:
   replicas: 1
   selector:
@@ -14,9 +14,9 @@ spec:
         app.kubernetes.io/instance: fleetconfig-controller
         app.kubernetes.io/name: fleetconfig-controller
     spec:
-      serviceAccountName: fleetconfig-controller-manager
+      serviceAccountName: fleetconfig-controller-agent
       containers:
-        - name: fleetconfig-controller-manager
+        - name: fleetconfig-controller-agent
           env:                                                                                                                                                                                                                        
           - name: KUBERNETES_CLUSTER_DOMAIN                                                                                                                                                                                           
             value: cluster.local                                                                                                                                                                                                      
@@ -53,4 +53,4 @@ spec:
       - name: hub-kubeconfig                                                                                                                                                                                                        
         secret:                                                                                                                                                                                                                     
           defaultMode: 420                                                                                                                                                                                                          
-          secretName: fleetconfig-controller-manager-hub-kubeconfig
+          secretName: fleetconfig-controller-agent-hub-kubeconfig

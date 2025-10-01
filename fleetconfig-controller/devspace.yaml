@@ -61,7 +61,7 @@ pipelines:
   debug-spoke: |-
     run_dependencies --all
     build_images fleetconfig-controller-dev
-    kubectl -n fleetconfig-system delete deployment fleetconfig-controller-manager --ignore-not-found
+    kubectl -n fleetconfig-system delete deployment fleetconfig-controller-agent --ignore-not-found
     create_deployments debug-spoke
     start_dev fleetconfig-controller-dev-spoke
 

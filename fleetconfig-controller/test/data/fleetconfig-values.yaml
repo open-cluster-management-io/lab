@@ -39,7 +39,7 @@ fleetConfig:
       namespace: fleetconfig-system
     addOns:
     - configName: test-addon
-    - configName: fleetconfig-controller-manager
+    - configName: fleetconfig-controller-agent
     createNamespace: true
     syncLabels: false
     kubeconfig:
