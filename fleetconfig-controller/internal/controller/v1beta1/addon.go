@@ -444,7 +444,7 @@ func patchFCCMca(ctx context.Context, spokeName string, addonC *addonapi.Clients
 		patchBytes,
 		metav1.PatchOptions{},
 	); err != nil {
-		return fmt.Errorf("failed to patch %S: %v", v1beta1.FCCAddOnName, err)
+		return fmt.Errorf("failed to patch %s: %v", v1beta1.FCCAddOnName, err)
 	}
 	return nil
 }
