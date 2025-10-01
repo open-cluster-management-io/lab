@@ -1,23 +1,24 @@
 # yaml-language-server: $schema=https://datreeio.github.io/CRDs-catalog/addon.open-cluster-management.io/clustermanagementaddon_v1alpha1.json
-
+{{- if eq (include "addonMode" .) "true" }}
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: ClusterManagementAddOn
 metadata:
- name: fleetconfig-controller-manager
+ name: fleetconfig-controller-agent
 spec:
   addOnMeta:
-    displayName: FleetConfig Controller Addon
+    displayName: FleetConfig Controller Agent
     description: |
-      fleetconfig-controller-manager is an addon to deploy fleetconfig-controller manager on the managed cluster.
+      fleetconfig-controller-agent is an addon to deploy a fleetconfig-controller agent on the managed cluster.
       It is used to enable decentralized management of spoke clusters.
   supportedConfigs:
     - group: addon.open-cluster-management.io
       resource: addontemplates
       defaultConfig:
-        name: fleetconfig-controller-manager
+        name: fleetconfig-controller-agent
   installStrategy:
     type: Manual
     # TODO - use `Placements` once ManagedClusters can be labeled immediately during the registration process. See https://github.com/open-cluster-management-io/ocm/issues/1195, https://github.com/open-cluster-management-io/ocm/pull/1123
     # placements:
     #   - namespace: managed-cluster-set-spokes
     #     name: spokes
+{{- end }}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"os/exec"
 	"slices"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -723,4 +725,64 @@ func allOwnersAddOns(mws []workv1.ManifestWork) bool {
 		}
 	}
 	return true
+}
+
+// bindAddonAgent creates the necessary bindings for fcc agent to access hub resources
+func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spoke) error {
+	roleName := os.Getenv(v1beta1.RoleNameEnvVar)
+	if roleName == "" {
+		roleName = v1beta1.DefaultFCCManagerRole
+	}
+
+	roleRef := rbacv1.RoleRef{
+		Kind:     "ClusterRole",
+		APIGroup: rbacv1.GroupName,
+		Name:     roleName,
+	}
+
+	err := r.createBinding(ctx, roleRef, spoke.Namespace, spoke.Name)
+	if err != nil {
+		return err
+	}
+	if spoke.Spec.HubRef.Namespace != spoke.Namespace {
+		err = r.createBinding(ctx, roleRef, spoke.Spec.HubRef.Namespace, spoke.Name)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// createBinding creates a binding for a given role
+func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.RoleRef, namespace, spokeName string) error {
+	binding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("open-cluster-management:%s:%s:agent-%s", // this is a different naming format than OCM uses for addon agents. we need to append the spoke name to avoid possible conflicts in cases where multiple spokes exist in 1 namespace
+				v1beta1.FCCAddOnName, strings.ToLower(roleRef.Kind), spokeName),
+			Namespace: namespace,
+			Labels: map[string]string{
+				addonv1alpha1.AddonLabelKey: v1beta1.FCCAddOnName,
+			},
+		},
+		RoleRef: roleRef,
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:     rbacv1.GroupKind,
+				APIGroup: rbacv1.GroupName,
+				Name:     clusterAddonGroup(spokeName, v1beta1.FCCAddOnName),
+			},
+		},
+	}
+
+	err := r.Create(ctx, binding, &client.CreateOptions{})
+	if err != nil {
+		return client.IgnoreAlreadyExists(err)
+	}
+	return nil
+}
+
+// clusterAddonGroup returns the group that represents the addon for the cluster
+// ref: https://github.com/open-cluster-management-io/ocm/blob/main/pkg/addon/templateagent/registration.go#L484
+func clusterAddonGroup(clusterName, addonName string) string {
+	return fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, addonName)
 }

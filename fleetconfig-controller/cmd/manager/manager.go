@@ -40,7 +40,7 @@ type Options struct {
 	CertDir                   string
 	WebhookPort               int
 	SpokeConcurrentReconciles int
-	ClusterType               string
+	InstanceType              string
 	Scheme                    *runtime.Scheme
 }
 
@@ -121,7 +121,7 @@ func ForHub(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 		Log:                  ctrl.Log.WithName("controllers").WithName("Spoke"),
 		ConcurrentReconciles: opts.SpokeConcurrentReconciles,
 		Scheme:               mgr.GetScheme(),
-		ClusterType:          opts.ClusterType,
+		InstanceType:         opts.InstanceType,
 	}).SetupWithManagerForHub(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Spoke")
 		return nil, err
@@ -248,7 +248,7 @@ func ForSpoke(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 		Log:                  ctrl.Log.WithName("controllers").WithName("Spoke"),
 		ConcurrentReconciles: opts.SpokeConcurrentReconciles,
 		Scheme:               mgr.GetScheme(),
-		ClusterType:          opts.ClusterType,
+		InstanceType:         opts.InstanceType,
 	}).SetupWithManagerForSpoke(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Spoke")
 		return nil, err

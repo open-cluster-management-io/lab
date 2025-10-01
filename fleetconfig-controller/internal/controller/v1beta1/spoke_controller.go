@@ -48,7 +48,7 @@ type SpokeReconciler struct {
 	Log                  logr.Logger
 	Scheme               *runtime.Scheme
 	ConcurrentReconciles int
-	ClusterType          string
+	InstanceType         string
 }
 
 // +kubebuilder:rbac:groups=fleetconfig.open-cluster-management.io,resources=spokes,verbs=get;list;watch;create;update;patch;delete
@@ -91,8 +91,8 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		spoke.Status.Phase = v1beta1.Unhealthy
 	}
 
-	switch r.ClusterType {
-	case v1beta1.ClusterTypeHub:
+	switch r.InstanceType {
+	case v1beta1.InstanceTypeManager:
 		if !slices.Contains(spoke.Finalizers, v1beta1.HubCleanupFinalizer) {
 			setDefaults(ctx, spoke, hubMeta)
 			spoke.Finalizers = append(
@@ -105,14 +105,22 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			}
 			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 		}
-	case v1beta1.ClusterTypeSpoke:
+	case v1beta1.InstanceTypeUnified:
+		setDefaults(ctx, spoke, hubMeta)
+		spoke.Finalizers = append(
+			spoke.Finalizers,
+			v1beta1.HubCleanupPreflightFinalizer, // removed by the hub to signal to the spoke that preflight is completed
+			v1beta1.SpokeCleanupFinalizer,        // removed by the hub after successful unjoin
+			v1beta1.HubCleanupFinalizer,          // removed by the hub after post-unjoin cleanup is finished
+		)
+	case v1beta1.InstanceTypeAgent:
 		if !slices.Contains(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) && spoke.DeletionTimestamp.IsZero() {
 			spoke.Finalizers = append(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) // removed by the spoke to signal to the hub that unjoin succeeded
 			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 		}
 	default:
 		// this is guarded against when the manager is initialized. should never reach this point
-		panic(fmt.Sprintf("unknown cluster type %s. Must be one of %v", r.ClusterType, v1beta1.SupportedClusterTypes))
+		panic(fmt.Sprintf("unknown instance type %s. Must be one of %v", r.InstanceType, v1beta1.SupportedInstanceTypes))
 	}
 
 	// Handle deletion logic with finalizer

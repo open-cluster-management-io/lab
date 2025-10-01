@@ -38,7 +38,11 @@ spec:
         - "--webhook-cert-dir={{ .Values.admissionWebhooks.certificate.mountPath }}"
         {{- end }}
         - "--spoke-concurrent-reconciles={{ .Values.spokeConcurrentReconciles }}"
-        - "--cluster-type=hub"
+        {{- if eq (include "addonMode" .) "true" }}
+        - "--instance-type=manager"
+        {{- else }}
+        - "--instance-type=unified"
+        {{- end }}
         command:
         - /manager
         env:

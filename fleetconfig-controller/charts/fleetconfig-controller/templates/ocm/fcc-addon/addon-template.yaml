@@ -1,11 +1,11 @@
 # yaml-language-server: $schema=https://datreeio.github.io/CRDs-catalog/addon.open-cluster-management.io/addontemplate_v1alpha1.json
-
+{{- if eq (include "addonMode" .) "true" }}
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: AddOnTemplate
 metadata:
-  name: fleetconfig-controller-manager
+  name: fleetconfig-controller-agent
 spec:
-  addonName: fleetconfig-controller-manager
+  addonName: fleetconfig-controller-agent
   agentSpec:
     workload:
       manifests:
@@ -16,7 +16,7 @@ spec:
       - kind: Deployment
         apiVersion: apps/v1
         metadata:
-          name: {{ include "chart.fullname" . }}-manager
+          name: {{ include "chart.fullname" . }}-agent
           namespace: {{ .Release.Namespace }}
           labels:
             control-plane: controller-manager
@@ -41,7 +41,7 @@ spec:
               {{- end }}
               securityContext:
               {{- toYaml .Values.podSecurityContext | nindent 16 }}
-              serviceAccountName: {{ include "chart.fullname" . }}-manager
+              serviceAccountName: {{ include "chart.fullname" . }}-agent
               terminationGracePeriodSeconds: 10
               containers:
               - args:
@@ -49,7 +49,7 @@ spec:
                 - "--health-probe-bind-address=:{{ .Values.healthCheck.port }}"
                 - "--use-webhook=false"
                 - "--spoke-concurrent-reconciles=1"
-                - "--cluster-type=spoke"
+                - "--instance-type=agent"
                 command:
                 - /manager
                 env:
@@ -79,12 +79,12 @@ spec:
       - kind: ServiceAccount
         apiVersion: v1
         metadata:
-          name: {{ include "chart.fullname" . }}-manager
+          name: {{ include "chart.fullname" . }}-agent
           namespace: {{ .Release.Namespace }}
       - kind: ClusterRole
         apiVersion: rbac.authorization.k8s.io/v1
         metadata:
-          name: {{ include "chart.fullname" . }}-manager-spoke-role
+          name: {{ include "chart.fullname" . }}-agent-role
         rules:
         - apiGroups: [""]
           resources: ["namespaces"]
@@ -113,14 +113,14 @@ spec:
       - kind: ClusterRoleBinding
         apiVersion: rbac.authorization.k8s.io/v1
         metadata:
-          name: {{ include "chart.fullname" . }}-manager-spoke-rolebinding
+          name: {{ include "chart.fullname" . }}-agent-rolebinding
         roleRef:
           apiGroup: rbac.authorization.k8s.io
           kind: ClusterRole
-          name: {{ include "chart.fullname" . }}-manager-spoke-role
+          name: {{ include "chart.fullname" . }}-agent-role
         subjects:
           - kind: ServiceAccount
-            name: {{ include "chart.fullname" . }}-manager
+            name: {{ include "chart.fullname" . }}-agent
             namespace: {{ .Release.Namespace }}
       - kind: Role
         apiVersion: rbac.authorization.k8s.io/v1
@@ -152,7 +152,7 @@ spec:
           name: {{ include "chart.fullname" . }}-leader-election-role
         subjects:
         - kind: ServiceAccount
-          name: {{ include "chart.fullname" . }}-manager
+          name: {{ include "chart.fullname" . }}-agent
           namespace: {{ .Release.Namespace }}
   registration:
     - type: KubeClient
@@ -161,3 +161,4 @@ spec:
           - type: CurrentCluster
             currentCluster:
               clusterRoleName: {{ include "chart.fullname" . }}-manager-role
+{{- end }}

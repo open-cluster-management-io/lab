@@ -68,7 +68,7 @@ func main() {
 	flag.IntVar(&mOpts.WebhookPort, "webhook-port", 9443, "Admission webhook port")
 
 	flag.IntVar(&mOpts.SpokeConcurrentReconciles, "spoke-concurrent-reconciles", apiv1beta1.SpokeDefaultMaxConcurrentReconciles, fmt.Sprintf("Maximum number of Spoke resources that may be reconciled in parallel. Defaults to %d.", apiv1beta1.SpokeDefaultMaxConcurrentReconciles))
-	flag.StringVar(&mOpts.ClusterType, "cluster-type", apiv1beta1.ClusterTypeHub, "The type of cluster that this controller instance is installed in.")
+	flag.StringVar(&mOpts.InstanceType, "instance-type", apiv1beta1.InstanceTypeManager, fmt.Sprintf("The type of cluster that this controller instance is installed in. Defaults to %s", apiv1beta1.InstanceTypeManager))
 
 	zOpts := zap.Options{
 		Development: true,
@@ -83,21 +83,21 @@ func main() {
 		err error
 	)
 
-	switch mOpts.ClusterType {
-	case apiv1beta1.ClusterTypeHub:
+	switch mOpts.InstanceType {
+	case apiv1beta1.InstanceTypeManager, apiv1beta1.InstanceTypeUnified:
 		mgr, err = manager.ForHub(setupLog, mOpts)
 		if err != nil {
 			setupLog.Error(err, "unable to start manager")
 			os.Exit(1)
 		}
-	case apiv1beta1.ClusterTypeSpoke:
+	case apiv1beta1.InstanceTypeAgent:
 		mgr, err = manager.ForSpoke(setupLog, mOpts)
 		if err != nil {
 			setupLog.Error(err, "unable to start manager")
 			os.Exit(1)
 		}
 	default:
-		setupLog.Info("unable to create controller for unknown cluster type", "clusterType", mOpts.ClusterType, "allowed", apiv1beta1.SupportedClusterTypes)
+		setupLog.Info("unable to create controller for unknown instance type", "instanceType", mOpts.InstanceType, "allowed", apiv1beta1.SupportedInstanceTypes)
 		os.Exit(1)
 	}
 

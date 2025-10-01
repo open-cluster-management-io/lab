@@ -71,10 +71,10 @@ var _ = Describe("Spoke Controller", Ordered, func() {
 				Namespace: "default",
 			}
 			spokeReconciler = &SpokeReconciler{
-				Client:      k8sClient,
-				Log:         logr.Logger{},
-				Scheme:      k8sClient.Scheme(),
-				ClusterType: v1beta1.ClusterTypeHub,
+				Client:       k8sClient,
+				Log:          logr.Logger{},
+				Scheme:       k8sClient.Scheme(),
+				InstanceType: v1beta1.InstanceTypeManager,
 			}
 			spoke = &v1beta1.Spoke{
 				ObjectMeta: metav1.ObjectMeta{

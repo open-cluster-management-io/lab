@@ -9,12 +9,10 @@ import (
 	"os"
 	"os/exec"
 	"slices"
-	"strings"
 
 	"dario.cat/mergo"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,8 +36,8 @@ import (
 
 // cleanup cleans up a Spoke and its associated resources.
 func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke, hubKubeconfig []byte) error {
-	switch r.ClusterType {
-	case v1beta1.ClusterTypeHub:
+	switch r.InstanceType {
+	case v1beta1.InstanceTypeManager:
 		originalSpoke, ok := ctx.Value(originalSpokeKey).(*v1beta1.Spoke) // use the original object to check conditions/finalizers
 		if !ok {
 			originalSpoke = spoke.DeepCopy()
@@ -56,11 +54,17 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke, hub
 			}
 		}
 		return nil
-	case v1beta1.ClusterTypeSpoke:
+	case v1beta1.InstanceTypeUnified:
+		err := r.doHubCleanup(ctx, spoke, hubKubeconfig, false)
+		if err != nil {
+			return err
+		}
+		return r.doSpokeCleanup(ctx, spoke, false)
+	case v1beta1.InstanceTypeAgent:
 		return r.doSpokeCleanup(ctx, spoke, true)
 	default:
 		// this is guarded against when the manager is initialized. should never reach this point
-		panic(fmt.Sprintf("unknown cluster type %s. Must be one of %v", r.ClusterType, v1beta1.SupportedClusterTypes))
+		panic(fmt.Sprintf("unknown cluster type %s. Must be one of %v", r.InstanceType, v1beta1.SupportedInstanceTypes))
 	}
 }
 
@@ -74,8 +78,8 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 		return err
 	}
 
-	switch r.ClusterType {
-	case v1beta1.ClusterTypeHub:
+	switch r.InstanceType {
+	case v1beta1.InstanceTypeManager:
 		err = r.doHubWork(ctx, spoke, hubMeta, klusterletValues)
 		if err != nil {
 			return err
@@ -90,7 +94,20 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 			}
 		}
 		return nil
-	case v1beta1.ClusterTypeSpoke:
+	case v1beta1.InstanceTypeUnified:
+		err = r.doHubWork(ctx, spoke, hubMeta, klusterletValues)
+		if err != nil {
+			return err
+		}
+		err = r.doSpokeWork(ctx, spoke, hubMeta.hub, klusterletValues)
+		if err != nil {
+			spoke.SetConditions(true, v1beta1.NewCondition(
+				err.Error(), v1beta1.KlusterletSynced, metav1.ConditionFalse, metav1.ConditionTrue,
+			))
+			return err
+		}
+		return nil
+	case v1beta1.InstanceTypeAgent:
 		err = r.doSpokeWork(ctx, spoke, hubMeta.hub, klusterletValues)
 		if err != nil {
 			spoke.SetConditions(true, v1beta1.NewCondition(
@@ -101,7 +118,7 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 		return nil
 	default:
 		// this is guarded against when the manager is initialized. should never reach this point
-		panic(fmt.Sprintf("unknown cluster type %s. Must be one of %v", r.ClusterType, v1beta1.SupportedClusterTypes))
+		panic(fmt.Sprintf("unknown cluster type %s. Must be one of %v", r.InstanceType, v1beta1.SupportedInstanceTypes))
 	}
 }
 
@@ -240,66 +257,6 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 	}
 	spoke.Status.EnabledAddons = enabledAddons
 	return nil
-}
-
-// bindAddonAgent creates the necessary bindings for fcc agent to access hub resources
-func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spoke) error {
-	roleName := os.Getenv(v1beta1.RoleNameEnvVar)
-	if roleName == "" {
-		roleName = v1beta1.DefaultFCCManagerRole
-	}
-
-	roleRef := rbacv1.RoleRef{
-		Kind:     "ClusterRole",
-		APIGroup: rbacv1.GroupName,
-		Name:     roleName,
-	}
-
-	err := r.createBinding(ctx, roleRef, spoke.Namespace, spoke.Name)
-	if err != nil {
-		return err
-	}
-	if spoke.Spec.HubRef.Namespace != spoke.Namespace {
-		err = r.createBinding(ctx, roleRef, spoke.Spec.HubRef.Namespace, spoke.Name)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// createBinding creates a binding for a given role
-func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.RoleRef, namespace, spokeName string) error {
-	binding := &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("open-cluster-management:%s:%s:agent-%s", // this is a different naming format than OCM uses for addon agents. we need to append the spoke name to avoid possible conflicts in cases where multiple spokes exist in 1 namespace
-				v1beta1.FCCAddOnName, strings.ToLower(roleRef.Kind), spokeName),
-			Namespace: namespace,
-			Labels: map[string]string{
-				addonv1alpha1.AddonLabelKey: v1beta1.FCCAddOnName,
-			},
-		},
-		RoleRef: roleRef,
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:     rbacv1.GroupKind,
-				APIGroup: rbacv1.GroupName,
-				Name:     clusterAddonGroup(spokeName, v1beta1.FCCAddOnName),
-			},
-		},
-	}
-
-	err := r.Create(ctx, binding, &client.CreateOptions{})
-	if err != nil {
-		return client.IgnoreAlreadyExists(err)
-	}
-	return nil
-}
-
-// clusterAddonGroup returns the group that represents the addon for the cluster
-// ref: https://github.com/open-cluster-management-io/ocm/blob/main/pkg/addon/templateagent/registration.go#L484
-func clusterAddonGroup(clusterName, addonName string) string {
-	return fmt.Sprintf("system:open-cluster-management:cluster:%s:addon:%s", clusterName, addonName)
 }
 
 // doSpokeWork handles spoke-side work such as upgrades
@@ -507,8 +464,8 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 		return err
 	}
 
-	// hub-as-spoke/failed pivot case, no further cleanup needed - clusteradm unjoin will have handled it all
-	if r.ClusterType == v1beta1.ClusterTypeHub {
+	// unified manager/hub-as-spoke/failed pivot case, no further cleanup needed - clusteradm unjoin will have handled it all
+	if r.InstanceType != v1beta1.InstanceTypeAgent {
 		spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
 			return s == v1beta1.SpokeCleanupFinalizer
 		})
@@ -955,7 +912,7 @@ func (r *SpokeReconciler) getHubMeta(ctx context.Context, hubRef v1beta1.HubRef)
 	}
 	hubMeta.hub = hub
 	// load the hub's kubeconfig. only needed on the hub's reconciler instance - the spoke's instance can access the hub using its default client
-	if r.ClusterType != v1beta1.ClusterTypeSpoke {
+	if r.InstanceType != v1beta1.InstanceTypeAgent {
 		hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig, hub.Namespace)
 		if err != nil {
 			return hubMeta, err

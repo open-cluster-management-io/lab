@@ -78,11 +78,14 @@ const (
 )
 
 const (
-	// ClusterTypeHub indicates that the controller is running in a Hub cluster.
-	ClusterTypeHub = "hub"
+	// InstanceTypeManager indicates that the controller is running in a Hub cluster and only handles day 1 Spoke operations.
+	InstanceTypeManager = "manager"
 
-	// ClusterTypeSpoke indicates that the controller is running in a Spoke cluster.
-	ClusterTypeSpoke = "spoke"
+	// InstanceTypeAgent indicates that the controller is running in a Spoke cluster and only handles day 2 Spoke operations.
+	InstanceTypeAgent = "agent"
+
+	// InstanceTypeUnified indicates that the controller is running in a Hub cluster and handles the entire lifecycle of Spoke resources.
+	InstanceTypeUnified = "unified"
 
 	// HubKubeconfigEnvVar is the environment variable containing the path to the mounted Hub kubeconfig.
 	HubKubeconfigEnvVar = "HUB_KUBECONFIG"
@@ -112,10 +115,11 @@ const (
 	DefaultFCCManagerRole = "fleetconfig-controller-manager-role"
 )
 
-// SupportedClusterTypes are the valid cluster types that the controller can be installed in.
-var SupportedClusterTypes = []string{
-	ClusterTypeHub,
-	ClusterTypeSpoke,
+// SupportedInstanceTypes are the valid cluster types that the controller can be installed in.
+var SupportedInstanceTypes = []string{
+	InstanceTypeManager,
+	InstanceTypeAgent,
+	InstanceTypeUnified,
 }
 
 // FleetConfig labels
