@@ -1,0 +1,30 @@
+apiVersion: fleetconfig.open-cluster-management.io/v1beta1
+kind: Spoke
+metadata:
+  name: spoke
+  namespace: fleetconfig-system
+spec:
+  hubRef:
+    name: hub
+    namespace: fleetconfig-system
+  addOns:
+  - configName: fleetconfig-controller-agent
+  createNamespace: true
+  syncLabels: false
+  kubeconfig:
+    context: ""
+    inCluster: false
+    secretReference: 
+      kubeconfigKey: value
+      name: spoke-kubeconfig
+  proxyCa: ""
+  proxyUrl: ""
+  klusterlet:
+    annotations:
+      foo: "bar"
+    mode: "Default"
+    purgeOperator: true
+    featureGates: "ClusterClaim=true,RawFeedbackJsonString=true"
+    forceInternalEndpointLookup: true
+    forceInternalEndpointLookupManaged: false
+    singleton: false

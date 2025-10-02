@@ -25,11 +25,11 @@ spec:
           - name: HUB_KUBECONFIG                                                                                                                                                                                                      
             value: /managed/hub-kubeconfig/kubeconfig                                                                                                                                                                                 
           - name: CLUSTER_NAME                                                                                                                                                                                                        
-            value: spoke-1                                                                                                                                                                                                            
+            value: spoke                                                                                                                                                                                                            
           - name: INSTALL_NAMESPACE                                                                                                                                                                                                   
             value: fleetconfig-system
           - name: HUB_NAMESPACE                                                                                                                                                                                                 
-            value: default
+            value: fleetconfig-system
           - name: CONTROLLER_NAMESPACE
             valueFrom:
               fieldRef:

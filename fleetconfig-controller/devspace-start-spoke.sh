@@ -5,7 +5,7 @@ COLOR_CYAN="\033[0;36m"
 COLOR_RESET="\033[0m"
 
 export CGO_ENABLED=0
-FLAGS="--cluster-type=spoke --spoke-concurrent-reconciles=1"
+FLAGS="--instance-type=agent --spoke-concurrent-reconciles=1"
 RUN_CMD="go run ./cmd/main.go $FLAGS"
 DEBUG_CMD="dlv debug ./cmd/main.go --listen=0.0.0.0:2345 --api-version=2 --output /tmp/__debug_bin --headless -- $FLAGS"
 
