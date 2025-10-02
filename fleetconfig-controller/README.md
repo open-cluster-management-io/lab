@@ -2,12 +2,12 @@
 
 ## 🌱 Project Overview
 
-The `fleetconfig-controller` introduces 2 new custom resource to the OCM ecosystem: `Hub` and `Spoke` . It reconciles `Hub` and `Spoke` resources to declaratively manage the lifecycle of Open Cluster Management (OCM) multi-clusters. The `fleetconfig-controller` will initialize an OCM hub and one or more spoke clusters; add, remove, and upgrade clustermanagers and klusterlets when their bundle versions change, manage their feature gates, and uninstall all OCM components properly whenever a `Hub` or `Spoke`s are deleted.
+The `fleetconfig-controller` introduces 2 new custom resources to the OCM ecosystem: `Hub` and `Spoke` . It reconciles `Hub` and `Spoke` resources to declaratively manage the lifecycle of Open Cluster Management (OCM) multi-clusters. The `fleetconfig-controller` will initialize an OCM hub and one or more spoke clusters; add, remove, and upgrade clustermanagers and klusterlets when their bundle versions change, manage their feature gates, and uninstall all OCM components properly whenever a `Hub` or `Spoke`s are deleted.
 
 The controller is a lightweight wrapper around [clusteradm](https://github.com/open-cluster-management-io/clusteradm). Anything you can accomplish imperatively via a series of `clusteradm` commands can now be accomplished declaratively using the `fleetconfig-controller`.
 
 `fleetconfig-controller` supports 2 modes of operation:
-- `addonMode: true` (recommended): After the initial join, a `fleetconfig-controller-agent` will be installed on the spoke cluster as an OCM addon. Once installed, the agent will manage all day 2 operations for the spoke cluster asyncronously. For more information about addon mode, see [2-phase-spoke-reconcile.md](./docs/2-phase-spoke-reconcile.md).
+- `addonMode: true` (recommended): After the initial join, a `fleetconfig-controller-agent` will be installed on the spoke cluster as an OCM addon. Once installed, the agent will manage all day 2 operations for the spoke cluster asynchronously. For more information about addon mode, see [2-phase-spoke-reconcile.md](./docs/2-phase-spoke-reconcile.md).
 - `addonMode: false`: All management of all spokes is done from the hub cluster. No agent is installed on the spoke cluster. Currently, this is the only mode supported for EKS.
 
 For the deprecated `v1alpha1` `FleetConfig` API, addon mode is not supported.

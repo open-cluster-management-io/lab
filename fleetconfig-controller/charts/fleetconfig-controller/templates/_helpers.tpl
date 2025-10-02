@@ -96,11 +96,7 @@ Get the Kubernetes provider
 {{- end -}}
 
 {{/*
-Format the image name and tag for the given provider.
-For managed kubernetes providers, the image tag is suffixed with the provider name.
-These images are bundled with provider-specific auth binaries.
-For generic kubernetes providers, the image tag is used as is.
-This image has no additional binaries bundled, other than clusteradm.
+Build the base controller image string from registry, repository, and tag.
 */}}
 {{- define "controller.baseImage" -}}
 {{- printf "%s%s:%s" .Values.imageRegistry .Values.image.repository .Values.image.tag -}}
