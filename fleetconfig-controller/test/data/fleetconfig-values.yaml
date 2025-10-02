@@ -42,6 +42,7 @@ fleetConfig:
     - configName: fleetconfig-controller-agent
     createNamespace: true
     syncLabels: false
+    purgeAgentNamespace: true
     kubeconfig:
       # secret is provisioned during E2E test setup
       secretReference:
