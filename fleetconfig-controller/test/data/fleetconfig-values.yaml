@@ -29,7 +29,6 @@ fleetConfig:
         foo: "not-bar"
         baz: "quux"
       mode: "Default"
-      purgeOperator: true
       forceInternalEndpointLookup: true
       forceInternalEndpointLookupManaged: false
       singleton: false
@@ -56,7 +55,6 @@ fleetConfig:
         baz: "quux"
         foo: "bar"
       mode: "Default"
-      purgeOperator: true
       forceInternalEndpointLookup: true
       forceInternalEndpointLookupManaged: false
       singleton: false
