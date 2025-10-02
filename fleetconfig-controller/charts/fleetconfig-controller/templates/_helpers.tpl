@@ -102,8 +102,20 @@ These images are bundled with provider-specific auth binaries.
 For generic kubernetes providers, the image tag is used as is.
 This image has no additional binaries bundled, other than clusteradm.
 */}}
+{{- define "controller.baseImage" -}}
+{{- printf "%s%s:%s" .Values.imageRegistry .Values.image.repository .Values.image.tag -}}
+{{- end -}}
+
+
+{{/*
+Format the image name and tag for the given provider.
+For managed kubernetes providers, the image tag is suffixed with the provider name.
+These images are bundled with provider-specific auth binaries.
+For generic kubernetes providers, the image tag is used as is.
+This image has no additional binaries bundled, other than clusteradm.
+*/}}
 {{- define "controller.image" -}}
-{{- $baseImage := printf "%s%s:%s" .Values.imageRegistry .Values.image.repository .Values.image.tag -}}
+{{- $baseImage := include "controller.baseImage" . -}}
 {{- $provider := include "kubernetesProvider" . -}}
 {{- if eq $provider "eks" -}}
 {{- printf "%s-%s" $baseImage $provider -}}
