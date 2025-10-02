@@ -171,6 +171,33 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 			logger.Error(err, "failed to get managedCluster after join", "spoke", spoke.Name)
 			return err
 		}
+
+		// precreate the namespace that the agent will be installed into
+		// this prevents it from being automatically garbage collected when the spoke is deregistered
+		if r.InstanceType != v1beta1.InstanceTypeUnified {
+			spokeRestCfg, err := kube.RestConfigFromKubeconfig(spokeKubeconfig)
+			if err != nil {
+				logger.Error(err, "failed to create agent namespace", "spoke", spoke.Name)
+				return err
+			}
+			spokeCli, err := client.New(spokeRestCfg, client.Options{})
+			if err != nil {
+				logger.Error(err, "failed to create agent namespace", "spoke", spoke.Name)
+				return err
+			}
+			agentNamespace := os.Getenv(v1beta1.ControllerNamespaceEnvVar) // manager.go enforces that this is not ""
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: agentNamespace,
+				},
+			}
+			err = spokeCli.Create(ctx, ns)
+			if err != nil && !kerrs.IsNotFound(err) {
+				logger.Error(err, "failed to create agent namespace", "spoke", spoke.Name)
+				return err
+			}
+		}
+
 	}
 
 	// check managed clusters joined condition
@@ -490,6 +517,10 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 		"open-cluster-management-agent",
 		"open-cluster-management-agent-addon",
 		"open-cluster-management",
+	}
+	if spoke.Spec.PurgeAgentNamespace {
+		agentNamespace := os.Getenv(v1beta1.ControllerNamespaceEnvVar) // manager.go enforces that this is not ""
+		namespacesToDelete = append(namespacesToDelete, agentNamespace)
 	}
 
 	restCfg, err := kube.RestConfigFromKubeconfig(spokeKubeconfig)

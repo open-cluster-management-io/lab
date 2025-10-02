@@ -2281,6 +2281,12 @@ spec:
                 description: URL of a forward proxy server used by agents to connect
                   to the Hub cluster.
                 type: string
+              purgeAgentNamespace:
+                default: false
+                description: PurgeAgentNamespace. If true, the agent will attempt
+                  to garbage collect it's own namespace after the spoke cluster is
+                  unjoined.
+                type: boolean
               syncLabels:
                 description: If true, sync the labels from klusterlet to all agent
                   resources.

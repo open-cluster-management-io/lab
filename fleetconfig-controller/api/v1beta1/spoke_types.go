@@ -80,6 +80,11 @@ type SpokeSpec struct {
 	// +kubebuilder:default:=0
 	// +optional
 	LogVerbosity int `json:"logVerbosity,omitempty"`
+
+	// PurgeAgentNamespace. If true, the agent will attempt to garbage collect it's own namespace after the spoke cluster is unjoined.
+	// +kubebuilder:default:=false
+	// +optional
+	PurgeAgentNamespace bool `json:"purgeAgentNamespace,omitempty"`
 }
 
 // HubRef is the information required to get a Hub resource.

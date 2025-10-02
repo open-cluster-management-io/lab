@@ -23,7 +23,7 @@ import (
 
 const (
 	warnHubNotFound       = "hub not found, cannot validate spoke addons"
-	errAllowedSpokeUpdate = "spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.values, spec.klusterlet.valuesFrom, spec.kubeconfig, spec.addOns, spec.timeout, and spec.logVerbosity are allowed when updating a spoke"
+	errAllowedSpokeUpdate = "spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.values, spec.klusterlet.valuesFrom, spec.kubeconfig, spec.addOns, spec.purgeAgentNamespace, spec.timeout, and spec.logVerbosity are allowed when updating a spoke"
 	errAllowedHubUpdate   = "only changes to spec.apiServer, spec.clusterManager.source.*, spec.hubAddOns, spec.addOnConfigs, spec.logVerbosity, spec.timeout, spec.registrationAuth, and spec.kubeconfig are allowed when updating the hub"
 )
 
@@ -104,6 +104,7 @@ func allowHubUpdate(oldHub, newHub *v1beta1.Hub) error {
 // - spec.addOns
 // - spec.timeout
 // - spec.logVerbosity
+// - spec.purgeAgentNamespace
 func allowSpokeUpdate(oldSpoke, newSpoke *v1beta1.Spoke) error {
 	if !reflect.DeepEqual(newSpoke.Spec, oldSpoke.Spec) {
 		oldSpokeCopy := oldSpoke.Spec.DeepCopy()
@@ -122,6 +123,8 @@ func allowSpokeUpdate(oldSpoke, newSpoke *v1beta1.Spoke) error {
 		newSpokeCopy.LogVerbosity = 0
 		oldSpokeCopy.Timeout = 0
 		newSpokeCopy.Timeout = 0
+		oldSpokeCopy.PurgeAgentNamespace = false
+		newSpokeCopy.PurgeAgentNamespace = false
 
 		if !reflect.DeepEqual(oldSpokeCopy, newSpokeCopy) {
 			return errors.New(errAllowedSpokeUpdate)
