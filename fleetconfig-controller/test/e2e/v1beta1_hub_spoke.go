@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ktypes "k8s.io/apimachinery/pkg/types"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
@@ -120,19 +121,15 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 		})
 
 		It("should successfully upgrade spoke Klusterlet, with no kubeconfig secret", func() {
-			By("deleting the secret")
+			By("confirming the kubeconfig secret is deleted")
 			EventuallyWithOffset(1, func() error {
-				secret := &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      spokeSecretName,
-						Namespace: fcNamespace,
-					},
-				}
-				err := tc.kClient.Delete(tc.ctx, secret)
+				secret := &corev1.Secret{}
+				err := tc.kClient.Get(tc.ctx, types.NamespacedName{Namespace: fcNamespace, Name: spokeSecretName}, secret)
 				if err != nil {
 					return client.IgnoreNotFound(err)
 				}
-				return nil
+				utils.Info("kubeconfig secret still exists")
+				return err
 			}, 1*time.Minute, 1*time.Second).Should(Succeed())
 
 			By("updating the klusterlet values and verifying that the upgrade is successful")

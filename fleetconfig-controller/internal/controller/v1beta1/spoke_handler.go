@@ -38,11 +38,7 @@ import (
 func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke, hubKubeconfig []byte) error {
 	switch r.InstanceType {
 	case v1beta1.InstanceTypeManager:
-		originalSpoke, ok := ctx.Value(originalSpokeKey).(*v1beta1.Spoke) // use the original object to check conditions/finalizers
-		if !ok {
-			originalSpoke = spoke.DeepCopy()
-		}
-		pivotComplete := originalSpoke.PivotComplete()
+		pivotComplete := spoke.PivotComplete()
 		err := r.doHubCleanup(ctx, spoke, hubKubeconfig, pivotComplete)
 		if err != nil {
 			return err
@@ -175,24 +171,8 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 		// precreate the namespace that the agent will be installed into
 		// this prevents it from being automatically garbage collected when the spoke is deregistered
 		if r.InstanceType != v1beta1.InstanceTypeUnified {
-			spokeRestCfg, err := kube.RestConfigFromKubeconfig(spokeKubeconfig)
+			err = r.createAgentNamespace(ctx, spokeKubeconfig)
 			if err != nil {
-				logger.Error(err, "failed to create agent namespace", "spoke", spoke.Name)
-				return err
-			}
-			spokeCli, err := client.New(spokeRestCfg, client.Options{})
-			if err != nil {
-				logger.Error(err, "failed to create agent namespace", "spoke", spoke.Name)
-				return err
-			}
-			agentNamespace := os.Getenv(v1beta1.ControllerNamespaceEnvVar) // manager.go enforces that this is not ""
-			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: agentNamespace,
-				},
-			}
-			err = spokeCli.Create(ctx, ns)
-			if err != nil && !kerrs.IsNotFound(err) {
 				logger.Error(err, "failed to create agent namespace", "spoke", spoke.Name)
 				return err
 			}
@@ -243,6 +223,12 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 		logger.V(0).Info("labeled ManagedCluster as hub-as-spoke", "name", spoke.Name)
 	}
 
+	err = r.deleteKubeconfigSecret(ctx, spoke)
+	if err != nil {
+		logger.V(1).Info("warning: failed to remove spoke's kubeconfig secret", "spoke", spoke.Name, "error", err)
+		return err
+	}
+
 	if !spoke.IsHubAsSpoke() {
 		adc := &addonv1alpha1.AddOnDeploymentConfig{
 			ObjectMeta: metav1.ObjectMeta{
@@ -283,6 +269,56 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 		return err
 	}
 	spoke.Status.EnabledAddons = enabledAddons
+	return nil
+}
+
+func (r *SpokeReconciler) createAgentNamespace(ctx context.Context, spokeKubeconfig []byte) error {
+	spokeRestCfg, err := kube.RestConfigFromKubeconfig(spokeKubeconfig)
+	if err != nil {
+
+		return err
+	}
+	spokeCli, err := client.New(spokeRestCfg, client.Options{})
+	if err != nil {
+		return err
+	}
+	agentNamespace := os.Getenv(v1beta1.ControllerNamespaceEnvVar) // manager.go enforces that this is not ""
+	ns := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: agentNamespace,
+		},
+	}
+	err = spokeCli.Create(ctx, ns)
+	if err != nil && !kerrs.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+func (r *SpokeReconciler) deleteKubeconfigSecret(ctx context.Context, spoke *v1beta1.Spoke) error {
+	if r.InstanceType != v1beta1.InstanceTypeManager {
+		return nil
+	}
+	if !spoke.PivotComplete() {
+		return nil
+	}
+	if !spoke.Spec.Kubeconfig.InCluster {
+		return nil
+	}
+	if !spoke.Spec.CleanupConfig.PurgeKubeconfigSecret {
+		return nil
+	}
+
+	sec := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      spoke.Spec.Kubeconfig.SecretReference.Name,
+			Namespace: spoke.Namespace,
+		},
+	}
+	err := r.Delete(ctx, sec)
+	if err != nil && !kerrs.IsNotFound(err) {
+		return err
+	}
 	return nil
 }
 
@@ -518,7 +554,7 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 		"open-cluster-management-agent-addon",
 		"open-cluster-management",
 	}
-	if spoke.Spec.PurgeAgentNamespace {
+	if spoke.Spec.CleanupConfig.PurgeAgentNamespace {
 		agentNamespace := os.Getenv(v1beta1.ControllerNamespaceEnvVar) // manager.go enforces that this is not ""
 		namespacesToDelete = append(namespacesToDelete, agentNamespace)
 	}
@@ -869,7 +905,7 @@ func (r *SpokeReconciler) unjoinSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 	unjoinArgs := append([]string{
 		"unjoin",
 		"--cluster-name", spoke.GetName(),
-		fmt.Sprintf("--purge-operator=%t", spoke.Spec.Klusterlet.PurgeOperator),
+		fmt.Sprintf("--purge-operator=%t", spoke.Spec.CleanupConfig.PurgeKlusterletOperator),
 	}, spoke.BaseArgs()...)
 
 	unjoinArgs, cleanupKcfg, err := args.PrepareKubeconfig(ctx, spokeKubeconfig, spoke.Spec.Kubeconfig.Context, unjoinArgs)

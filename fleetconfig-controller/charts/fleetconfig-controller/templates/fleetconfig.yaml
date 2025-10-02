@@ -70,6 +70,10 @@ metadata:
   name: {{ .name }}
   namespace: {{ $releaseNamespace }}    
 spec:
+  cleanupConfig:
+    purgeKlusterletOperator: {{ .cleanupConfig.purgeKlusterletOperator }}
+    purgeKubeconfigSecret: {{ .cleanupConfig.purgeKubeconfigSecret }}
+    purgeAgentNamespace: {{ .cleanupConfig.purgeAgentNamespace }}
   hubRef:
     name: {{ .hubRef.name }}
     namespace: {{ $releaseNamespace }}
@@ -97,7 +101,6 @@ spec:
     annotations: {{- toYaml $.Values.fleetConfig.spokeAnnotations | nindent 6 }}
     {{- end }}
     mode: {{ .klusterlet.mode | quote }}
-    purgeOperator: {{ .klusterlet.purgeOperator }}
     featureGates: {{ include "featureGates" (dict "dict" $spokeFeatureGates) | quote }}
     forceInternalEndpointLookup: {{ .klusterlet.forceInternalEndpointLookup }}
     forceInternalEndpointLookupManaged: {{ .klusterlet.forceInternalEndpointLookupManaged }}

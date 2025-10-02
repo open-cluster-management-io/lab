@@ -81,10 +81,29 @@ type SpokeSpec struct {
 	// +optional
 	LogVerbosity int `json:"logVerbosity,omitempty"`
 
-	// PurgeAgentNamespace. If true, the agent will attempt to garbage collect it's own namespace after the spoke cluster is unjoined.
+	// CleanupConfig is used to configure which resources should be automatically garbage collected during cleanup.
+	// +kubebuilder:default:={}
+	// +required
+	CleanupConfig CleanupConfig `json:"cleanupConfig,omitzero"`
+}
+
+// CleanupConfig is the configuration for cleaning up resources during Spoke cleanup.
+type CleanupConfig struct {
+	// If true, the agent will attempt to garbage collect it's own namespace after the spoke cluster is unjoined.
 	// +kubebuilder:default:=false
 	// +optional
 	PurgeAgentNamespace bool `json:"purgeAgentNamespace,omitempty"`
+
+	// If set, the klusterlet operator will be purged and all open-cluster-management namespaces deleted
+	// when the klusterlet is unjoined from its Hub cluster.
+	// +kubebuilder:default:=true
+	// +optional
+	PurgeKlusterletOperator bool `json:"purgeKlusterletOperator,omitempty"`
+
+	// If set, the kubeconfig secret will will be automatically deleted after the agent has taken over managing the Spoke.
+	// +kubebuilder:default:=false
+	// +optional
+	PurgeKubeconfigSecret bool `json:"purgeKubeconfigSecret,omitempty"`
 }
 
 // HubRef is the information required to get a Hub resource.
@@ -143,12 +162,6 @@ type Klusterlet struct {
 	// +kubebuilder:default:="Default"
 	// +optional
 	Mode string `json:"mode,omitempty"`
-
-	// If set, the klusterlet operator will be purged and all open-cluster-management namespaces deleted
-	// when the klusterlet is unjoined from its Hub cluster.
-	// +kubebuilder:default:=true
-	// +optional
-	PurgeOperator bool `json:"purgeOperator,omitempty"`
 
 	// If true, the installed klusterlet agent will start the cluster registration process by looking for the
 	// internal endpoint from the public cluster-info in the Hub cluster instead of using hubApiServer.
