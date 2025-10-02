@@ -149,6 +149,27 @@ func ForHub(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 func ForSpoke(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 	_, tlsOpts := setupServer(opts, setupLog)
 
+	var err error
+
+	// Verify that all required environment variables have been set
+	spokeNamespace := os.Getenv(apiv1beta1.SpokeNamespaceEnvVar)
+	if spokeNamespace == "" {
+		err = fmt.Errorf("%s environment variable must be set", apiv1beta1.SpokeNamespaceEnvVar)
+		setupLog.Error(err, "unable to create controller", "controller", "Spoke")
+		return nil, err
+	}
+	hubNamespace := os.Getenv(apiv1beta1.HubNamespaceEnvVar)
+	if hubNamespace == "" {
+		err = fmt.Errorf("%s environment variable must be set", apiv1beta1.HubNamespaceEnvVar)
+		setupLog.Error(err, "unable to create controller", "controller", "Spoke")
+		return nil, err
+	}
+	ctrlNamespace := os.Getenv(apiv1beta1.ControllerNamespaceEnvVar)
+	if ctrlNamespace == "" {
+		err = fmt.Errorf("%s environment variable must be set", apiv1beta1.ControllerNamespaceEnvVar)
+		setupLog.Error(err, "unable to create controller", "controller", "Spoke")
+		return nil, err
+	}
 	// enables watching resources in the hub cluster
 	hubRestCfg, err := getHubRestConfig()
 	if err != nil {
@@ -159,19 +180,6 @@ func ForSpoke(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 	// enables leader election in the spoke cluster
 	localRestCfg, err := ctrl.GetConfig()
 	if err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Spoke")
-		return nil, err
-	}
-
-	spokeNamespace := os.Getenv(apiv1beta1.SpokeNamespaceEnvVar)
-	if spokeNamespace == "" {
-		err = fmt.Errorf("CLUSTER_NAMESPACE environment variable must be set")
-		setupLog.Error(err, "unable to create controller", "controller", "Spoke")
-		return nil, err
-	}
-	hubNamespace := os.Getenv(apiv1beta1.HubNamespaceEnvVar)
-	if hubNamespace == "" {
-		err = fmt.Errorf("HUB_NAMESPACE environment variable must be set")
 		setupLog.Error(err, "unable to create controller", "controller", "Spoke")
 		return nil, err
 	}
