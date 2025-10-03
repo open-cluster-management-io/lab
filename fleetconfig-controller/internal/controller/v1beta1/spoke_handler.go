@@ -533,29 +533,27 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 	}
 
 	// remove all remaining klusterlet resources that unjoin did not remove (because of the remaining AMW)
-	workClient, err := common.WorkClient(spokeKubeconfig)
-	if err != nil {
-		return err
-	}
-	operatorClient, err := common.OperatorClient(spokeKubeconfig)
-	if err != nil {
-		return err
-	}
+	var namespacesToDelete []string
+	if spoke.Spec.CleanupConfig.PurgeKlusterletOperator {
+		operatorClient, err := common.OperatorClient(spokeKubeconfig)
+		if err != nil {
+			return err
+		}
 
-	if err := operatorClient.OperatorV1().Klusterlets().Delete(ctx, "klusterlet", metav1.DeleteOptions{}); err != nil && !kerrs.IsNotFound(err) {
-		return err
-	}
-
-	namespacesToDelete := []string{
-		"open-cluster-management-agent",
-		"open-cluster-management-agent-addon",
-		"open-cluster-management",
+		if err := operatorClient.OperatorV1().Klusterlets().Delete(ctx, "klusterlet", metav1.DeleteOptions{}); err != nil && !kerrs.IsNotFound(err) {
+			return err
+		}
+		namespacesToDelete = append(namespacesToDelete, "open-cluster-management-agent", "open-cluster-management-agent-addon", "open-cluster-management")
 	}
 	if spoke.Spec.CleanupConfig.PurgeAgentNamespace {
 		agentNamespace := os.Getenv(v1beta1.ControllerNamespaceEnvVar) // manager.go enforces that this is not ""
 		namespacesToDelete = append(namespacesToDelete, agentNamespace)
 	}
 
+	workClient, err := common.WorkClient(spokeKubeconfig)
+	if err != nil {
+		return err
+	}
 	restCfg, err := kube.RestConfigFromKubeconfig(spokeKubeconfig)
 	if err != nil {
 		return err
