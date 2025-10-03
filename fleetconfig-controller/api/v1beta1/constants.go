@@ -105,14 +105,23 @@ const (
 	// ControllerNamespaceEnvVar is the environment variable containing the namespace that the controller is deployed to.
 	ControllerNamespaceEnvVar = "CONTROLLER_NAMESPACE"
 
-	// RoleNameEnvVar containing the name of the ClusterRole for fleetconfig-controller-manager.
-	RoleNameEnvVar = "ROLE_NAME"
+	// ClusterRoleNameEnvVar containing the name of the ClusterRole for fleetconfig-controller-manager.
+	ClusterRoleNameEnvVar = "ROLE_NAME"
 
 	// FCCAddOnName is the name of the fleetconfig-controller addon
 	FCCAddOnName = "fleetconfig-controller-agent"
 
 	// DefaultFCCManagerRole is the default name of the fleetconfig-controller-manager ClusterRole
 	DefaultFCCManagerRole = "fleetconfig-controller-manager-role"
+
+	// NamespaceOCM is the open-cluster-management namespace
+	NamespaceOCM = "open-cluster-management"
+
+	// NamespaceOCMAgent is the namespace for the open-cluster-management agent.
+	NamespaceOCMAgent = "open-cluster-management-agent"
+
+	// NamespaceOCMAgentAddOn is the namespace for open-cluster-management agent addons.
+	NamespaceOCMAgentAddOn = "open-cluster-management-agent-addon"
 )
 
 // SupportedInstanceTypes are the valid cluster types that the controller can be installed in.
@@ -120,6 +129,13 @@ var SupportedInstanceTypes = []string{
 	InstanceTypeManager,
 	InstanceTypeAgent,
 	InstanceTypeUnified,
+}
+
+// OCMSpokeNamespaces are the namespaces created on an OCM managed cluster
+var OCMSpokeNamespaces = []string{
+	NamespaceOCM,
+	NamespaceOCMAgent,
+	NamespaceOCMAgentAddOn,
 }
 
 // FleetConfig labels

@@ -387,8 +387,6 @@ func handleAddonEnable(ctx context.Context, spoke *v1beta1.Spoke, addons []v1bet
 			continue
 		}
 		// TODO - do this natively with clusteradm once https://github.com/open-cluster-management-io/clusteradm/issues/501 is resolved.
-		// When switching to using Placements strategy once https://github.com/open-cluster-management-io/ocm/pull/1123 is merged,
-		// this will still need to be done, just in a different part of the code.
 		if a.ConfigName == v1beta1.FCCAddOnName {
 			err = patchFCCMca(ctx, spoke.Name, addonC)
 			if err != nil {
@@ -729,7 +727,7 @@ func allOwnersAddOns(mws []workv1.ManifestWork) bool {
 
 // bindAddonAgent creates the necessary bindings for fcc agent to access hub resources
 func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spoke) error {
-	roleName := os.Getenv(v1beta1.RoleNameEnvVar)
+	roleName := os.Getenv(v1beta1.ClusterRoleNameEnvVar)
 	if roleName == "" {
 		roleName = v1beta1.DefaultFCCManagerRole
 	}
@@ -753,11 +751,15 @@ func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spo
 	return nil
 }
 
-// createBinding creates a binding for a given role
+// createBinding creates a role binding for a given role.
+// The role binding follows a different naming format than OCM uses for addon agents.
+// We need to append the spoke name to avoid possible conflicts in cases where multiple spokes exist in 1 namespace
 func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.RoleRef, namespace, spokeName string) error {
+	logger := log.FromContext(ctx)
+
 	binding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("open-cluster-management:%s:%s:agent-%s", // this is a different naming format than OCM uses for addon agents. we need to append the spoke name to avoid possible conflicts in cases where multiple spokes exist in 1 namespace
+			Name: fmt.Sprintf("open-cluster-management:%s:%s:agent-%s",
 				v1beta1.FCCAddOnName, strings.ToLower(roleRef.Kind), spokeName),
 			Namespace: namespace,
 			Labels: map[string]string{
@@ -776,7 +778,22 @@ func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.Role
 
 	err := r.Create(ctx, binding, &client.CreateOptions{})
 	if err != nil {
-		return client.IgnoreAlreadyExists(err)
+		if !kerrs.IsAlreadyExists(err) {
+			logger.Error(err, "failed to create role binding for addon")
+			return err
+		}
+		curr := binding.DeepCopy()
+		err = r.Get(ctx, types.NamespacedName{Namespace: curr.Namespace, Name: curr.Name}, curr)
+		if err != nil {
+			logger.Error(err, "failed to get role binding for addon")
+			return err
+		}
+		binding.SetResourceVersion(curr.ResourceVersion)
+		err = r.Patch(ctx, binding, client.MergeFrom(curr))
+		if err != nil {
+			logger.Error(err, "failed to patch role binding for addon")
+			return err
+		}
 	}
 	return nil
 }

@@ -52,7 +52,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        - name: ROLE_NAME
+        - name: CLUSTER_ROLE_NAME
           value: {{ include "chart.fullname" . }}-manager-role
         image: {{ include "controller.image" . }}
         imagePullPolicy: {{ quote .Values.image.pullPolicy }}

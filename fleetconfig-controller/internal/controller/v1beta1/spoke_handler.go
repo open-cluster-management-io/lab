@@ -495,7 +495,7 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 	return nil
 }
 
-// doHubCleanup handles all the required cleanup of a spoke cluster when deregistering a Spoke
+// doSpokeCleanup handles all the required cleanup of a spoke cluster when deregistering a Spoke
 func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spoke, pivotComplete bool) error {
 	logger := log.FromContext(ctx)
 	// requeue until preflight is complete by the hub's controller
@@ -543,7 +543,7 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 		if err := operatorClient.OperatorV1().Klusterlets().Delete(ctx, "klusterlet", metav1.DeleteOptions{}); err != nil && !kerrs.IsNotFound(err) {
 			return err
 		}
-		namespacesToDelete = append(namespacesToDelete, "open-cluster-management-agent", "open-cluster-management-agent-addon", "open-cluster-management")
+		namespacesToDelete = append(namespacesToDelete, v1beta1.OCMSpokeNamespaces...)
 	}
 	if spoke.Spec.CleanupConfig.PurgeAgentNamespace {
 		agentNamespace := os.Getenv(v1beta1.ControllerNamespaceEnvVar) // manager.go enforces that this is not ""

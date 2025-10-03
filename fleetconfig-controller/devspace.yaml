@@ -27,7 +27,7 @@ profiles:
     patches:
       - path: vars.FLEETCONFIG_ENABLED.value
         op: replace
-        value: false 
+        value: false
   - name: v1beta1
     patches:
       - path: vars.FLEETCONFIG_ENABLED.value
