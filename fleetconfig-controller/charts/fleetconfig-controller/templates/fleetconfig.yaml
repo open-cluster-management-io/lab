@@ -70,10 +70,12 @@ metadata:
   name: {{ .name }}
   namespace: {{ $releaseNamespace }}    
 spec:
+  {{- with .cleanupConfig }}
   cleanupConfig:
-    purgeKlusterletOperator: {{ .cleanupConfig.purgeKlusterletOperator }}
-    purgeKubeconfigSecret: {{ .cleanupConfig.purgeKubeconfigSecret }}
-    purgeAgentNamespace: {{ .cleanupConfig.purgeAgentNamespace }}
+    purgeKlusterletOperator: {{ .purgeKlusterletOperator | default true }}
+    purgeKubeconfigSecret: {{ .purgeKubeconfigSecret | default false }}
+    purgeAgentNamespace: {{ .purgeAgentNamespace | default false }}
+  {{- end }}
   hubRef:
     name: {{ .hubRef.name }}
     namespace: {{ $releaseNamespace }}
