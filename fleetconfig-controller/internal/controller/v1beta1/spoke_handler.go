@@ -171,7 +171,7 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 		// precreate the namespace that the agent will be installed into
 		// this prevents it from being automatically garbage collected when the spoke is deregistered
 		if r.InstanceType != v1beta1.InstanceTypeUnified {
-			err = r.createAgentNamespace(ctx, spokeKubeconfig)
+			err = r.createAgentNamespace(ctx, spoke.Name, spokeKubeconfig)
 			if err != nil {
 				logger.Error(err, "failed to create agent namespace", "spoke", spoke.Name)
 				return err
@@ -272,7 +272,8 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 	return nil
 }
 
-func (r *SpokeReconciler) createAgentNamespace(ctx context.Context, spokeKubeconfig []byte) error {
+func (r *SpokeReconciler) createAgentNamespace(ctx context.Context, spokeName string, spokeKubeconfig []byte) error {
+	logger := log.FromContext(ctx)
 	spokeRestCfg, err := kube.RestConfigFromKubeconfig(spokeKubeconfig)
 	if err != nil {
 
@@ -292,20 +293,16 @@ func (r *SpokeReconciler) createAgentNamespace(ctx context.Context, spokeKubecon
 	if err != nil && !kerrs.IsNotFound(err) {
 		return err
 	}
+	logger.V(1).Info("agent namespace configured", "spoke", spokeName, "namespace", agentNamespace)
 	return nil
 }
 
 func (r *SpokeReconciler) deleteKubeconfigSecret(ctx context.Context, spoke *v1beta1.Spoke) error {
-	if r.InstanceType != v1beta1.InstanceTypeManager {
-		return nil
-	}
-	if !spoke.PivotComplete() {
-		return nil
-	}
-	if !spoke.Spec.Kubeconfig.InCluster {
-		return nil
-	}
-	if !spoke.Spec.CleanupConfig.PurgeKubeconfigSecret {
+	logger := log.FromContext(ctx)
+	if r.InstanceType != v1beta1.InstanceTypeManager ||
+		!spoke.PivotComplete() ||
+		!spoke.Spec.Kubeconfig.InCluster ||
+		!spoke.Spec.CleanupConfig.PurgeKubeconfigSecret {
 		return nil
 	}
 
@@ -319,6 +316,7 @@ func (r *SpokeReconciler) deleteKubeconfigSecret(ctx context.Context, spoke *v1b
 	if err != nil && !kerrs.IsNotFound(err) {
 		return err
 	}
+	logger.V(1).Info("kubeconfig secret purged", "spoke", spoke.Name)
 	return nil
 }
 
