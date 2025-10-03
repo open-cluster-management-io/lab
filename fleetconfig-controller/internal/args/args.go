@@ -12,6 +12,7 @@ import (
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
 )
 
+// Redacted is used to mask sensitive values
 const Redacted = "REDACTED"
 
 var sensitiveKeys = []string{
