@@ -85,6 +85,7 @@ spec:
         - apiGroups: [""]
           resources: ["namespaces"]
           verbs: ["get", "list", "watch", "delete"]
+          resourceNames: ["{{ .Release.Namespace }}", "open-cluster-management", "open-cluster-management-agent", "open-cluster-management-agent-addon"]
         - apiGroups: [""]
           resources: ["pods", "serviceaccounts"]
           verbs: ["get", "list", "watch"]

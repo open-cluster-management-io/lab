@@ -60,7 +60,7 @@ func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke, hub
 		return r.doSpokeCleanup(ctx, spoke, true)
 	default:
 		// this is guarded against when the manager is initialized. should never reach this point
-		panic(fmt.Sprintf("unknown cluster type %s. Must be one of %v", r.InstanceType, v1beta1.SupportedInstanceTypes))
+		panic(fmt.Sprintf("unknown instance type %s. Must be one of %v", r.InstanceType, v1beta1.SupportedInstanceTypes))
 	}
 }
 
