@@ -95,9 +95,16 @@ func (w *ResourceWatcher) Start(ctx context.Context) error {
 			w.log.Info("Shutting down resource watcher", "name", w.name)
 			return nil
 		case <-ticker.C:
-			if err := w.check(ctx); err != nil {
-				w.log.Error(err, "Watch check failed", "name", w.name)
-			}
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						w.log.Error(fmt.Errorf("panic: %v", r), "Watch check panicked", "name", w.name)
+					}
+				}()
+				if err := w.check(ctx); err != nil {
+					w.log.Error(err, "Watch check failed", "name", w.name)
+				}
+			}()
 		}
 	}
 }
