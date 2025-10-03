@@ -89,7 +89,7 @@ type SpokeSpec struct {
 
 // CleanupConfig is the configuration for cleaning up resources during Spoke cleanup.
 type CleanupConfig struct {
-	// If true, the agent will attempt to garbage collect it's own namespace after the spoke cluster is unjoined.
+	// If true, the agent will attempt to garbage collect its own namespace after the spoke cluster is unjoined.
 	// +kubebuilder:default:=false
 	// +optional
 	PurgeAgentNamespace bool `json:"purgeAgentNamespace,omitempty"`
@@ -100,7 +100,7 @@ type CleanupConfig struct {
 	// +optional
 	PurgeKlusterletOperator bool `json:"purgeKlusterletOperator,omitempty"`
 
-	// If set, the kubeconfig secret will will be automatically deleted after the agent has taken over managing the Spoke.
+	// If set, the kubeconfig secret will be automatically deleted after the agent has taken over managing the Spoke.
 	// +kubebuilder:default:=false
 	// +optional
 	PurgeKubeconfigSecret bool `json:"purgeKubeconfigSecret,omitempty"`
