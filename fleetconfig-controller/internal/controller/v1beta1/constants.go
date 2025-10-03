@@ -33,6 +33,4 @@ const (
 	addonCleanupPollInterval = 2 * time.Second
 
 	manifestWorkAddOnLabelKey = "open-cluster-management.io/addon-name"
-
-	manifestWorkAddOnLabelValueFcc = "fleetconfig-controller-agent"
 )

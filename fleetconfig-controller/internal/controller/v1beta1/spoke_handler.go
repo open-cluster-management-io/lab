@@ -405,7 +405,7 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 
 	// for hub-as-spoke, or if the addon agent never came up, disable all addons
 	// otherwise, leave fleetconfig-controller-agent addon running so that it can do deregistration
-	shouldCleanAll := spoke.IsHubAsSpoke() || !pivotComplete
+	shouldCleanAll := spoke.IsHubAsSpoke() || !pivotComplete || r.InstanceType == v1beta1.InstanceTypeUnified
 
 	if !shouldCleanAll {
 		spokeCopy.Spec.AddOns = append(spokeCopy.Spec.AddOns, v1beta1.AddOn{ConfigName: v1beta1.FCCAddOnName})
@@ -454,8 +454,17 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 		}
 	}
 
+	// delete fcc agent addon
+	spokeCopy.Spec.AddOns = nil
+	if _, err := handleSpokeAddons(ctx, addonC, spokeCopy); err != nil {
+		spoke.SetConditions(true, v1beta1.NewCondition(
+			err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
+		))
+		return err
+	}
+
 	// at this point, klusterlet-work-agent is uninstalled, so nothing can remove this finalizer. all resources are cleaned up by the spoke's controller, so to prevent a dangling mw/namespace, we remove the finalizer manually
-	mwList, err := workC.WorkV1().ManifestWorks(spoke.Name).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", manifestWorkAddOnLabelKey, manifestWorkAddOnLabelValueFcc)})
+	mwList, err := workC.WorkV1().ManifestWorks(spoke.Name).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", manifestWorkAddOnLabelKey, v1beta1.FCCAddOnName)})
 	if err != nil {
 		return err
 	}
@@ -479,6 +488,14 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 		if err != nil && !kerrs.IsNotFound(err) {
 			return err
 		}
+	}
+
+	// Wait for all manifestWorks to be cleaned up
+	if err := waitForAddonManifestWorksCleanup(ctx, workC, spoke.Name, addonCleanupTimeout, true); err != nil {
+		spoke.SetConditions(true, v1beta1.NewCondition(
+			err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
+		))
+		return fmt.Errorf("addon manifestWorks cleanup failed: %w", err)
 	}
 
 	// remove ManagedCluster
