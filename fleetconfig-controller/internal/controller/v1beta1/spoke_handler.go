@@ -225,7 +225,7 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 
 	err = r.deleteKubeconfigSecret(ctx, spoke)
 	if err != nil {
-		logger.Error(err, "warning: failed to remove spoke's kubeconfig secret", "spoke", spoke.Name)
+		logger.Error(err, "failed to remove spoke's kubeconfig secret", "spoke", spoke.Name)
 		return err
 	}
 
@@ -631,11 +631,14 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 		"--feature-gates", spoke.Spec.Klusterlet.FeatureGates,
 		fmt.Sprintf("--force-internal-endpoint-lookup=%t", spoke.Spec.Klusterlet.ForceInternalEndpointLookup),
 		fmt.Sprintf("--singleton=%t", spoke.Spec.Klusterlet.Singleton),
-		// source args
-		"--bundle-version", hub.Spec.ClusterManager.Source.BundleVersion,
-		"--image-registry", hub.Spec.ClusterManager.Source.Registry,
 	}, spoke.BaseArgs()...)
 
+	if hub.Spec.ClusterManager != nil {
+		// source args
+		joinArgs = append(joinArgs,
+			"--bundle-version", hub.Spec.ClusterManager.Source.BundleVersion,
+			"--image-registry", hub.Spec.ClusterManager.Source.Registry)
+	}
 	for k, v := range spoke.Spec.Klusterlet.Annotations {
 		joinArgs = append(joinArgs, fmt.Sprintf("--klusterlet-annotation=%s=%s", k, v))
 	}
