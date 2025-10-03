@@ -218,3 +218,75 @@ func TestMockResourceValues_String(t *testing.T) {
 		})
 	}
 }
+
+func TestSanitizeArgs(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected []string
+	}{
+		{
+			name:     "empty args",
+			args:     []string{},
+			expected: []string{},
+		},
+		{
+			name:     "no sensitive args",
+			args:     []string{"init", "--hub-name", "my-hub", "--cluster-name", "spoke1"},
+			expected: []string{"init", "--hub-name", "my-hub", "--cluster-name", "spoke1"},
+		},
+		{
+			name:     "with token flag",
+			args:     []string{"join", "--token", "secret-token-value", "--hub-name", "my-hub"},
+			expected: []string{"join", "--token", Redacted, "--hub-name", "my-hub"},
+		},
+		{
+			name:     "with joinToken flag",
+			args:     []string{"join", "--joinToken", "secret-join-token", "--hub-name", "my-hub"},
+			expected: []string{"join", "--joinToken", Redacted, "--hub-name", "my-hub"},
+		},
+		{
+			name:     "case insensitive token",
+			args:     []string{"join", "--TOKEN", "secret-value", "--hub-name", "my-hub"},
+			expected: []string{"join", "--TOKEN", Redacted, "--hub-name", "my-hub"},
+		},
+		{
+			name:     "case insensitive joinToken",
+			args:     []string{"join", "--JoinToken", "secret-value", "--hub-name", "my-hub"},
+			expected: []string{"join", "--JoinToken", Redacted, "--hub-name", "my-hub"},
+		},
+		{
+			name:     "multiple sensitive flags",
+			args:     []string{"join", "--token", "secret1", "--hub-name", "my-hub", "--hub-token", "secret2"},
+			expected: []string{"join", "--token", Redacted, "--hub-name", "my-hub", "--hub-token", Redacted},
+		},
+		{
+			name:     "sensitive flag at end with value",
+			args:     []string{"join", "--hub-name", "my-hub", "--token", "secret-token"},
+			expected: []string{"join", "--hub-name", "my-hub", "--token", Redacted},
+		},
+		{
+			name:     "token value contains sensitive keyword",
+			args:     []string{"join", "--message", "token-message", "--hub-name", "my-hub"},
+			expected: []string{"join", "--message", "token-message", "--hub-name", "my-hub"},
+		},
+		{
+			name:     "consecutive sensitive flags",
+			args:     []string{"join", "--token", "secret1", "--joinToken", "secret2", "--hub-name", "my-hub"},
+			expected: []string{"join", "--token", Redacted, "--joinToken", Redacted, "--hub-name", "my-hub"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SanitizeArgs(tt.args)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("SanitizeArgs() = %v, want %v", result, tt.expected)
+			}
+			// Verify the output has the same length as input
+			if len(result) != len(tt.args) {
+				t.Errorf("SanitizeArgs() output length = %d, want %d", len(result), len(tt.args))
+			}
+		})
+	}
+}

@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
+	arg_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/args"
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
 )
@@ -188,7 +189,7 @@ func handleAddonCreate(ctx context.Context, kClient client.Client, hub *v1beta1.
 			args = append(args, fmt.Sprintf("--cluster-role-bind=%s", a.ClusterRoleBinding))
 		}
 
-		logger.V(7).Info("running", "command", clusteradm, "args", args)
+		logger.V(7).Info("running", "command", clusteradm, "args", arg_utils.SanitizeArgs(args))
 		cmd := exec.Command(clusteradm, args...)
 		stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm addon create' to complete...")
 		if err != nil {
@@ -378,7 +379,7 @@ func handleAddonEnable(ctx context.Context, spoke *v1beta1.Spoke, addons []v1bet
 		}
 
 		args = append(baseArgs, args...)
-		logger.V(7).Info("running", "command", clusteradm, "args", args)
+		logger.V(7).Info("running", "command", clusteradm, "args", arg_utils.SanitizeArgs(args))
 		cmd := exec.Command(clusteradm, args...)
 		stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm addon enable' to complete...")
 		if err != nil {
@@ -462,7 +463,7 @@ func handleAddonDisable(ctx context.Context, spoke *v1beta1.Spoke, enabledAddons
 		fmt.Sprintf("--clusters=%s", spoke.Name),
 	}, spoke.BaseArgs()...)
 
-	logger.V(7).Info("running", "command", clusteradm, "args", args)
+	logger.V(7).Info("running", "command", clusteradm, "args", arg_utils.SanitizeArgs(args))
 	cmd := exec.Command(clusteradm, args...)
 	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm addon disable' to complete...")
 	if err != nil {
@@ -593,7 +594,7 @@ func handleHubAddonUninstall(ctx context.Context, addons []v1beta1.InstalledHubA
 			args = append(args, fmt.Sprintf("--namespace=%s", addon.Namespace))
 		}
 
-		logger.V(7).Info("running", "command", clusteradm, "args", args)
+		logger.V(7).Info("running", "command", clusteradm, "args", arg_utils.SanitizeArgs(args))
 		cmd := exec.Command(clusteradm, args...)
 		stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm uninstall hub-addon' to complete...")
 		if err != nil {
@@ -643,6 +644,7 @@ func handleHubAddonInstall(ctx context.Context, addonC *addonapi.Clientset, addo
 			args = append(args, fmt.Sprintf("--namespace=%s", addon.InstallNamespace))
 		}
 
+		logger.V(7).Info("running", "command", clusteradm, "args", arg_utils.SanitizeArgs(args))
 		cmd := exec.Command(clusteradm, args...)
 		stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm install hub-addon' to complete...")
 		if err != nil {

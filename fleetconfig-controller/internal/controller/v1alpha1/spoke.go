@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
-	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/args"
+	arg_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/args"
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/hash"
@@ -240,7 +240,7 @@ func acceptCluster(ctx context.Context, fc *v1alpha1.FleetConfig, name string, s
 		"accept", "--cluster", name,
 	}, fc.BaseArgs()...)
 
-	logger.V(1).Info("clusteradm accept", "args", acceptArgs)
+	logger.V(1).Info("clusteradm accept", "args", arg_utils.SanitizeArgs(acceptArgs))
 
 	// TODO: handle other args:
 	// --requesters=[]:
@@ -278,7 +278,7 @@ func getToken(ctx context.Context, fc *v1alpha1.FleetConfig, hubKubeconfig []byt
 	if fc.Spec.Hub.ClusterManager != nil {
 		tokenArgs = append(tokenArgs, fmt.Sprintf("--use-bootstrap-token=%t", fc.Spec.Hub.ClusterManager.UseBootstrapToken))
 	}
-	tokenArgs, cleanupKcfg, err := args.PrepareKubeconfig(ctx, hubKubeconfig, fc.Spec.Hub.Kubeconfig.Context, tokenArgs)
+	tokenArgs, cleanupKcfg, err := arg_utils.PrepareKubeconfig(ctx, hubKubeconfig, fc.Spec.Hub.Kubeconfig.Context, tokenArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -286,7 +286,7 @@ func getToken(ctx context.Context, fc *v1alpha1.FleetConfig, hubKubeconfig []byt
 		return nil, fmt.Errorf("failed to prepare kubeconfig: %w", err)
 	}
 
-	logger.V(1).Info("clusteradm get token", "args", tokenArgs)
+	logger.V(1).Info("clusteradm get token", "args", arg_utils.SanitizeArgs(tokenArgs))
 
 	cmd := exec.Command(clusteradm, tokenArgs...)
 	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm get token' to complete...")
@@ -294,7 +294,7 @@ func getToken(ctx context.Context, fc *v1alpha1.FleetConfig, hubKubeconfig []byt
 		out := append(stdout, stderr...)
 		return nil, fmt.Errorf("failed to get join token: %v, output: %s", err, string(out))
 	}
-	logger.V(1).Info("got join token", "output", string(stdout))
+	logger.V(1).Info("got join token", "output", arg_utils.Redacted) // TODO - SANITIZE
 
 	tokenMeta := &tokenMeta{}
 	if err := json.Unmarshal(stdout, &tokenMeta); err != nil {
@@ -330,7 +330,7 @@ func joinSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetCon
 	}
 
 	// resources args
-	joinArgs = append(joinArgs, args.PrepareResources(spoke.Klusterlet.Resources)...)
+	joinArgs = append(joinArgs, arg_utils.PrepareResources(spoke.Klusterlet.Resources)...)
 
 	// Use hub API server from spec if provided and not forced to use internal endpoint,
 	// otherwise fall back to the hub API server from the tokenMeta
@@ -410,7 +410,7 @@ func joinSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetCon
 	if err != nil {
 		return err
 	}
-	joinArgs, cleanupKcfg, err := args.PrepareKubeconfig(ctx, kubeconfig, spoke.Kubeconfig.Context, joinArgs)
+	joinArgs, cleanupKcfg, err := arg_utils.PrepareKubeconfig(ctx, kubeconfig, spoke.Kubeconfig.Context, joinArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -418,7 +418,7 @@ func joinSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetCon
 		return err
 	}
 
-	logger.V(1).Info("clusteradm join", "args", joinArgs)
+	logger.V(1).Info("clusteradm join", "args", arg_utils.SanitizeArgs(joinArgs))
 
 	cmd := exec.Command(clusteradm, joinArgs...)
 	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, fmt.Sprintf("waiting for 'clusteradm join' to complete for spoke %s...", spoke.Name))
@@ -527,7 +527,7 @@ func upgradeSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 	if err != nil {
 		return err
 	}
-	upgradeArgs, cleanupKcfg, err := args.PrepareKubeconfig(ctx, kubeconfig, spoke.Kubeconfig.Context, upgradeArgs)
+	upgradeArgs, cleanupKcfg, err := arg_utils.PrepareKubeconfig(ctx, kubeconfig, spoke.Kubeconfig.Context, upgradeArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -535,7 +535,7 @@ func upgradeSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 		return err
 	}
 
-	logger.V(1).Info("clusteradm upgrade klusterlet", "args", upgradeArgs)
+	logger.V(1).Info("clusteradm upgrade klusterlet", "args", arg_utils.SanitizeArgs(upgradeArgs))
 
 	cmd := exec.Command(clusteradm, upgradeArgs...)
 	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, fmt.Sprintf("waiting for 'clusteradm upgrade klusterlet' to complete for spoke %s...", spoke.Name))
@@ -587,7 +587,7 @@ func unjoinSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetC
 	if err != nil {
 		return err
 	}
-	unjoinArgs, cleanupKcfg, err := args.PrepareKubeconfig(ctx, kubeconfig, spoke.GetKubeconfig().Context, unjoinArgs)
+	unjoinArgs, cleanupKcfg, err := arg_utils.PrepareKubeconfig(ctx, kubeconfig, spoke.GetKubeconfig().Context, unjoinArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -595,7 +595,7 @@ func unjoinSpoke(ctx context.Context, kClient client.Client, fc *v1alpha1.FleetC
 		return fmt.Errorf("failed to unjoin spoke cluster %s: %w", spoke.GetName(), err)
 	}
 
-	logger.V(1).Info("clusteradm unjoin", "args", unjoinArgs)
+	logger.V(1).Info("clusteradm unjoin", "args", arg_utils.SanitizeArgs(unjoinArgs))
 
 	cmd := exec.Command(clusteradm, unjoinArgs...)
 	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, fmt.Sprintf("waiting for 'clusteradm unjoin' to complete for spoke %s...", spoke.GetName()))

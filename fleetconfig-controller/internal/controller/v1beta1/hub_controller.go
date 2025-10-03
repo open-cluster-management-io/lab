@@ -43,7 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
-	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/args"
+	arg_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/args"
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
@@ -248,6 +248,7 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub, hubKubec
 	}
 	cleanArgs = append(cleanArgs, hub.BaseArgs()...)
 
+	logger.V(7).Info("running", "command", clusteradm, "args", arg_utils.SanitizeArgs(cleanArgs))
 	cmd := exec.Command(clusteradm, cleanArgs...)
 	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm clean' to complete...")
 	if err != nil {
@@ -421,13 +422,13 @@ func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub, hub
 		initArgs = append(initArgs, "--bundle-version", hub.Spec.ClusterManager.Source.BundleVersion)
 		initArgs = append(initArgs, "--image-registry", hub.Spec.ClusterManager.Source.Registry)
 		// resources args
-		initArgs = append(initArgs, args.PrepareResources(hub.Spec.ClusterManager.Resources)...)
+		initArgs = append(initArgs, arg_utils.PrepareResources(hub.Spec.ClusterManager.Resources)...)
 	} else {
 		// one of clusterManager or singletonControlPlane must be specified, per validating webhook, but handle the edge case anyway
 		return fmt.Errorf("unknown hub type, must specify either hub.clusterManager or hub.singletonControlPlane")
 	}
 
-	initArgs, cleanupKcfg, err := args.PrepareKubeconfig(ctx, hubKubeconfig, hub.Spec.Kubeconfig.Context, initArgs)
+	initArgs, cleanupKcfg, err := arg_utils.PrepareKubeconfig(ctx, hubKubeconfig, hub.Spec.Kubeconfig.Context, initArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -435,7 +436,7 @@ func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub, hub
 		return err
 	}
 
-	logger.V(1).Info("clusteradm init", "args", initArgs)
+	logger.V(1).Info("clusteradm init", "args", arg_utils.SanitizeArgs(initArgs))
 
 	cmd := exec.Command(clusteradm, initArgs...)
 	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm init' to complete...")
@@ -509,7 +510,7 @@ func (r *HubReconciler) upgradeHub(ctx context.Context, hub *v1beta1.Hub) error 
 		"--wait=true",
 	}, hub.BaseArgs()...)
 
-	logger.V(1).Info("clusteradm upgrade clustermanager", "args", upgradeArgs)
+	logger.V(1).Info("clusteradm upgrade clustermanager", "args", arg_utils.SanitizeArgs(upgradeArgs))
 
 	cmd := exec.Command(clusteradm, upgradeArgs...)
 	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm upgrade clustermanager' to complete...")

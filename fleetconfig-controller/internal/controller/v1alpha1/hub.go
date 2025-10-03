@@ -21,7 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
-	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/args"
+	arg_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/args"
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
@@ -182,13 +182,13 @@ func initializeHub(ctx context.Context, fc *v1alpha1.FleetConfig, hubKubeconfig 
 		initArgs = append(initArgs, "--bundle-version", fc.Spec.Hub.ClusterManager.Source.BundleVersion)
 		initArgs = append(initArgs, "--image-registry", fc.Spec.Hub.ClusterManager.Source.Registry)
 		// resources args
-		initArgs = append(initArgs, args.PrepareResources(fc.Spec.Hub.ClusterManager.Resources)...)
+		initArgs = append(initArgs, arg_utils.PrepareResources(fc.Spec.Hub.ClusterManager.Resources)...)
 	} else {
 		// one of clusterManager or singletonControlPlane must be specified, per validating webhook, but handle the edge case anyway
 		return fmt.Errorf("unknown hub type, must specify either hub.clusterManager or hub.singletonControlPlane")
 	}
 
-	initArgs, cleanupKcfg, err := args.PrepareKubeconfig(ctx, hubKubeconfig, fc.Spec.Hub.Kubeconfig.Context, initArgs)
+	initArgs, cleanupKcfg, err := arg_utils.PrepareKubeconfig(ctx, hubKubeconfig, fc.Spec.Hub.Kubeconfig.Context, initArgs)
 	if cleanupKcfg != nil {
 		defer cleanupKcfg()
 	}
@@ -196,7 +196,7 @@ func initializeHub(ctx context.Context, fc *v1alpha1.FleetConfig, hubKubeconfig 
 		return err
 	}
 
-	logger.V(1).Info("clusteradm init", "args", initArgs)
+	logger.V(1).Info("clusteradm init", "args", arg_utils.SanitizeArgs(initArgs))
 
 	cmd := exec.Command(clusteradm, initArgs...)
 	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm init' to complete...")
@@ -282,7 +282,7 @@ func upgradeHub(ctx context.Context, fc *v1alpha1.FleetConfig) error {
 		"--wait=true",
 	}, fc.BaseArgs()...)
 
-	logger.V(1).Info("clusteradm upgrade clustermanager", "args", upgradeArgs)
+	logger.V(1).Info("clusteradm upgrade clustermanager", "args", arg_utils.SanitizeArgs(upgradeArgs))
 
 	cmd := exec.Command(clusteradm, upgradeArgs...)
 	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm upgrade clustermanager' to complete...")
@@ -325,7 +325,7 @@ func cleanHub(ctx context.Context, kClient client.Client, hubKubeconfig []byte, 
 		fmt.Sprintf("--purge-operator=%t", fc.Spec.Hub.ClusterManager.PurgeOperator),
 	}, fc.BaseArgs()...)
 
-	logger.V(1).Info("clusteradm clean", "args", cleanArgs)
+	logger.V(1).Info("clusteradm clean", "args", arg_utils.SanitizeArgs(cleanArgs))
 
 	cmd := exec.Command(clusteradm, cleanArgs...)
 	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm clean' to complete...")
