@@ -3,11 +3,15 @@ package watch
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+const defaultTimeout = 10 * time.Second
 
 // ConditionFunc checks if a condition is met
 // Returns (conditionMet, error)
@@ -21,6 +25,7 @@ type ResourceWatcher struct {
 	client    client.Client
 	log       logr.Logger
 	interval  time.Duration
+	timeout   time.Duration
 	name      string
 	condition ConditionFunc
 	handler   HandlerFunc
@@ -31,21 +36,51 @@ type Config struct {
 	Client    client.Client
 	Log       logr.Logger
 	Interval  time.Duration
+	Timeout   time.Duration
 	Name      string
 	Condition ConditionFunc
 	Handler   HandlerFunc
 }
 
 // New creates a new ResourceWatcher
-func New(cfg Config) *ResourceWatcher {
+func New(cfg Config) (*ResourceWatcher, error) {
+	if cfg.Client == nil {
+		return nil, errors.New("watch.Config.Client must not be nil")
+	}
+	if cfg.Log.GetSink() == nil {
+		return nil, errors.New("watch.Config.Log must not be nil")
+	}
+	if cfg.Condition == nil {
+		return nil, errors.New("watch.Config.Condition must not be nil")
+	}
+	if cfg.Handler == nil {
+		return nil, errors.New("watch.Config.Handler must not be nil")
+	}
+	if cfg.Interval <= 0 {
+		return nil, errors.New("watch.Config.Interval must be positive")
+	}
+	timeout := cfg.Timeout
+	if timeout <= 0 {
+		timeout = defaultTimeout
+	}
+
 	return &ResourceWatcher{
 		client:    cfg.Client,
 		log:       cfg.Log,
 		interval:  cfg.Interval,
+		timeout:   timeout,
 		name:      cfg.Name,
 		condition: cfg.Condition,
 		handler:   cfg.Handler,
+	}, nil
+}
+
+func NewOrDie(cfg Config) *ResourceWatcher {
+	rw, err := New(cfg)
+	if err != nil {
+		panic(fmt.Errorf("failed to create ResourceWatcher due to invalid input: %w", err))
 	}
+	return rw
 }
 
 // Start begins the watch loop
@@ -68,7 +103,10 @@ func (w *ResourceWatcher) Start(ctx context.Context) error {
 }
 
 func (w *ResourceWatcher) check(ctx context.Context) error {
-	met, err := w.condition(ctx, w.client)
+	cCtx, cancel := context.WithTimeout(ctx, w.timeout)
+	defer cancel()
+
+	met, err := w.condition(cCtx, w.client)
 	if err != nil {
 		return err
 	}
@@ -78,5 +116,8 @@ func (w *ResourceWatcher) check(ctx context.Context) error {
 	}
 
 	w.log.V(1).Info("Condition met, executing handler", "name", w.name)
-	return w.handler(ctx, w.client)
+	hCtx, cancel := context.WithTimeout(ctx, w.timeout)
+	defer cancel()
+
+	return w.handler(hCtx, w.client)
 }

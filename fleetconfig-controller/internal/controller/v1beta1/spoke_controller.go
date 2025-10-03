@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"slices"
 	"strconv"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
@@ -268,10 +269,11 @@ func (r *SpokeReconciler) SetupWithManagerForSpoke(mgr ctrl.Manager) error {
 	spokeName := os.Getenv(v1beta1.SpokeNameEnvVar) // we know this is set, because the mgr setup would have failed otherwise
 
 	// set up a watcher that is independent of the reconcile loop, so that we can delete the controller AMW after the Spoke is fully deleted
-	watcher := watch.New(watch.Config{
+	watcher := watch.NewOrDie(watch.Config{
 		Client:    mgr.GetClient(),
 		Log:       r.Log.WithName(v1beta1.AgentCleanupWatcherName),
 		Interval:  requeue,
+		Timeout:   10 * time.Second,
 		Name:      v1beta1.AgentCleanupWatcherName,
 		Condition: spokeDeletedCondition,
 		Handler:   agentSelfDestruct,
