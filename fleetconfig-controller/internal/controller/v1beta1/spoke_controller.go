@@ -22,7 +22,9 @@ import (
 	"os"
 	"reflect"
 	"slices"
+	"strconv"
 
+	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,6 +42,9 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/watch"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/pkg/common"
 )
 
 // SpokeReconciler reconciles a Spoke object
@@ -261,6 +266,21 @@ func (r *SpokeReconciler) SetupWithManagerForHub(mgr ctrl.Manager) error {
 // SetupWithManagerForSpoke sets up the controller with the Manager to run on a Spoke cluster.
 func (r *SpokeReconciler) SetupWithManagerForSpoke(mgr ctrl.Manager) error {
 	spokeName := os.Getenv(v1beta1.SpokeNameEnvVar) // we know this is set, because the mgr setup would have failed otherwise
+
+	// set up a watcher that is independent of the reconcile loop, so that we can delete the controller AMW after the Spoke is fully deleted
+	watcher := watch.New(watch.Config{
+		Client:    mgr.GetClient(),
+		Log:       r.Log.WithName(v1beta1.AgentCleanupWatcherName),
+		Interval:  requeue,
+		Name:      v1beta1.AgentCleanupWatcherName,
+		Condition: spokeDeletedCondition,
+		Handler:   agentSelfDestruct,
+	})
+
+	err := mgr.Add(watcher)
+	if err != nil {
+		return err
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1beta1.Spoke{},
 			builder.WithPredicates(predicate.NewPredicateFuncs(
@@ -274,6 +294,55 @@ func (r *SpokeReconciler) SetupWithManagerForSpoke(mgr ctrl.Manager) error {
 		}).
 		Named("spoke").
 		Complete(r)
+}
+
+func spokeDeletedCondition(ctx context.Context, c client.Client) (bool, error) {
+	spokeName := os.Getenv(v1beta1.SpokeNameEnvVar)
+	spokeNamespace := os.Getenv(v1beta1.SpokeNamespaceEnvVar)
+	spoke := &v1beta1.Spoke{}
+	err := c.Get(ctx, types.NamespacedName{
+		Name:      spokeName,
+		Namespace: spokeNamespace,
+	}, spoke)
+
+	// condition is met when resource is NOT found
+	return kerrs.IsNotFound(err), client.IgnoreNotFound(err)
+}
+
+func agentSelfDestruct(ctx context.Context, _ client.Client) error {
+	spokeKubeconfig, err := kube.RawFromInClusterRestConfig()
+	if err != nil {
+		return err
+	}
+	workClient, err := common.WorkClient(spokeKubeconfig)
+	if err != nil {
+		return err
+	}
+	restCfg, err := kube.RestConfigFromKubeconfig(spokeKubeconfig)
+	if err != nil {
+		return err
+	}
+	spokeClient, err := client.New(restCfg, client.Options{})
+	if err != nil {
+		return err
+	}
+
+	purgeNamespaceStr := os.Getenv(v1beta1.PurgeAgentNamespaceEnvVar)
+	purgeNamespace, err := strconv.ParseBool(purgeNamespaceStr)
+	if err != nil {
+		// fall back to orphaning the namespace which is less destructive
+		purgeNamespace = false
+	}
+
+	if purgeNamespace {
+		agentNamespace := os.Getenv(v1beta1.ControllerNamespaceEnvVar) // manager.go enforces that this is not ""
+		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: agentNamespace}}
+		err := spokeClient.Delete(ctx, ns)
+		if err != nil && !kerrs.IsNotFound(err) {
+			return err
+		}
+	}
+	return workClient.WorkV1().AppliedManifestWorks().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 }
 
 // sharedFieldsChanged checks whether the spec fields that are shared between Hub and Spokes were updated,

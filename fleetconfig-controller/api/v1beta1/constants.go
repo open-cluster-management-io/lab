@@ -106,8 +106,11 @@ const (
 	// ControllerNamespaceEnvVar is the environment variable containing the namespace that the controller is deployed to.
 	ControllerNamespaceEnvVar = "CONTROLLER_NAMESPACE"
 
-	// ClusterRoleNameEnvVar containing the name of the ClusterRole for fleetconfig-controller-manager.
+	// ClusterRoleNameEnvVar is the environment variable containing the name of the ClusterRole for fleetconfig-controller-manager.
 	ClusterRoleNameEnvVar = "CLUSTER_ROLE_NAME"
+
+	// PurgeAgentNamespaceEnvVar is the environment variable used to signal to the agent whether or not it should garbage collect it install namespace.
+	PurgeAgentNamespaceEnvVar = "PURGE_AGENT_NAMESPACE"
 
 	// FCCAddOnName is the name of the fleetconfig-controller addon.
 	FCCAddOnName = "fleetconfig-controller-agent"
@@ -123,6 +126,9 @@ const (
 
 	// NamespaceOCMAgentAddOn is the namespace for open-cluster-management agent addons.
 	NamespaceOCMAgentAddOn = "open-cluster-management-agent-addon"
+
+	// AgentCleanupWatcherName is the name of the watcher for cleaning up the spoke agent.
+	AgentCleanupWatcherName = "agent-cleanup-watcher"
 )
 
 // SupportedInstanceTypes are the valid cluster types that the controller can be installed in.

@@ -76,7 +76,7 @@ spec:
                   purgeAgentNamespace:
                     default: false
                     description: If true, the agent will attempt to garbage collect
-                      it's own namespace after the spoke cluster is unjoined.
+                      its own namespace after the spoke cluster is unjoined.
                     type: boolean
                   purgeKlusterletOperator:
                     default: true
@@ -86,7 +86,7 @@ spec:
                     type: boolean
                   purgeKubeconfigSecret:
                     default: false
-                    description: If set, the kubeconfig secret will will be automatically
+                    description: If set, the kubeconfig secret will be automatically
                       deleted after the agent has taken over managing the Spoke.
                     type: boolean
                 type: object

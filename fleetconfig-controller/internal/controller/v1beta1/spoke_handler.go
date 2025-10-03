@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"slices"
+	"strconv"
 
 	"dario.cat/mergo"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -246,6 +247,10 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 						Name:  v1beta1.SpokeNamespaceEnvVar,
 						Value: spoke.Namespace,
 					},
+					{
+						Name:  v1beta1.PurgeAgentNamespaceEnvVar,
+						Value: strconv.FormatBool(spoke.Spec.CleanupConfig.PurgeAgentNamespace),
+					},
 				},
 			},
 		}
@@ -299,7 +304,7 @@ func (r *SpokeReconciler) createAgentNamespace(ctx context.Context, spokeName st
 func (r *SpokeReconciler) deleteKubeconfigSecret(ctx context.Context, spoke *v1beta1.Spoke) error {
 	if r.InstanceType != v1beta1.InstanceTypeManager ||
 		!spoke.PivotComplete() ||
-		!spoke.Spec.Kubeconfig.InCluster ||
+		spoke.Spec.Kubeconfig.InCluster ||
 		!spoke.Spec.CleanupConfig.PurgeKubeconfigSecret {
 		return nil
 	}
@@ -533,8 +538,15 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 	}
 
 	// remove all remaining klusterlet resources that unjoin did not remove (because of the remaining AMW)
-	var namespacesToDelete []string
 	if spoke.Spec.CleanupConfig.PurgeKlusterletOperator {
+		restCfg, err := kube.RestConfigFromKubeconfig(spokeKubeconfig)
+		if err != nil {
+			return err
+		}
+		spokeClient, err := client.New(restCfg, client.Options{})
+		if err != nil {
+			return err
+		}
 		operatorClient, err := common.OperatorClient(spokeKubeconfig)
 		if err != nil {
 			return err
@@ -543,42 +555,17 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 		if err := operatorClient.OperatorV1().Klusterlets().Delete(ctx, "klusterlet", metav1.DeleteOptions{}); err != nil && !kerrs.IsNotFound(err) {
 			return err
 		}
-		namespacesToDelete = append(namespacesToDelete, v1beta1.OCMSpokeNamespaces...)
-	}
-	if spoke.Spec.CleanupConfig.PurgeAgentNamespace {
-		agentNamespace := os.Getenv(v1beta1.ControllerNamespaceEnvVar) // manager.go enforces that this is not ""
-		namespacesToDelete = append(namespacesToDelete, agentNamespace)
-	}
 
-	workClient, err := common.WorkClient(spokeKubeconfig)
-	if err != nil {
-		return err
-	}
-	restCfg, err := kube.RestConfigFromKubeconfig(spokeKubeconfig)
-	if err != nil {
-		return err
-	}
-	spokeClient, err := client.New(restCfg, client.Options{})
-	if err != nil {
-		return err
-	}
-	for _, nsName := range namespacesToDelete {
-		if nsName == "" {
-			continue
-		}
-		ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: nsName}}
-		if err := spokeClient.Delete(ctx, ns); err != nil && !kerrs.IsNotFound(err) {
-			return err
+		for _, nsName := range v1beta1.OCMSpokeNamespaces {
+			if nsName == "" {
+				continue
+			}
+			ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: nsName}}
+			if err := spokeClient.Delete(ctx, ns); err != nil && !kerrs.IsNotFound(err) {
+				return err
+			}
 		}
 	}
-
-	// self-destruct as late as possible, so that the controller has enough time to patch the Spoke before being garbage collected
-	defer func() {
-		err = workClient.WorkV1().AppliedManifestWorks().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
-		if err != nil {
-			logger.Error(err, "failed to finalize agent cleanup")
-		}
-	}()
 
 	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
 		return s == v1beta1.SpokeCleanupFinalizer
