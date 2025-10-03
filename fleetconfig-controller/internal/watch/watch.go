@@ -42,7 +42,7 @@ type Config struct {
 	Handler   HandlerFunc
 }
 
-// New creates a new ResourceWatcher
+// New creates a new ResourceWatcher. Returns an error if misconfigured.
 func New(cfg Config) (*ResourceWatcher, error) {
 	if cfg.Client == nil {
 		return nil, errors.New("watch.Config.Client must not be nil")
@@ -75,6 +75,7 @@ func New(cfg Config) (*ResourceWatcher, error) {
 	}, nil
 }
 
+// NewOrDie creates a new ResourceWatcher. Panics if misconfigured.
 func NewOrDie(cfg Config) *ResourceWatcher {
 	rw, err := New(cfg)
 	if err != nil {
