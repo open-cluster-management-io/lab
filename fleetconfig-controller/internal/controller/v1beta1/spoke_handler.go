@@ -18,6 +18,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
+	workapi "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -454,6 +456,31 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 		}
 	}
 
+	err = r.waitForAgentAddonDeleted(ctx, spoke, spokeCopy, addonC, workC)
+	if err != nil {
+		return err
+	}
+
+	// remove ManagedCluster
+	err = clusterC.ClusterV1().ManagedClusters().Delete(ctx, spoke.Name, metav1.DeleteOptions{})
+	if err != nil && !kerrs.IsNotFound(err) {
+		return err
+	}
+	// remove Namespace
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: spoke.Name}}
+	err = r.Delete(ctx, ns)
+	if err != nil && !kerrs.IsNotFound(err) {
+		return err
+	}
+
+	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
+		return s == v1beta1.HubCleanupFinalizer
+	})
+
+	return nil
+}
+
+func (r *SpokeReconciler) waitForAgentAddonDeleted(ctx context.Context, spoke *v1beta1.Spoke, spokeCopy *v1beta1.Spoke, addonC *addonapi.Clientset, workC *workapi.Clientset) error {
 	// delete fcc agent addon
 	spokeCopy.Spec.AddOns = nil
 	if _, err := handleSpokeAddons(ctx, addonC, spokeCopy); err != nil {
@@ -497,23 +524,6 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 		))
 		return fmt.Errorf("addon manifestWorks cleanup failed: %w", err)
 	}
-
-	// remove ManagedCluster
-	err = clusterC.ClusterV1().ManagedClusters().Delete(ctx, spoke.Name, metav1.DeleteOptions{})
-	if err != nil && !kerrs.IsNotFound(err) {
-		return err
-	}
-	// remove Namespace
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: spoke.Name}}
-	err = r.Delete(ctx, ns)
-	if err != nil && !kerrs.IsNotFound(err) {
-		return err
-	}
-
-	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
-		return s == v1beta1.HubCleanupFinalizer
-	})
-
 	return nil
 }
 
