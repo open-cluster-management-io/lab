@@ -123,8 +123,6 @@ const (
 
 	// NamespaceOCMAgentAddOn is the namespace for open-cluster-management agent addons.
 	NamespaceOCMAgentAddOn = "open-cluster-management-agent-addon"
-
-	ManifestWorkAddOnNameLabelKey = "open-cluster-management.io/addon-name"
 )
 
 // SupportedInstanceTypes are the valid cluster types that the controller can be installed in.

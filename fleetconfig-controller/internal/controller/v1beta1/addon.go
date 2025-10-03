@@ -700,7 +700,7 @@ func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Client
 				return true, nil
 			}
 			mw := manifestWorks.Items[0]
-			val, ok := mw.Labels[v1beta1.ManifestWorkAddOnNameLabelKey]
+			val, ok := mw.Labels[addonv1alpha1.AddonLabelKey]
 			if ok && val == v1beta1.FCCAddOnName {
 				logger.V(1).Info("addon manifestWorks cleanup completed", "spokeName", spokeName, "remainingManifestWork", mw.Name)
 				return true, nil
@@ -790,16 +790,16 @@ func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.Role
 			logger.Error(err, "failed to create role binding for addon")
 			return err
 		}
-		curr := binding.DeepCopy()
-		err = r.Get(ctx, types.NamespacedName{Namespace: curr.Namespace, Name: curr.Name}, curr)
+		curr := &rbacv1.RoleBinding{}
+		err = r.Get(ctx, types.NamespacedName{Namespace: binding.Namespace, Name: binding.Name}, curr)
 		if err != nil {
 			logger.Error(err, "failed to get role binding for addon")
 			return err
 		}
 		binding.SetResourceVersion(curr.ResourceVersion)
-		err = r.Patch(ctx, binding, client.MergeFrom(curr))
+		err = r.Update(ctx, binding)
 		if err != nil {
-			logger.Error(err, "failed to patch role binding for addon")
+			logger.Error(err, "failed to update role binding for addon")
 			return err
 		}
 	}
