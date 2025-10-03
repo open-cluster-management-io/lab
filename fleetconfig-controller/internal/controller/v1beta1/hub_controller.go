@@ -444,7 +444,7 @@ func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub, hub
 		out := append(stdout, stderr...)
 		return fmt.Errorf("failed to init hub: %v, output: %s", err, string(out))
 	}
-	logger.V(1).Info("hub initialized", "output", string(stdout))
+	logger.V(1).Info("hub initialized", "output", string(arg_utils.SanitizeOutput(stdout)))
 
 	return nil
 }

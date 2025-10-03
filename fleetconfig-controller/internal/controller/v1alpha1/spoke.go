@@ -294,7 +294,7 @@ func getToken(ctx context.Context, fc *v1alpha1.FleetConfig, hubKubeconfig []byt
 		out := append(stdout, stderr...)
 		return nil, fmt.Errorf("failed to get join token: %v, output: %s", err, string(out))
 	}
-	logger.V(1).Info("got join token", "output", arg_utils.Redacted) // TODO - SANITIZE
+	logger.V(1).Info("got join token", "output", arg_utils.SanitizeOutput(stdout))
 
 	tokenMeta := &tokenMeta{}
 	if err := json.Unmarshal(stdout, &tokenMeta); err != nil {

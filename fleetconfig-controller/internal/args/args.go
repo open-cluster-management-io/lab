@@ -15,7 +15,6 @@ import (
 const Redacted = "REDACTED"
 
 var sensitiveKeys = []string{
-	"token",
 	"join-token",
 	"jointoken",
 	"hub-token",
@@ -80,19 +79,40 @@ type ResourceValues interface {
 
 // SanitizeArgs redacts sensitive args to prevent leaking credentials
 func SanitizeArgs(args []string) []string {
-	if len(args) == 0 {
+	return sanitizeSlice(args)
+}
+
+// SanitizeOutput redacts sensitive values from command output
+func SanitizeOutput(output []byte) []byte {
+	if len(output) == 0 {
+		return output
+	}
+
+	// Convert bytes to string and split into words
+	text := string(output)
+	words := strings.Fields(text)
+
+	// Sanitize the words
+	sanitized := sanitizeSlice(words)
+
+	// Join back and convert to bytes
+	return []byte(strings.Join(sanitized, " "))
+}
+
+func sanitizeSlice(words []string) []string {
+	if len(words) == 0 {
 		return []string{}
 	}
 
 	// Start with a copy of all args
-	out := make([]string, len(args))
-	copy(out, args)
+	out := make([]string, len(words))
+	copy(out, words)
 
 	// Iterate through and redact values following sensitive keys
-	for i := 0; i < len(args); i++ {
-		if isSensitiveKey(args[i]) {
+	for i := 0; i < len(words); i++ {
+		if isSensitiveKey(words[i]) {
 			// Check if there's a next element to redact
-			if i+1 < len(args) {
+			if i+1 < len(words) {
 				out[i+1] = Redacted
 				i++ // Skip the next element since we just redacted it
 			}

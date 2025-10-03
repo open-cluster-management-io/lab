@@ -204,7 +204,7 @@ func initializeHub(ctx context.Context, fc *v1alpha1.FleetConfig, hubKubeconfig 
 		out := append(stdout, stderr...)
 		return fmt.Errorf("failed to init hub: %v, output: %s", err, string(out))
 	}
-	logger.V(1).Info("hub initialized", "output", string(stdout))
+	logger.V(1).Info("hub initialized", "output", string(arg_utils.SanitizeOutput(stdout)))
 
 	return nil
 }

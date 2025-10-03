@@ -237,18 +237,13 @@ func TestSanitizeArgs(t *testing.T) {
 		},
 		{
 			name:     "with token flag",
-			args:     []string{"join", "--token", "secret-token-value", "--hub-name", "my-hub"},
-			expected: []string{"join", "--token", Redacted, "--hub-name", "my-hub"},
+			args:     []string{"join", "--hub-token", "secret-token-value", "--hub-name", "my-hub"},
+			expected: []string{"join", "--hub-token", Redacted, "--hub-name", "my-hub"},
 		},
 		{
 			name:     "with joinToken flag",
 			args:     []string{"join", "--joinToken", "secret-join-token", "--hub-name", "my-hub"},
 			expected: []string{"join", "--joinToken", Redacted, "--hub-name", "my-hub"},
-		},
-		{
-			name:     "case insensitive token",
-			args:     []string{"join", "--TOKEN", "secret-value", "--hub-name", "my-hub"},
-			expected: []string{"join", "--TOKEN", Redacted, "--hub-name", "my-hub"},
 		},
 		{
 			name:     "case insensitive joinToken",
@@ -257,13 +252,13 @@ func TestSanitizeArgs(t *testing.T) {
 		},
 		{
 			name:     "multiple sensitive flags",
-			args:     []string{"join", "--token", "secret1", "--hub-name", "my-hub", "--hub-token", "secret2"},
-			expected: []string{"join", "--token", Redacted, "--hub-name", "my-hub", "--hub-token", Redacted},
+			args:     []string{"join", "--hub-token", "secret1", "--hub-name", "my-hub", "--hub-token", "secret2"},
+			expected: []string{"join", "--hub-token", Redacted, "--hub-name", "my-hub", "--hub-token", Redacted},
 		},
 		{
 			name:     "sensitive flag at end with value",
-			args:     []string{"join", "--hub-name", "my-hub", "--token", "secret-token"},
-			expected: []string{"join", "--hub-name", "my-hub", "--token", Redacted},
+			args:     []string{"join", "--hub-name", "my-hub", "--hub-token", "secret-token"},
+			expected: []string{"join", "--hub-name", "my-hub", "--hub-token", Redacted},
 		},
 		{
 			name:     "token value contains sensitive keyword",
@@ -272,8 +267,8 @@ func TestSanitizeArgs(t *testing.T) {
 		},
 		{
 			name:     "consecutive sensitive flags",
-			args:     []string{"join", "--token", "secret1", "--joinToken", "secret2", "--hub-name", "my-hub"},
-			expected: []string{"join", "--token", Redacted, "--joinToken", Redacted, "--hub-name", "my-hub"},
+			args:     []string{"join", "--hub-token", "secret1", "--joinToken", "secret2", "--hub-name", "my-hub"},
+			expected: []string{"join", "--hub-token", Redacted, "--joinToken", Redacted, "--hub-name", "my-hub"},
 		},
 	}
 
@@ -286,6 +281,69 @@ func TestSanitizeArgs(t *testing.T) {
 			// Verify the output has the same length as input
 			if len(result) != len(tt.args) {
 				t.Errorf("SanitizeArgs() output length = %d, want %d", len(result), len(tt.args))
+			}
+		})
+	}
+}
+
+func TestSanitizeOutput(t *testing.T) {
+	tests := []struct {
+		name     string
+		output   []byte
+		expected []byte
+	}{
+		{
+			name:     "empty output",
+			output:   []byte{},
+			expected: []byte{},
+		},
+		{
+			name:     "no sensitive data",
+			output:   []byte("Successfully initialized cluster my-hub"),
+			expected: []byte("Successfully initialized cluster my-hub"),
+		},
+		{
+			name:     "output with token flag and value",
+			output:   []byte("clusteradm join --hub-token abc123secret --hub-name my-hub"),
+			expected: []byte("clusteradm join --hub-token REDACTED --hub-name my-hub"),
+		},
+		{
+			name:     "output with hub-token",
+			output:   []byte("Using --hub-token xyz789secret for authentication"),
+			expected: []byte("Using --hub-token REDACTED for authentication"),
+		},
+		{
+			name:     "multiline output with token",
+			output:   []byte("Connecting to hub...\nUsing --hub-token mysecret123\nSuccess!"),
+			expected: []byte("Connecting to hub... Using --hub-token REDACTED Success!"),
+		},
+		{
+			name:     "output with multiple sensitive values",
+			output:   []byte("join --hub-token secret1 --hub-token secret2 --cluster-name spoke1"),
+			expected: []byte("join --hub-token REDACTED --hub-token REDACTED --cluster-name spoke1"),
+		},
+		{
+			name:     "output with jointoken variations",
+			output:   []byte("Using --jointoken abc123 or --join-token def456"),
+			expected: []byte("Using --jointoken REDACTED or --join-token REDACTED"),
+		},
+		{
+			name:     "token word that is not a flag",
+			output:   []byte("The token was successfully generated"),
+			expected: []byte("The token was successfully generated"),
+		},
+		{
+			name:     "output with extra whitespace",
+			output:   []byte("   join   --hub-token   secret123   --hub-name   test   "),
+			expected: []byte("join --hub-token REDACTED --hub-name test"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SanitizeOutput(tt.output)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("SanitizeOutput() = %q, want %q", string(result), string(tt.expected))
 			}
 		})
 	}
