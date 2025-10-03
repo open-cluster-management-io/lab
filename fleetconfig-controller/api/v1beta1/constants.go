@@ -77,6 +77,7 @@ const (
 	ManagedClusterTypeHubAsSpoke = "hub-as-spoke"
 )
 
+// Addon mode
 const (
 	// InstanceTypeManager indicates that the controller is running in a Hub cluster and only handles day 1 Spoke operations.
 	InstanceTypeManager = "manager"
@@ -108,13 +109,13 @@ const (
 	// ClusterRoleNameEnvVar containing the name of the ClusterRole for fleetconfig-controller-manager.
 	ClusterRoleNameEnvVar = "ROLE_NAME"
 
-	// FCCAddOnName is the name of the fleetconfig-controller addon
+	// FCCAddOnName is the name of the fleetconfig-controller addon.
 	FCCAddOnName = "fleetconfig-controller-agent"
 
-	// DefaultFCCManagerRole is the default name of the fleetconfig-controller-manager ClusterRole
+	// DefaultFCCManagerRole is the default name of the fleetconfig-controller-manager ClusterRole.
 	DefaultFCCManagerRole = "fleetconfig-controller-manager-role"
 
-	// NamespaceOCM is the open-cluster-management namespace
+	// NamespaceOCM is the open-cluster-management namespace.
 	NamespaceOCM = "open-cluster-management"
 
 	// NamespaceOCMAgent is the namespace for the open-cluster-management agent.
@@ -122,6 +123,8 @@ const (
 
 	// NamespaceOCMAgentAddOn is the namespace for open-cluster-management agent addons.
 	NamespaceOCMAgentAddOn = "open-cluster-management-agent-addon"
+
+	ManifestWorkAddOnNameLabelKey = "open-cluster-management.io/addon-name"
 )
 
 // SupportedInstanceTypes are the valid cluster types that the controller can be installed in.
@@ -131,7 +134,7 @@ var SupportedInstanceTypes = []string{
 	InstanceTypeUnified,
 }
 
-// OCMSpokeNamespaces are the namespaces created on an OCM managed cluster
+// OCMSpokeNamespaces are the namespaces created on an OCM managed cluster.
 var OCMSpokeNamespaces = []string{
 	NamespaceOCM,
 	NamespaceOCMAgent,
