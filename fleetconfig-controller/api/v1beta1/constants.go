@@ -107,7 +107,7 @@ const (
 	ControllerNamespaceEnvVar = "CONTROLLER_NAMESPACE"
 
 	// ClusterRoleNameEnvVar containing the name of the ClusterRole for fleetconfig-controller-manager.
-	ClusterRoleNameEnvVar = "ROLE_NAME"
+	ClusterRoleNameEnvVar = "CLUSTER_ROLE_NAME"
 
 	// FCCAddOnName is the name of the fleetconfig-controller addon.
 	FCCAddOnName = "fleetconfig-controller-agent"

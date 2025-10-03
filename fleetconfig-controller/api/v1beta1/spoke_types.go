@@ -84,7 +84,7 @@ type SpokeSpec struct {
 	// CleanupConfig is used to configure which resources should be automatically garbage collected during cleanup.
 	// +kubebuilder:default:={}
 	// +required
-	CleanupConfig CleanupConfig `json:"cleanupConfig,omitzero"`
+	CleanupConfig CleanupConfig `json:"cleanupConfig"`
 }
 
 // CleanupConfig is the configuration for cleaning up resources during Spoke cleanup.
