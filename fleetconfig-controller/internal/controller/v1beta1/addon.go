@@ -706,10 +706,11 @@ func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Client
 			}
 			mw := manifestWorks.Items[0]
 			val, ok := mw.Labels[addonv1alpha1.AddonLabelKey]
-			if ok && val == v1beta1.FCCAddOnName {
-				logger.V(1).Info("addon manifestWorks cleanup completed", "spokeName", spokeName, "remainingManifestWork", mw.Name)
-				return true, nil
+			if !ok || val != v1beta1.FCCAddOnName {
+				return false, fmt.Errorf("unexpected remaining ManifestWork: expected %s, got label=%q (ok=%t)", v1beta1.FCCAddOnName, val, ok)
 			}
+			logger.V(1).Info("addon manifestWorks cleanup completed", "spokeName", spokeName, "remainingManifestWork", mw.Name)
+			return true, nil
 		}
 
 		logger.V(3).Info("waiting for addon manifestWorks cleanup",
