@@ -225,7 +225,7 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 
 	err = r.deleteKubeconfigSecret(ctx, spoke)
 	if err != nil {
-		logger.V(1).Info("warning: failed to remove spoke's kubeconfig secret", "spoke", spoke.Name, "error", err)
+		logger.Error(err, "warning: failed to remove spoke's kubeconfig secret", "spoke", spoke.Name)
 		return err
 	}
 
@@ -289,7 +289,7 @@ func (r *SpokeReconciler) createAgentNamespace(ctx context.Context, spokeName st
 		},
 	}
 	err = spokeCli.Create(ctx, ns)
-	if err != nil && !kerrs.IsNotFound(err) {
+	if err != nil && !kerrs.IsAlreadyExists(err) {
 		return err
 	}
 	logger.V(1).Info("agent namespace configured", "spoke", spokeName, "namespace", agentNamespace)
