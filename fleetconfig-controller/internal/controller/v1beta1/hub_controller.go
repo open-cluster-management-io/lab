@@ -453,11 +453,11 @@ func (r *HubReconciler) hubNeedsUpgrade(ctx context.Context, hub *v1beta1.Hub, o
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("hubNeedsUpgrade", "hub", hub.Name)
 
-	if hub.Spec.ClusterManager.Source.BundleVersion == "default" {
+	if hub.Spec.ClusterManager.Source.BundleVersion == v1beta1.BundleVersionDefault {
 		logger.V(0).Info("clustermanager bundleVersion is default, skipping upgrade")
 		return false, nil
 	}
-	if hub.Spec.ClusterManager.Source.BundleVersion == "latest" {
+	if hub.Spec.ClusterManager.Source.BundleVersion == v1beta1.BundleVersionLatest {
 		logger.V(0).Info("clustermanager bundleVersion is latest, attempting upgrade")
 		return true, nil
 	}

@@ -804,11 +804,11 @@ func (r *SpokeReconciler) spokeNeedsUpgrade(ctx context.Context, spoke *v1beta1.
 		return true, nil
 	}
 
-	if source.BundleVersion == "default" {
+	if source.BundleVersion == v1beta1.BundleVersionDefault {
 		logger.V(0).Info("klusterlet bundleVersion is default, skipping upgrade")
 		return false, nil
 	}
-	if source.BundleVersion == "latest" {
+	if source.BundleVersion == v1beta1.BundleVersionLatest {
 		logger.V(0).Info("klusterlet bundleVersion is latest, attempting upgrade")
 		return true, nil
 	}

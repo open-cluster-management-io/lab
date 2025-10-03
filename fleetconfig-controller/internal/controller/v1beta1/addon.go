@@ -497,7 +497,7 @@ func handleHubAddons(ctx context.Context, addonC *addonapi.Clientset, hub *v1bet
 	logger.V(0).Info("handleHubAddons", "fleetconfig", hub.Name)
 
 	desiredAddOns := hub.Spec.HubAddOns
-	bundleVersion := "latest"
+	bundleVersion := v1beta1.BundleVersionLatest
 	if hub.Spec.ClusterManager != nil {
 		bundleVersion = hub.Spec.ClusterManager.Source.BundleVersion
 	}

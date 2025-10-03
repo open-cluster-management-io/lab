@@ -200,3 +200,11 @@ var SupportedHubAddons = []string{
 	AddonArgoCD,
 	AddonGPF,
 }
+
+const (
+	// BundleVersionLatest is the latest OCM source version
+	BundleVersionLatest = "latest"
+
+	// BundleVersionDefault is the default OCM source version
+	BundleVersionDefault = "default"
+)
