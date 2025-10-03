@@ -218,8 +218,8 @@ fleetConfig:
     clusterARN: ""
     cleanupConfig:
       purgeKlusterletOperator: true
-      purgeKubeconfigSecret: false
-      purgeAgentNamespace: false
+      purgeKubeconfigSecret: true
+      purgeAgentNamespace: true
     ## Kubeconfig details for the Spoke cluster.
     kubeconfig:
       context: ""
