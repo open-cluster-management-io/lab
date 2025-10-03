@@ -373,11 +373,11 @@ func validateAddonNotInUse(ctx context.Context, removedAddons []string, fieldPat
 func (v *SpokeCustomValidator) validateAddons(ctx context.Context, cli client.Client, newObject *v1beta1.Spoke) (admission.Warnings, field.ErrorList) {
 	errs := field.ErrorList{}
 
-	if newObject.IsHubAsSpoke() {
+	if newObject.IsHubAsSpoke() || v.instanceType == v1beta1.InstanceTypeUnified {
 		if slices.ContainsFunc(newObject.Spec.AddOns, func(a v1beta1.AddOn) bool {
 			return a.ConfigName == v1beta1.FCCAddOnName
 		}) {
-			errs = append(errs, field.Invalid(field.NewPath("spec").Child("addOns"), newObject.Spec.AddOns, "hub-as-spoke Spoke cannot enable fleetconfig-controller-agent addon"))
+			errs = append(errs, field.Invalid(field.NewPath("spec").Child("addOns"), newObject.Spec.AddOns, "fleetconfig-controller-agent addon must not be enabled for hub-as-spoke Spokes, or when using Unified mode"))
 		}
 	} else if v.instanceType != v1beta1.InstanceTypeUnified { // fcc-agent MUST be enabled when using manager-agent (addon), MUST NOT be enabled when using unified mode
 		if !slices.ContainsFunc(newObject.Spec.AddOns, func(a v1beta1.AddOn) bool {
