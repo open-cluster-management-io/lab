@@ -276,7 +276,6 @@ func (r *SpokeReconciler) createAgentNamespace(ctx context.Context, spokeName st
 	logger := log.FromContext(ctx)
 	spokeRestCfg, err := kube.RestConfigFromKubeconfig(spokeKubeconfig)
 	if err != nil {
-
 		return err
 	}
 	spokeCli, err := client.New(spokeRestCfg, client.Options{})
@@ -298,7 +297,6 @@ func (r *SpokeReconciler) createAgentNamespace(ctx context.Context, spokeName st
 }
 
 func (r *SpokeReconciler) deleteKubeconfigSecret(ctx context.Context, spoke *v1beta1.Spoke) error {
-	logger := log.FromContext(ctx)
 	if r.InstanceType != v1beta1.InstanceTypeManager ||
 		!spoke.PivotComplete() ||
 		!spoke.Spec.Kubeconfig.InCluster ||
@@ -306,6 +304,7 @@ func (r *SpokeReconciler) deleteKubeconfigSecret(ctx context.Context, spoke *v1b
 		return nil
 	}
 
+	logger := log.FromContext(ctx)
 	sec := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      spoke.Spec.Kubeconfig.SecretReference.Name,
