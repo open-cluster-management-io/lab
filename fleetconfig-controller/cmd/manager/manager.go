@@ -41,6 +41,7 @@ type Options struct {
 	WebhookPort               int
 	SpokeConcurrentReconciles int
 	InstanceType              string
+	EnableLegacyControllers   bool
 	Scheme                    *runtime.Scheme
 }
 
@@ -99,15 +100,6 @@ func ForHub(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 		return nil, err
 	}
 
-	if err = (&controllerv1alpha1.FleetConfigReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("FleetConfig"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "FleetConfig")
-		return nil, err
-	}
-
 	if err := (&controllerv1beta1.HubReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("Hub"),
@@ -127,12 +119,19 @@ func ForHub(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 		return nil, err
 	}
 
-	// nolint:goconst
-	if opts.UseWebhook || os.Getenv("ENABLE_WEBHOOKS") == "true" {
-		if err = apiv1alpha1.SetupFleetConfigWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "FleetConfig")
+	if opts.EnableLegacyControllers {
+		if err = (&controllerv1alpha1.FleetConfigReconciler{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controllers").WithName("FleetConfig"),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "FleetConfig")
 			return nil, err
 		}
+	}
+
+	// nolint:goconst
+	if opts.UseWebhook || os.Getenv("ENABLE_WEBHOOKS") == "true" {
 		if err := webhookv1beta1.SetupHubWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Hub")
 			return nil, err
@@ -140,6 +139,12 @@ func ForHub(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 		if err := webhookv1beta1.SetupSpokeWebhookWithManager(mgr, opts.InstanceType); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Spoke")
 			return nil, err
+		}
+		if opts.EnableLegacyControllers {
+			if err = apiv1alpha1.SetupFleetConfigWebhookWithManager(mgr); err != nil {
+				setupLog.Error(err, "unable to create webhook", "webhook", "FleetConfig")
+				return nil, err
+			}
 		}
 	}
 	return mgr, nil

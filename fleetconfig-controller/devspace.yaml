@@ -20,6 +20,8 @@ vars:
     value: true
   ADDON_MODE:
     value: true
+  ENABLE_LEGACY_CONTROLLERS:
+    value: false
 
 # profiles are used to set the fleetconfig-controller values for the different versions of the fleetconfig-controller API
 profiles:
@@ -28,6 +30,9 @@ profiles:
       - path: vars.FLEETCONFIG_ENABLED.value
         op: replace
         value: false
+      - path: vars.ENABLE_LEGACY_CONTROLLERS.value
+        op: replace
+        value: true
   - name: v1beta1
     patches:
       - path: vars.FLEETCONFIG_ENABLED.value
@@ -111,6 +116,7 @@ deployments:
         fleetConfig:
           enabled: ${FLEETCONFIG_ENABLED}
         addonMode: ${ADDON_MODE}
+        enableLegacyControllers: ${ENABLE_LEGACY_CONTROLLERS}
       valuesFiles:
       - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
     updateImageTags: false
@@ -124,6 +130,7 @@ deployments:
         fleetConfig:
           enabled: ${FLEETCONFIG_ENABLED}
         addonMode: ${ADDON_MODE}
+        enableLegacyControllers: ${ENABLE_LEGACY_CONTROLLERS}
       valuesFiles:
       - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
 
@@ -138,6 +145,7 @@ deployments:
           repository: ${IMAGE_REPOSITORY}-local
           tag: local
         addonMode: ${ADDON_MODE}
+        enableLegacyControllers: ${ENABLE_LEGACY_CONTROLLERS}
       valuesFiles:
       - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
       - ${CONTEXT}/test/data/fleetconfig-values.yaml

@@ -85,6 +85,7 @@ helm-doc-gen: helmdoc ## Generate helm chart README.md
 .PHONY: manifests
 manifests: controller-gen ## Generate CustomResourceDefinition and WebhookConfiguration objects.
 	$(CONTROLLER_GEN) webhook crd paths="./..." output:crd:artifacts:config=charts/fleetconfig-controller/crds
+	./hack/format_legacy_crds.sh
 	./hack/install_crds.sh
 
 ##@ Testing Targets

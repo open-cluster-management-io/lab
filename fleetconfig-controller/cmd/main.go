@@ -69,6 +69,7 @@ func main() {
 
 	flag.IntVar(&mOpts.SpokeConcurrentReconciles, "spoke-concurrent-reconciles", apiv1beta1.SpokeDefaultMaxConcurrentReconciles, fmt.Sprintf("Maximum number of Spoke resources that may be reconciled in parallel. Defaults to %d.", apiv1beta1.SpokeDefaultMaxConcurrentReconciles))
 	flag.StringVar(&mOpts.InstanceType, "instance-type", apiv1beta1.InstanceTypeManager, fmt.Sprintf("The type of cluster that this controller instance is installed in. Defaults to %s", apiv1beta1.InstanceTypeManager))
+	flag.BoolVar(&mOpts.EnableLegacyControllers, "enable-legacy-controllers", false, "Enable legacy FleetConfig resource and controllers")
 
 	zOpts := zap.Options{
 		Development: true,

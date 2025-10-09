@@ -281,6 +281,9 @@ spokeConcurrentReconciles: 5
 ## @param addonMode Whether to run fleetconfig-controller in addon mode. Addon mode allows for decentralized day 2 management of spoke clusters. Not supported when kubernetesProvider is EKS.
 addonMode: true
 
+## @param enableLegacyControllers Whether to enable the legacy FleetConfig resource controller.
+enableLegacyControllers: false
+
 ## @param kubernetesProvider Kubernetes provider of the cluster that fleetconfig-controller will be installed on. Valid values are "Generic", "EKS", "GKE-Ingress".
 kubernetesProvider: "Generic"
 
@@ -306,8 +309,9 @@ serviceAccount:
   annotations: {}
 
 ## @skip podSecurityContext
-podSecurityContext: {}
-  # fsGroup: 2000
+podSecurityContext:
+  seccompProfile:
+    type: "RuntimeDefault"
 
 ## @param containerSecurityContext.allowPrivilegeEscalation allowPrivilegeEscalation
 ## @param containerSecurityContext.capabilities.drop capabilities to drop
@@ -320,6 +324,9 @@ containerSecurityContext:
   runAsNonRoot: true
   # readOnlyRootFilesystem: true
   # runAsUser: 1000
+
+## @param env Additional environment variables to pass to the fleetconfig-controller container and its pods.
+env: []
 
 ## @param resources.limits.cpu fleetconfig controller's cpu limit
 ## @param resources.limits.memory fleetconfig controller's memory limit

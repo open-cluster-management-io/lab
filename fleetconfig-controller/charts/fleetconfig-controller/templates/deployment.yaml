@@ -43,6 +43,7 @@ spec:
         {{- else }}
         - "--instance-type=unified"
         {{- end }}
+        - "--enable-legacy-controllers={{ .Values.enableLegacyControllers | default false }}"
         command:
         - /manager
         env:
@@ -54,6 +55,9 @@ spec:
               fieldPath: metadata.namespace
         - name: CLUSTER_ROLE_NAME
           value: {{ include "chart.fullname" . }}-manager-role
+        {{- with .Values.env }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         image: {{ include "controller.image" . }}
         imagePullPolicy: {{ quote .Values.image.pullPolicy }}
         name: manager
