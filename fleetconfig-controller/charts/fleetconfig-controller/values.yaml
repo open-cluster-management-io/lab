@@ -325,7 +325,7 @@ containerSecurityContext:
   # readOnlyRootFilesystem: true
   # runAsUser: 1000
 
-## @param env Additional environment variables to pass to the fleetconfig-controller container and its pods.
+## @param env Additional environment variables to pass to the fleetconfig-controller pod.
 env: []
 
 ## @param resources.limits.cpu fleetconfig controller's cpu limit
