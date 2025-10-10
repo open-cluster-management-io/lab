@@ -308,7 +308,7 @@ imagePullSecrets: []
 serviceAccount:
   annotations: {}
 
-## @skip podSecurityContext
+## @param podSecurityContext.seccompProfile.type seccomp profile to use for the fleetconfig-controller manager and agent pods.
 podSecurityContext:
   seccompProfile:
     type: "RuntimeDefault"
