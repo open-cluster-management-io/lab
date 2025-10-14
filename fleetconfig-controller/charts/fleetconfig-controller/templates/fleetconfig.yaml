@@ -40,9 +40,12 @@ spec:
   createNamespace: {{ .Values.fleetConfig.hub.createNamespace }}
   force: {{ .Values.fleetConfig.hub.force }}
   {{- with .Values.fleetConfig.hub.kubeconfig }}
+  {{- if and .inCluster (and .secretReference (not (empty .secretReference.name))) }}
+  {{- fail "hub.kubeconfig.inCluster and hub.kubeconfig.secretReference are mutually exclusive" }}
+  {{- end }}
   kubeconfig:
-    context: {{ .context | quote }}
-    inCluster: {{ .inCluster }}
+    context: {{ default "" .context | quote }}
+    inCluster: {{ default false .inCluster }}
     {{- if and .secretReference (not (empty .secretReference.name)) }}
     secretReference: {{ toYaml .secretReference | nindent 6 }}
     {{- end }}
@@ -82,8 +85,11 @@ spec:
   createNamespace: {{ .createNamespace }}
   syncLabels: {{ .syncLabels }}
   {{- with .kubeconfig }}
+  {{- if and .inCluster (and .secretReference (not (empty .secretReference.name))) }}
+  {{- fail "spoke.kubeconfig.inCluster and spoke.kubeconfig.secretReference are mutually exclusive" }}
+  {{- end }}
   kubeconfig:
-    context: {{ .context | quote }}
+    context: {{ default "" .context | quote }}
     inCluster: {{ .inCluster }}
     {{- if and .secretReference (not (empty .secretReference.name)) }}
     secretReference: {{ toYaml .secretReference | nindent 6 }}
@@ -108,9 +114,12 @@ spec:
     forceInternalEndpointLookupManaged: {{ .klusterlet.forceInternalEndpointLookupManaged }}
     singleton: {{ .klusterlet.singleton }}
     {{- $mck := .klusterlet.managedClusterKubeconfig -}}
+    {{- if and $mck.inCluster (and $mck.secretReference (not (empty $mck.secretReference.name))) }}
+    {{- fail "spoke.klusterlet.managedClusterKubeconfig.inCluster and spoke.klusterlet.managedClusterKubeconfig.secretReference are mutually exclusive" }}
+    {{- end }}
     {{- if or $mck.context $mck.inCluster (and $mck.secretReference (not (empty $mck.secretReference.name))) }}
     managedClusterKubeconfig:
-      context: {{ $mck.context | quote }}
+      context: {{ default "" $mck.context | quote }}
       inCluster: {{ $mck.inCluster }}
       {{- if and $mck.secretReference (not (empty $mck.secretReference.name)) }}
       secretReference: {{ toYaml $mck.secretReference | nindent 8 }}

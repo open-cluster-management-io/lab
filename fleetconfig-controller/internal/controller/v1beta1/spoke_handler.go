@@ -170,17 +170,14 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 			logger.Error(err, "failed to get managedCluster after join", "spoke", spoke.Name)
 			return err
 		}
+	}
 
-		// precreate the namespace that the agent will be installed into
-		// this prevents it from being automatically garbage collected when the spoke is deregistered
-		if r.InstanceType != v1beta1.InstanceTypeUnified {
-			err = r.createAgentNamespace(ctx, spoke.Name, spokeKubeconfig)
-			if err != nil {
-				logger.Error(err, "failed to create agent namespace", "spoke", spoke.Name)
-				return err
-			}
-		}
-
+	// precreate the namespace that the agent will be installed into
+	// this prevents it from being automatically garbage collected when the spoke is deregistered
+	err = r.createAgentNamespace(ctx, spoke)
+	if err != nil {
+		logger.Error(err, "failed to create agent namespace", "spoke", spoke.Name)
+		return err
 	}
 
 	// check managed clusters joined condition
@@ -279,8 +276,18 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 	return nil
 }
 
-func (r *SpokeReconciler) createAgentNamespace(ctx context.Context, spokeName string, spokeKubeconfig []byte) error {
+func (r *SpokeReconciler) createAgentNamespace(ctx context.Context, spoke *v1beta1.Spoke) error {
 	logger := log.FromContext(ctx)
+
+	if r.InstanceType == v1beta1.InstanceTypeUnified || spoke.IsHubAsSpoke() || spoke.PivotComplete() {
+		return nil
+	}
+
+	spokeKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, spoke.Spec.Kubeconfig, spoke.Namespace)
+	if err != nil {
+		return err
+	}
+
 	spokeRestCfg, err := kube.RestConfigFromKubeconfig(spokeKubeconfig)
 	if err != nil {
 		return err
@@ -299,7 +306,7 @@ func (r *SpokeReconciler) createAgentNamespace(ctx context.Context, spokeName st
 	if err != nil && !kerrs.IsAlreadyExists(err) {
 		return err
 	}
-	logger.V(1).Info("agent namespace configured", "spoke", spokeName, "namespace", agentNamespace)
+	logger.V(1).Info("agent namespace configured", "spoke", spoke.Name, "namespace", agentNamespace)
 	return nil
 }
 
