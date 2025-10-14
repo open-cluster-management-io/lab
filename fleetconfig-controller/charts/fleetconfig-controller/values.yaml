@@ -222,7 +222,7 @@ fleetConfig:
       inCluster: true
       ## A reference to an existing secret containing a kubeconfig. Must be provided for remote clusters. For same-cluster, must be provided unless InCluster is set to true.
       secretReference:
-        name: "foog"
+        name: ""
         kubeconfigKey: "kubeconfig"
     proxyCa: ""
     proxyUrl: ""
