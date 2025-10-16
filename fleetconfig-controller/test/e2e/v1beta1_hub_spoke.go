@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	ktypes "k8s.io/apimachinery/pkg/types"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
@@ -124,7 +123,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 			By("confirming the kubeconfig secret is deleted")
 			EventuallyWithOffset(1, func() error {
 				secret := &corev1.Secret{}
-				err := tc.kClient.Get(tc.ctx, types.NamespacedName{Namespace: fcNamespace, Name: spokeSecretName}, secret)
+				err := tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Namespace: fcNamespace, Name: spokeSecretName}, secret)
 				if err != nil {
 					return client.IgnoreNotFound(err)
 				}
@@ -132,7 +131,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 				return err
 			}, 1*time.Minute, 1*time.Second).Should(Succeed())
 
-			By("updating the klusterlet values and verifying that the upgrade is successful")
+			By("updating the klusterlet values and annotations, and verifying that the upgrade is successful")
 			EventuallyWithOffset(1, func() error {
 				err := tc.kClient.Get(tc.ctx, v1beta1spokeNN, spokeClone)
 				if err != nil {
@@ -150,6 +149,12 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 							},
 						},
 					},
+				}
+				// Update annotations - change existing ones and add a new one
+				spokeClone.Spec.Klusterlet.Annotations = map[string]string{
+					"foo": "updated-bar",
+					"baz": "updated-quux",
+					"new": "annotation",
 				}
 				err = tc.kClient.Update(tc.ctx, spokeClone)
 				if err != nil {
@@ -173,6 +178,39 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 				}
 				return nil
 			}, 3*time.Minute, 5*time.Second).Should(Succeed())
+
+			By("verifying that the annotation updates are propagated to the ManagedCluster")
+			EventuallyWithOffset(1, func() error {
+				kcfg, err := os.ReadFile(tc.hubKubeconfig)
+				if err != nil {
+					return err
+				}
+				clusterC, err := common.ClusterClient(kcfg)
+				if err != nil {
+					return err
+				}
+				managedCluster, err := clusterC.ClusterV1().ManagedClusters().Get(tc.ctx, spokeName, metav1.GetOptions{})
+				if err != nil {
+					utils.WarnError(err, "failed to get ManagedCluster")
+					return err
+				}
+				annotations := managedCluster.GetAnnotations()
+				expectedAnnotations := map[string]string{
+					fmt.Sprintf("%s/foo", klusterletAnnotationPrefix): "updated-bar",
+					fmt.Sprintf("%s/baz", klusterletAnnotationPrefix): "updated-quux",
+					fmt.Sprintf("%s/new", klusterletAnnotationPrefix): "annotation",
+				}
+				for key, expectedValue := range expectedAnnotations {
+					actualValue, ok := annotations[key]
+					if !ok {
+						return fmt.Errorf("expected annotation %s not found", key)
+					}
+					if actualValue != expectedValue {
+						return fmt.Errorf("annotation %s has wrong value. want: %s, got: %s", key, expectedValue, actualValue)
+					}
+				}
+				return nil
+			}, 1*time.Minute, 1*time.Second).Should(Succeed())
 		})
 
 		It("should successfully create a namespace in the hub-as-spoke cluster", func() {

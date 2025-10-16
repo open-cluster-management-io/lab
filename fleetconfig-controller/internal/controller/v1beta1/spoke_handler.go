@@ -8,8 +8,10 @@ import (
 	"maps"
 	"os"
 	"os/exec"
+	"reflect"
 	"slices"
 	"strconv"
+	"strings"
 
 	"dario.cat/mergo"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -77,13 +79,25 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 		return err
 	}
 
+	// to avoid conflicts between sources, always use OCMSource as the source of truth for registry and version
+	if klusterletValues != nil {
+		if hubMeta.hub != nil && hubMeta.hub.Spec.ClusterManager != nil {
+			if klusterletValues.Images.Registry != "" {
+				klusterletValues.Images.Registry = hubMeta.hub.Spec.ClusterManager.Source.Registry
+			}
+			if klusterletValues.Images.Tag != "" {
+				klusterletValues.Images.Tag = hubMeta.hub.Spec.ClusterManager.Source.BundleVersion
+			}
+		}
+	}
+
 	switch r.InstanceType {
 	case v1beta1.InstanceTypeManager:
 		err = r.doHubWork(ctx, spoke, hubMeta, klusterletValues)
 		if err != nil {
 			return err
 		}
-		if spoke.IsHubAsSpoke() { // hub-as-spoke
+		if spoke.IsHubAsSpoke() {
 			err = r.doSpokeWork(ctx, spoke, hubMeta.hub, klusterletValues)
 			if err != nil {
 				spoke.SetConditions(true, v1beta1.NewCondition(
@@ -119,6 +133,31 @@ func (r *SpokeReconciler) handleSpoke(ctx context.Context, spoke *v1beta1.Spoke,
 		// this is guarded against when the manager is initialized. should never reach this point
 		panic(fmt.Sprintf("unknown cluster type %s. Must be one of %v", r.InstanceType, v1beta1.SupportedInstanceTypes))
 	}
+}
+
+// merges annotation from Spoke spec and Klusterlet values overrides. For consistency with clusteradm, priority is given to klusterlet overrides.
+// since the behaviour w.r.t prefixes of the `--klusterlet-annotation` flag, and the annotations specified in `--klusterlet-values-file` are different,
+// this function will add the prefix to both before merging.
+// the output of this function is the complete and finalized set of annotations that will be applied to the ManagedCluster
+func mergeKlusterletAnnotations(base, override map[string]string) map[string]string {
+	formattedBase := make(map[string]string, len(base))
+	for k, v := range base {
+		if !strings.HasPrefix(k, operatorv1.ClusterAnnotationsKeyPrefix) {
+			k = fmt.Sprintf("%s/%s", operatorv1.ClusterAnnotationsKeyPrefix, k)
+		}
+		formattedBase[k] = v
+	}
+	formattedOverride := make(map[string]string, len(override))
+	for k, v := range override {
+		if !strings.HasPrefix(k, operatorv1.ClusterAnnotationsKeyPrefix) {
+			k = fmt.Sprintf("%s/%s", operatorv1.ClusterAnnotationsKeyPrefix, k)
+		}
+		formattedOverride[k] = v
+	}
+	out := make(map[string]string, 0)
+	maps.Copy(out, formattedBase)
+	maps.Copy(out, formattedOverride)
+	return out
 }
 
 // doHubWork handles hub-side work such as joins and addons
@@ -172,6 +211,21 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 		}
 	}
 
+	// TODO - handle this via `klusterlet upgrade` once https://github.com/open-cluster-management-io/ocm/issues/1210 is resolved
+	if managedCluster != nil {
+		klusterletValuesAnnotations := map[string]string{}
+		if klusterletValues != nil {
+			klusterletValuesAnnotations = klusterletValues.Klusterlet.RegistrationConfiguration.ClusterAnnotations
+		}
+		requestedAnnotations := mergeKlusterletAnnotations(spoke.Spec.Klusterlet.Annotations, klusterletValuesAnnotations)
+		if !reflect.DeepEqual(requestedAnnotations, managedCluster.GetAnnotations()) {
+			managedCluster.SetAnnotations(requestedAnnotations)
+			if err = common.UpdateManagedCluster(ctx, clusterClient, managedCluster); err != nil {
+				return err
+			}
+			logger.V(1).Info("synced annotations to ManagedCluster")
+		}
+	}
 	// precreate the namespace that the agent will be installed into
 	// this prevents it from being automatically garbage collected when the spoke is deregistered
 	err = r.createAgentNamespace(ctx, spoke)
@@ -346,6 +400,7 @@ func (r *SpokeReconciler) doSpokeWork(ctx context.Context, spoke *v1beta1.Spoke,
 	if err != nil {
 		return fmt.Errorf("failed to load kubeconfig from inCluster: %v", err)
 	}
+
 	// attempt an upgrade whenever the klusterlet's bundleVersion or values change
 	currKlusterletHash, err := hash.ComputeHash(klusterletValues)
 	if err != nil {
@@ -660,9 +715,6 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 			"--bundle-version", hub.Spec.ClusterManager.Source.BundleVersion,
 			"--image-registry", hub.Spec.ClusterManager.Source.Registry)
 	}
-	for k, v := range spoke.Spec.Klusterlet.Annotations {
-		joinArgs = append(joinArgs, fmt.Sprintf("--klusterlet-annotation=%s=%s", k, v))
-	}
 
 	// resources args
 	joinArgs = append(joinArgs, arg_utils.PrepareResources(spoke.Spec.Klusterlet.Resources)...)
@@ -813,6 +865,7 @@ func (r *SpokeReconciler) spokeNeedsUpgrade(ctx context.Context, spoke *v1beta1.
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("spokeNeedsUpgrade", "spokeClusterName", spoke.Name)
 
+	// klusterlet values hash changed
 	prevHash := spoke.Status.KlusterletHash
 	hashChanged := prevHash != currKlusterletHash && prevHash != ""
 	logger.V(2).Info("comparing klusterlet values hash",
@@ -855,6 +908,8 @@ func (r *SpokeReconciler) spokeNeedsUpgrade(ctx context.Context, spoke *v1beta1.
 	if k.Spec.WorkImagePullSpec != "" {
 		bundleSpecs = append(bundleSpecs, k.Spec.WorkImagePullSpec)
 	}
+
+	// bundle version changed
 	activeBundleVersion, err := version.LowestBundleVersion(ctx, bundleSpecs)
 	if err != nil {
 		return false, fmt.Errorf("failed to detect bundleVersion from klusterlet spec: %w", err)
@@ -863,12 +918,24 @@ func (r *SpokeReconciler) spokeNeedsUpgrade(ctx context.Context, spoke *v1beta1.
 	if err != nil {
 		return false, err
 	}
+	versionChanged := activeBundleVersion != desiredBundleVersion
+
+	// bundle source changed
+	activeBundleSource, err := version.GetBundleSource(bundleSpecs)
+	if err != nil {
+		return false, fmt.Errorf("failed to get bundle source: %w", err)
+	}
+	desiredBundleSource := source.Registry
+	sourceChanged := activeBundleSource != desiredBundleSource
 
 	logger.V(0).Info("found klusterlet bundleVersions",
 		"activeBundleVersion", activeBundleVersion,
 		"desiredBundleVersion", desiredBundleVersion,
+		"activeBundleSource", activeBundleSource,
+		"desiredBundleSource", desiredBundleSource,
 	)
-	return activeBundleVersion != desiredBundleVersion, nil
+
+	return versionChanged || sourceChanged, nil
 }
 
 // upgradeSpoke upgrades the Spoke cluster's klusterlet
@@ -1075,7 +1142,6 @@ func (r *SpokeReconciler) mergeKlusterletValues(ctx context.Context, spoke *v1be
 	}
 
 	return merged, nil
-
 }
 
 // prepareKlusterletValuesFile creates a temporary file with klusterlet values and returns

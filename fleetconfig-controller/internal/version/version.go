@@ -53,3 +53,40 @@ func Normalize(v string) (string, error) {
 	}
 	return sv.String(), nil
 }
+
+// GetBundleSource returns the bundle source, or an error if they do not match.
+func GetBundleSource(bundleSpecs []string) (string, error) {
+	seen := make(map[string]struct{})
+	for _, spec := range bundleSpecs {
+		versionedParts := strings.Split(spec, ":")
+		if len(versionedParts) != 2 {
+			return "", fmt.Errorf("invalid image spec %s", spec)
+		}
+		parts := strings.Split(versionedParts[0], "/")
+		if len(parts) < 2 {
+			return "", fmt.Errorf("invalid image spec %s: missing repository path", spec)
+		}
+		// Extract repository source (everything except the last part which is the image name)
+		source := strings.Join(parts[:len(parts)-1], "/")
+		seen[source] = struct{}{}
+	}
+
+	if len(seen) == 0 {
+		return "", fmt.Errorf("no bundle specs provided")
+	}
+
+	if len(seen) > 1 {
+		sources := make([]string, 0, len(seen))
+		for s := range seen {
+			sources = append(sources, s)
+		}
+		return "", fmt.Errorf("bundle specs have mismatched sources: %v", sources)
+	}
+
+	// Return the single source
+	for source := range seen {
+		return source, nil
+	}
+
+	return "", fmt.Errorf("unexpected error: no source found")
+}

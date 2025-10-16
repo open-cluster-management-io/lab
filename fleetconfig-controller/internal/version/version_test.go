@@ -90,3 +90,52 @@ func TestNormalize(t *testing.T) {
 		})
 	}
 }
+
+func TestGetBundleSource(t *testing.T) {
+	tests := []struct {
+		name        string
+		bundleSpecs []string
+		want        string
+		wantErr     bool
+	}{
+		{
+			name: "matching sources",
+			bundleSpecs: []string{
+				"quay.io/open-cluster-management/registration:v1.0.0",
+				"quay.io/open-cluster-management/work:v1.0.0",
+				"quay.io/open-cluster-management/placement:v1.0.0",
+			},
+			want:    "quay.io/open-cluster-management",
+			wantErr: false,
+		},
+		{
+			name: "mismatched sources",
+			bundleSpecs: []string{
+				"quay.io/foo/bar:v1.0.0",
+				"quay.io/baz/qux:v1.0.0",
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "invalid spec format",
+			bundleSpecs: []string{
+				"invalid-spec-without-colon",
+			},
+			want:    "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetBundleSource(tt.bundleSpecs)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetBundleSource(%v) error = %v, wantErr %v", tt.bundleSpecs, err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("GetBundleSource(%v) = %v, want %v", tt.bundleSpecs, got, tt.want)
+			}
+		})
+	}
+}

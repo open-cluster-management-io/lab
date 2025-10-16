@@ -482,6 +482,7 @@ func (r *HubReconciler) hubNeedsUpgrade(ctx context.Context, hub *v1beta1.Hub, o
 	if cm.Spec.WorkImagePullSpec != "" {
 		bundleSpecs = append(bundleSpecs, cm.Spec.WorkImagePullSpec)
 	}
+	// bundle version changed
 	activeBundleVersion, err := version.LowestBundleVersion(ctx, bundleSpecs)
 	if err != nil {
 		return false, fmt.Errorf("failed to detect bundleVersion from clustermanager spec: %w", err)
@@ -490,12 +491,24 @@ func (r *HubReconciler) hubNeedsUpgrade(ctx context.Context, hub *v1beta1.Hub, o
 	if err != nil {
 		return false, err
 	}
+	versionChanged := activeBundleVersion != desiredBundleVersion
+
+	// bundle source changed
+	activeBundleSource, err := version.GetBundleSource(bundleSpecs)
+	if err != nil {
+		return false, fmt.Errorf("failed to get bundle source: %w", err)
+	}
+	desiredBundleSource := hub.Spec.ClusterManager.Source.Registry
+	sourceChanged := activeBundleSource != desiredBundleSource
 
 	logger.V(0).Info("found clustermanager bundleVersions",
 		"activeBundleVersion", activeBundleVersion,
 		"desiredBundleVersion", desiredBundleVersion,
+		"activeBundleSource", activeBundleSource,
+		"desiredBundleSource", desiredBundleSource,
 	)
-	return activeBundleVersion != desiredBundleVersion, nil
+
+	return versionChanged || sourceChanged, nil
 }
 
 // upgradeHub upgrades the Hub cluster's clustermanager to the specified version
