@@ -60,8 +60,8 @@ func GetBundleSource(bundleSpecs []string) (string, error) {
 	for _, spec := range bundleSpecs {
 		var imageSpec string
 
-		// Check if using SHA256 digest (format: image@sha256:digest)
-		if atIdx := strings.Index(spec, "@sha256:"); atIdx != -1 {
+		// Check if using digest
+		if atIdx := strings.Index(spec, "@"); atIdx != -1 {
 			imageSpec = spec[:atIdx]
 		} else {
 			// Split on the last colon to handle registry URLs with ports (e.g., registry.io:5000/image:tag)
