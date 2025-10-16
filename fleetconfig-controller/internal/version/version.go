@@ -58,11 +58,21 @@ func Normalize(v string) (string, error) {
 func GetBundleSource(bundleSpecs []string) (string, error) {
 	seen := make(map[string]struct{})
 	for _, spec := range bundleSpecs {
-		versionedParts := strings.Split(spec, ":")
-		if len(versionedParts) != 2 {
-			return "", fmt.Errorf("invalid image spec %s", spec)
+		var imageSpec string
+
+		// Check if using SHA256 digest (format: image@sha256:digest)
+		if atIdx := strings.Index(spec, "@sha256:"); atIdx != -1 {
+			imageSpec = spec[:atIdx]
+		} else {
+			// Split on the last colon to handle registry URLs with ports (e.g., registry.io:5000/image:tag)
+			lastColonIdx := strings.LastIndex(spec, ":")
+			if lastColonIdx == -1 {
+				return "", fmt.Errorf("invalid image spec %s: missing version tag or digest", spec)
+			}
+			imageSpec = spec[:lastColonIdx]
 		}
-		parts := strings.Split(versionedParts[0], "/")
+
+		parts := strings.Split(imageSpec, "/")
 		if len(parts) < 2 {
 			return "", fmt.Errorf("invalid image spec %s: missing repository path", spec)
 		}

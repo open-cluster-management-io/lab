@@ -109,6 +109,26 @@ func TestGetBundleSource(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "matching sources with ported registry",
+			bundleSpecs: []string{
+				"registry.io:5000/ocm/registration:v1.0.0",
+				"registry.io:5000/ocm/work:v1.0.0",
+				"registry.io:5000/ocm/placement:v1.0.0",
+			},
+			want:    "registry.io:5000/ocm",
+			wantErr: false,
+		},
+		{
+			name: "matching sources with sha256 digest",
+			bundleSpecs: []string{
+				"registry.io:5000/ocm/registration@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+				"registry.io:5000/ocm/work@sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+				"registry.io:5000/ocm/placement@sha256:fedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321",
+			},
+			want:    "registry.io:5000/ocm",
+			wantErr: false,
+		},
+		{
 			name: "mismatched sources",
 			bundleSpecs: []string{
 				"quay.io/foo/bar:v1.0.0",

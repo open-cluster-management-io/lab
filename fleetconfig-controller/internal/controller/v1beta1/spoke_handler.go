@@ -160,6 +160,32 @@ func mergeKlusterletAnnotations(base, override map[string]string) map[string]str
 	return out
 }
 
+// syncManagedClusterAnnotations merges requested klusterlet annotations into the ManagedCluster's
+// existing annotations, preserving all non-klusterlet annotations while adding/updating/removing
+// only those with the klusterlet prefix.
+func syncManagedClusterAnnotations(current, requested map[string]string) map[string]string {
+	if current == nil {
+		current = map[string]string{}
+	}
+
+	result := maps.Clone(current)
+	prefix := operatorv1.ClusterAnnotationsKeyPrefix + "/"
+
+	// Remove klusterlet annotations that are no longer requested
+	for key := range current {
+		if strings.HasPrefix(key, prefix) {
+			if _, stillWanted := requested[key]; !stillWanted {
+				delete(result, key)
+			}
+		}
+	}
+
+	// Add or update all requested klusterlet annotations
+	maps.Copy(result, requested)
+
+	return result
+}
+
 // doHubWork handles hub-side work such as joins and addons
 func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, hubMeta hubMeta, klusterletValues *v1beta1.KlusterletChartConfig) error {
 	logger := log.FromContext(ctx)
@@ -218,14 +244,16 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 			klusterletValuesAnnotations = klusterletValues.Klusterlet.RegistrationConfiguration.ClusterAnnotations
 		}
 		requestedAnnotations := mergeKlusterletAnnotations(spoke.Spec.Klusterlet.Annotations, klusterletValuesAnnotations)
-		if !reflect.DeepEqual(requestedAnnotations, managedCluster.GetAnnotations()) {
-			managedCluster.SetAnnotations(requestedAnnotations)
+		updatedAnnotations := syncManagedClusterAnnotations(managedCluster.GetAnnotations(), requestedAnnotations)
+		if !reflect.DeepEqual(updatedAnnotations, managedCluster.GetAnnotations()) {
+			managedCluster.SetAnnotations(updatedAnnotations)
 			if err = common.UpdateManagedCluster(ctx, clusterClient, managedCluster); err != nil {
 				return err
 			}
 			logger.V(1).Info("synced annotations to ManagedCluster")
 		}
 	}
+
 	// precreate the namespace that the agent will be installed into
 	// this prevents it from being automatically garbage collected when the spoke is deregistered
 	err = r.createAgentNamespace(ctx, spoke)
@@ -715,7 +743,9 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 			"--bundle-version", hub.Spec.ClusterManager.Source.BundleVersion,
 			"--image-registry", hub.Spec.ClusterManager.Source.Registry)
 	}
-
+	for k, v := range spoke.Spec.Klusterlet.Annotations {
+		joinArgs = append(joinArgs, fmt.Sprintf("--klusterlet-annotation=%s=%s", k, v))
+	}
 	// resources args
 	joinArgs = append(joinArgs, arg_utils.PrepareResources(spoke.Spec.Klusterlet.Resources)...)
 
