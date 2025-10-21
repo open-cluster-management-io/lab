@@ -39,6 +39,11 @@ import (
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/pkg/common"
 )
 
+var managedClusterCleanupTaint = clusterv1.Taint{
+	Key:    v1beta1.ManagedClusterDeletingTaint,
+	Effect: clusterv1.TaintEffectNoSelect,
+}
+
 // cleanup cleans up a Spoke and its associated resources.
 func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke, hubKubeconfig []byte) error {
 	switch r.InstanceType {
@@ -475,10 +480,26 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 	managedCluster, err := clusterC.ClusterV1().ManagedClusters().Get(ctx, spoke.Name, metav1.GetOptions{})
 	if kerrs.IsNotFound(err) {
 		logger.Info("ManagedCluster resource not found; nothing to do")
+		// remove both hub finalizers
+		spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
+			return s == v1beta1.HubCleanupPreflightFinalizer || s == v1beta1.HubCleanupFinalizer
+		})
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("unexpected error listing managedClusters: %w", err)
 	}
+
+	// set a taint to purge any workload created via a Placement that doesnt tolerate the taint. This includes addons using `Placements` installStrategy
+	if !slices.ContainsFunc(managedCluster.Spec.Taints, func(t clusterv1.Taint) bool {
+		return t.Key == managedClusterCleanupTaint.Key && t.Effect == managedClusterCleanupTaint.Effect
+	}) {
+		managedCluster.Spec.Taints = append(managedCluster.Spec.Taints, managedClusterCleanupTaint)
+		if err := common.UpdateManagedCluster(ctx, clusterC, managedCluster); err != nil {
+			return fmt.Errorf("failed to add cleanup taint to ManagedCluster: %w", err)
+		}
+		logger.V(1).Info("added cleanup taint to ManagedCluster", "spokeName", spoke.Name, "taint", managedClusterCleanupTaint.Key)
+	}
+
 	manifestWorks, err := workC.WorkV1().ManifestWorks(managedCluster.Name).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list manifestWorks for managedCluster %s: %w", managedCluster.Name, err)

@@ -129,6 +129,9 @@ const (
 
 	// AgentCleanupWatcherName is the name of the watcher for cleaning up the spoke agent.
 	AgentCleanupWatcherName = "agent-cleanup-watcher"
+
+	// ManagedClusterDeletingTaint is the key of the taint applied to a ManagedCluster when cleanup is initiated
+	ManagedClusterDeletingTaint = "fleetconfig.open-cluster-management.io/deleting"
 )
 
 // SupportedInstanceTypes are the valid cluster types that the controller can be installed in.
