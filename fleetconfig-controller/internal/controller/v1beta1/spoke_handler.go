@@ -489,17 +489,6 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 		return fmt.Errorf("unexpected error listing managedClusters: %w", err)
 	}
 
-	// set a taint to purge any workload created via a Placement that doesnt tolerate the taint. This includes addons using `Placements` installStrategy
-	if !slices.ContainsFunc(managedCluster.Spec.Taints, func(t clusterv1.Taint) bool {
-		return t.Key == managedClusterCleanupTaint.Key && t.Effect == managedClusterCleanupTaint.Effect
-	}) {
-		managedCluster.Spec.Taints = append(managedCluster.Spec.Taints, managedClusterCleanupTaint)
-		if err := common.UpdateManagedCluster(ctx, clusterC, managedCluster); err != nil {
-			return fmt.Errorf("failed to add cleanup taint to ManagedCluster: %w", err)
-		}
-		logger.V(1).Info("added cleanup taint to ManagedCluster", "spokeName", spoke.Name, "taint", managedClusterCleanupTaint.Key)
-	}
-
 	manifestWorks, err := workC.WorkV1().ManifestWorks(managedCluster.Name).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list manifestWorks for managedCluster %s: %w", managedCluster.Name, err)
@@ -510,6 +499,16 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 		msg := fmt.Sprintf("Found manifestWorks for ManagedCluster %s; cannot unjoin spoke cluster while it has active ManifestWorks", managedCluster.Name)
 		logger.Info(msg)
 		return errors.New(msg)
+	}
+	// set a taint to purge any workload created via a Placement that doesnt tolerate the taint. This includes addons using `Placements` installStrategy
+	if !slices.ContainsFunc(managedCluster.Spec.Taints, func(t clusterv1.Taint) bool {
+		return t.Key == managedClusterCleanupTaint.Key && t.Effect == managedClusterCleanupTaint.Effect
+	}) {
+		managedCluster.Spec.Taints = append(managedCluster.Spec.Taints, managedClusterCleanupTaint)
+		if err := common.UpdateManagedCluster(ctx, clusterC, managedCluster); err != nil {
+			return fmt.Errorf("failed to add cleanup taint to ManagedCluster: %w", err)
+		}
+		logger.V(1).Info("added cleanup taint to ManagedCluster", "spokeName", spoke.Name, "taint", managedClusterCleanupTaint.Key)
 	}
 
 	// remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
