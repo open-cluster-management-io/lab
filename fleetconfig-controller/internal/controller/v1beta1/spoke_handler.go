@@ -39,10 +39,19 @@ import (
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/pkg/common"
 )
 
-var managedClusterCleanupTaint = clusterv1.Taint{
-	Key:    v1beta1.ManagedClusterDeletingTaint,
-	Effect: clusterv1.TaintEffectNoSelect,
-}
+var (
+	// Taint to drain non-addon workloads (addons can tolerate this)
+	managedClusterWorkloadCleanupTaint = clusterv1.Taint{
+		Key:    v1beta1.ManagedClusterWorkloadCleanupTaint,
+		Effect: clusterv1.TaintEffectNoSelect,
+	}
+
+	// Taint to remove all workloads including addons (nothing tolerates this)
+	managedClusterTerminatingTaint = clusterv1.Taint{
+		Key:    v1beta1.ManagedClusterTerminatingTaint,
+		Effect: clusterv1.TaintEffectNoSelect,
+	}
+)
 
 // cleanup cleans up a Spoke and its associated resources.
 func (r *SpokeReconciler) cleanup(ctx context.Context, spoke *v1beta1.Spoke, hubKubeconfig []byte) error {
@@ -489,6 +498,18 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 		return fmt.Errorf("unexpected error listing managedClusters: %w", err)
 	}
 
+	// Apply workload-cleanup taint to remove non-addon workloads via Placement descheduling.
+	// Addons can tolerate this taint to continue running during initial cleanup.
+	if !slices.ContainsFunc(managedCluster.Spec.Taints, func(t clusterv1.Taint) bool {
+		return t.Key == managedClusterWorkloadCleanupTaint.Key && t.Effect == managedClusterWorkloadCleanupTaint.Effect
+	}) {
+		managedCluster.Spec.Taints = append(managedCluster.Spec.Taints, managedClusterWorkloadCleanupTaint)
+		if err := common.UpdateManagedCluster(ctx, clusterC, managedCluster); err != nil {
+			return fmt.Errorf("failed to add workload-cleanup taint to ManagedCluster: %w", err)
+		}
+		logger.V(1).Info("added workload-cleanup taint to ManagedCluster", "spokeName", spoke.Name, "taint", managedClusterWorkloadCleanupTaint.Key)
+	}
+
 	manifestWorks, err := workC.WorkV1().ManifestWorks(managedCluster.Name).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list manifestWorks for managedCluster %s: %w", managedCluster.Name, err)
@@ -499,16 +520,6 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 		msg := fmt.Sprintf("Found manifestWorks for ManagedCluster %s; cannot unjoin spoke cluster while it has active ManifestWorks", managedCluster.Name)
 		logger.Info(msg)
 		return errors.New(msg)
-	}
-	// set a taint to purge any workload created via a Placement that doesnt tolerate the taint. This includes addons using `Placements` installStrategy
-	if !slices.ContainsFunc(managedCluster.Spec.Taints, func(t clusterv1.Taint) bool {
-		return t.Key == managedClusterCleanupTaint.Key && t.Effect == managedClusterCleanupTaint.Effect
-	}) {
-		managedCluster.Spec.Taints = append(managedCluster.Spec.Taints, managedClusterCleanupTaint)
-		if err := common.UpdateManagedCluster(ctx, clusterC, managedCluster); err != nil {
-			return fmt.Errorf("failed to add cleanup taint to ManagedCluster: %w", err)
-		}
-		logger.V(1).Info("added cleanup taint to ManagedCluster", "spokeName", spoke.Name, "taint", managedClusterCleanupTaint.Key)
 	}
 
 	// remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
@@ -527,6 +538,23 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 			err.Error(), v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionFalse,
 		))
 		return err
+	}
+
+	// Apply terminating taint to remove all remaining workloads including addons.
+	// This taint should not be tolerated by anything - it signals final cluster termination.
+	// We need to re-fetch the ManagedCluster to get the latest version after the first taint.
+	managedCluster, err = clusterC.ClusterV1().ManagedClusters().Get(ctx, spoke.Name, metav1.GetOptions{})
+	if err != nil && !kerrs.IsNotFound(err) {
+		return fmt.Errorf("failed to get ManagedCluster for terminating taint: %w", err)
+	}
+	if managedCluster != nil && !slices.ContainsFunc(managedCluster.Spec.Taints, func(t clusterv1.Taint) bool {
+		return t.Key == managedClusterTerminatingTaint.Key && t.Effect == managedClusterTerminatingTaint.Effect
+	}) {
+		managedCluster.Spec.Taints = append(managedCluster.Spec.Taints, managedClusterTerminatingTaint)
+		if err := common.UpdateManagedCluster(ctx, clusterC, managedCluster); err != nil {
+			return fmt.Errorf("failed to add terminating taint to ManagedCluster: %w", err)
+		}
+		logger.V(1).Info("added terminating taint to ManagedCluster", "spokeName", spoke.Name, "taint", managedClusterTerminatingTaint.Key)
 	}
 
 	if len(spoke.Status.EnabledAddons) > 0 {

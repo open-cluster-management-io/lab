@@ -117,6 +117,8 @@ deployments:
           enabled: ${FLEETCONFIG_ENABLED}
         addonMode: ${ADDON_MODE}
         enableLegacyControllers: ${ENABLE_LEGACY_CONTROLLERS}
+        cert-manager:
+          enabled: false
       valuesFiles:
       - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
     updateImageTags: false
@@ -131,6 +133,8 @@ deployments:
           enabled: ${FLEETCONFIG_ENABLED}
         addonMode: ${ADDON_MODE}
         enableLegacyControllers: ${ENABLE_LEGACY_CONTROLLERS}
+        cert-manager:
+          enabled: false
       valuesFiles:
       - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
 
@@ -146,6 +150,8 @@ deployments:
           tag: local
         addonMode: ${ADDON_MODE}
         enableLegacyControllers: ${ENABLE_LEGACY_CONTROLLERS}
+        cert-manager:
+          enabled: false
       valuesFiles:
       - ${CONTEXT}/charts/fleetconfig-controller/values.yaml
       - ${CONTEXT}/test/data/fleetconfig-values.yaml
