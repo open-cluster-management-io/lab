@@ -11,7 +11,7 @@ const (
 
 	hubRequeuePreInit    = 30 * time.Second
 	hubRequeuePostInit   = 2 * time.Minute
-	requeueDeleting      = 10 * time.Second
+	requeueDeleting      = 5 * time.Second
 	spokeRequeuePreJoin  = 15 * time.Second
 	spokeRequeuePostJoin = 1 * time.Minute
 	spokeWatchInterval   = 30 * time.Second
