@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
+	clusterapi "open-cluster-management.io/api/client/cluster/clientset/versioned"
 	workapi "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
@@ -485,6 +486,61 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 		return fmt.Errorf("failed to create addon client for cleanup: %w", err)
 	}
 
+	err = r.hubCleanupPreflight(ctx, spoke, addonC, workC, clusterC, pivotComplete)
+	if err != nil {
+		return err
+	}
+
+	// remove preflight cleanup finalizer - this lets the spoke's controller know to proceed with unjoin.
+	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
+		return s == v1beta1.HubCleanupPreflightFinalizer
+	})
+
+	// requeue until unjoin is complete by the spoke's controller
+	if slices.Contains(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) {
+		logger.V(1).Info("Hub preflight complete, waiting for spoke agent to deregister")
+		return nil
+	}
+
+	csrList := &certificatesv1.CertificateSigningRequestList{}
+	if err := r.List(ctx, csrList, client.HasLabels{"open-cluster-management.io/cluster-name"}); err != nil {
+		return err
+	}
+	for _, c := range csrList.Items {
+		trimmedName := csrSuffixPattern.ReplaceAllString(c.Name, "")
+		if trimmedName == spoke.Name {
+			if err := r.Delete(ctx, &c); err != nil {
+				return err
+			}
+		}
+	}
+
+	err = r.waitForAgentAddonDeleted(ctx, spoke, spoke.DeepCopy(), addonC, workC)
+	if err != nil {
+		return err
+	}
+
+	// remove ManagedCluster
+	err = clusterC.ClusterV1().ManagedClusters().Delete(ctx, spoke.Name, metav1.DeleteOptions{})
+	if err != nil && !kerrs.IsNotFound(err) {
+		return err
+	}
+	// remove Namespace
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: spoke.Name}}
+	err = r.Delete(ctx, ns)
+	if err != nil && !kerrs.IsNotFound(err) {
+		return err
+	}
+
+	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
+		return s == v1beta1.HubCleanupFinalizer
+	})
+
+	return nil
+}
+
+func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta1.Spoke, addonC *addonapi.Clientset, workC *workapi.Clientset, clusterC *clusterapi.Clientset, pivotComplete bool) error {
+	logger := log.FromContext(ctx)
 	// skip clean up if the ManagedCluster resource is not found or if any manifestWorks exist
 	managedCluster, err := clusterC.ClusterV1().ManagedClusters().Get(ctx, spoke.Name, metav1.GetOptions{})
 	if kerrs.IsNotFound(err) {
@@ -569,51 +625,6 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 			v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionFalse,
 		))
 	}
-
-	// remove preflight cleanup finalizer - this lets the spoke's controller know to proceed with unjoin.
-	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
-		return s == v1beta1.HubCleanupPreflightFinalizer
-	})
-
-	// requeue until unjoin is complete by the spoke's controller
-	if slices.Contains(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) {
-		logger.V(1).Info("Hub preflight complete, waiting for spoke agent to deregister")
-		return nil
-	}
-
-	csrList := &certificatesv1.CertificateSigningRequestList{}
-	if err := r.List(ctx, csrList, client.HasLabels{"open-cluster-management.io/cluster-name"}); err != nil {
-		return err
-	}
-	for _, c := range csrList.Items {
-		trimmedName := csrSuffixPattern.ReplaceAllString(c.Name, "")
-		if trimmedName == spoke.Name {
-			if err := r.Delete(ctx, &c); err != nil {
-				return err
-			}
-		}
-	}
-
-	err = r.waitForAgentAddonDeleted(ctx, spoke, spokeCopy, addonC, workC)
-	if err != nil {
-		return err
-	}
-
-	// remove ManagedCluster
-	err = clusterC.ClusterV1().ManagedClusters().Delete(ctx, spoke.Name, metav1.DeleteOptions{})
-	if err != nil && !kerrs.IsNotFound(err) {
-		return err
-	}
-	// remove Namespace
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: spoke.Name}}
-	err = r.Delete(ctx, ns)
-	if err != nil && !kerrs.IsNotFound(err) {
-		return err
-	}
-
-	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
-		return s == v1beta1.HubCleanupFinalizer
-	})
 
 	return nil
 }
