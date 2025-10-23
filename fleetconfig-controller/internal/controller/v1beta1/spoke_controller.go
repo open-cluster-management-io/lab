@@ -109,7 +109,7 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			if spoke.IsHubAsSpoke() {
 				spoke.Finalizers = append(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer)
 			}
-			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
+			return ret(ctx, ctrl.Result{RequeueAfter: spokeRequeuePreJoin}, nil)
 		}
 	case v1beta1.InstanceTypeUnified:
 		if !slices.Contains(spoke.Finalizers, v1beta1.HubCleanupFinalizer) {
@@ -124,7 +124,7 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	case v1beta1.InstanceTypeAgent:
 		if !slices.Contains(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) && spoke.DeletionTimestamp.IsZero() {
 			spoke.Finalizers = append(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) // removed by the spoke to signal to the hub that unjoin succeeded
-			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
+			return ret(ctx, ctrl.Result{RequeueAfter: spokeRequeuePreJoin}, nil)
 		}
 	default:
 		// this is guarded against when the manager is initialized. should never reach this point
@@ -135,16 +135,20 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	if !spoke.DeletionTimestamp.IsZero() {
 		if spoke.Status.Phase != v1beta1.Deleting {
 			spoke.Status.Phase = v1beta1.Deleting
-			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
+			return ret(ctx, ctrl.Result{RequeueAfter: requeueDeleting}, nil)
 		}
 
 		// HubCleanupFinalizer is the last finalizer to be removed
 		if slices.Contains(spoke.Finalizers, v1beta1.HubCleanupFinalizer) {
-			if err := r.cleanup(ctx, spoke, hubMeta.kubeconfig); err != nil {
+			requeue, err := r.cleanup(ctx, spoke, hubMeta.kubeconfig)
+			if err != nil {
 				spoke.SetConditions(true, v1beta1.NewCondition(
 					err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
 				))
 				return ret(ctx, ctrl.Result{}, err)
+			}
+			if requeue {
+				return ret(ctx, ctrl.Result{RequeueAfter: requeueDeleting}, nil)
 			}
 		}
 		// end reconciliation
@@ -175,7 +179,7 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	if previousPhase == "" {
 		// set initial phase/conditions and requeue
-		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
+		return ret(ctx, ctrl.Result{RequeueAfter: spokeRequeuePreJoin}, nil)
 	}
 
 	// Handle Spoke cluster: join and/or upgrade
@@ -189,14 +193,14 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		if c.Status != c.WantStatus {
 			logger.Info("WARNING: condition does not have the desired status", "type", c.Type, "reason", c.Reason, "message", c.Message, "status", c.Status, "wantStatus", c.WantStatus)
 			spoke.Status.Phase = v1beta1.Unhealthy
-			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
+			return ret(ctx, ctrl.Result{RequeueAfter: spokeRequeuePreJoin}, nil)
 		}
 	}
 	if spoke.Status.Phase == v1beta1.SpokeJoining {
 		spoke.Status.Phase = v1beta1.SpokeRunning
 	}
 
-	return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
+	return ret(ctx, ctrl.Result{RequeueAfter: spokeRequeuePostJoin}, nil)
 }
 
 type spokeContextKey int
@@ -253,7 +257,7 @@ func (r *SpokeReconciler) SetupWithManagerForHub(mgr ctrl.Manager) error {
 						return false
 					}
 					return sharedFieldsChanged(oldHub.Spec.DeepCopy(), newHub.Spec.DeepCopy()) ||
-						!reflect.DeepEqual(oldHub.Status, newHub.Status)
+						oldHub.Status.Phase != newHub.Status.Phase
 				},
 				GenericFunc: func(_ event.GenericEvent) bool {
 					return false
@@ -272,7 +276,7 @@ func (r *SpokeReconciler) SetupWithManagerForSpoke(mgr ctrl.Manager) error {
 	watcher := watch.NewOrDie(watch.Config{
 		Client:    mgr.GetClient(),
 		Log:       r.Log.WithName(v1beta1.AgentCleanupWatcherName),
-		Interval:  requeue,
+		Interval:  spokeWatchInterval,
 		Timeout:   10 * time.Second,
 		Name:      v1beta1.AgentCleanupWatcherName,
 		Condition: spokeDeletedCondition,
@@ -294,6 +298,34 @@ func (r *SpokeReconciler) SetupWithManagerForSpoke(mgr ctrl.Manager) error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: r.ConcurrentReconciles,
 		}).
+		// watch for Hub updates, to immediately propagate any updates to RegistrationAuth, OCMSource
+		Watches(
+			&v1beta1.Hub{},
+			handler.EnqueueRequestsFromMapFunc(r.mapHubEventToSpoke),
+			builder.WithPredicates(predicate.Funcs{
+				DeleteFunc: func(_ event.DeleteEvent) bool {
+					return false
+				},
+				CreateFunc: func(_ event.CreateEvent) bool {
+					return false
+				},
+				// only return true if old and new hub specs shared fields are different
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					oldHub, ok := e.ObjectOld.(*v1beta1.Hub)
+					if !ok {
+						return false
+					}
+					newHub, ok := e.ObjectNew.(*v1beta1.Hub)
+					if !ok {
+						return false
+					}
+					return sharedFieldsChanged(oldHub.Spec.DeepCopy(), newHub.Spec.DeepCopy())
+				},
+				GenericFunc: func(_ event.GenericEvent) bool {
+					return false
+				},
+			}),
+		).
 		Named("spoke").
 		Complete(r)
 }

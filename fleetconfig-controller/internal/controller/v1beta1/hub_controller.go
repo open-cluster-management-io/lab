@@ -94,7 +94,7 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	// Add a finalizer and requeue if not already present
 	if !slices.Contains(hub.Finalizers, v1beta1.HubCleanupFinalizer) {
 		hub.Finalizers = append(hub.Finalizers, v1beta1.HubCleanupFinalizer)
-		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
+		return ret(ctx, ctrl.Result{RequeueAfter: hubRequeuePreInit}, nil)
 	}
 
 	hubKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, hub.Spec.Kubeconfig, hub.Namespace)
@@ -106,20 +106,22 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	if !hub.DeletionTimestamp.IsZero() {
 		if hub.Status.Phase != v1beta1.Deleting {
 			hub.Status.Phase = v1beta1.Deleting
-			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
+			return ret(ctx, ctrl.Result{RequeueAfter: requeueDeleting}, nil)
 		}
 
 		if slices.Contains(hub.Finalizers, v1beta1.HubCleanupFinalizer) {
-			if err := r.cleanHub(ctx, hub, hubKubeconfig); err != nil {
+			requeue, err := r.cleanHub(ctx, hub, hubKubeconfig)
+			if err != nil {
 				hub.SetConditions(true, v1beta1.NewCondition(
 					err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
 				))
 				return ret(ctx, ctrl.Result{}, err)
 			}
+			if requeue {
+				return ret(ctx, ctrl.Result{RequeueAfter: requeueDeleting}, nil)
+			}
 		}
-		hub.Finalizers = slices.DeleteFunc(hub.Finalizers, func(s string) bool {
-			return s == v1beta1.HubCleanupFinalizer
-		})
+
 		// end reconciliation
 		return ret(ctx, ctrl.Result{}, nil)
 	}
@@ -145,7 +147,7 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	if previousPhase == "" {
 		// set initial phase/conditions and requeue
-		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
+		return ret(ctx, ctrl.Result{RequeueAfter: hubRequeuePreInit}, nil)
 	}
 
 	// Handle Hub cluster: initialization and/or upgrade
@@ -155,7 +157,7 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 	hubInitializedCond := hub.GetCondition(v1beta1.HubInitialized)
 	if hubInitializedCond == nil || hubInitializedCond.Status == metav1.ConditionFalse {
-		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
+		return ret(ctx, ctrl.Result{RequeueAfter: hubRequeuePreInit}, nil)
 	}
 
 	// Finalize phase
@@ -163,14 +165,14 @@ func (r *HubReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		if c.Status != c.WantStatus {
 			logger.Info("WARNING: condition does not have the desired status", "type", c.Type, "reason", c.Reason, "message", c.Message, "status", c.Status, "wantStatus", c.WantStatus)
 			hub.Status.Phase = v1beta1.Unhealthy
-			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
+			return ret(ctx, ctrl.Result{RequeueAfter: hubRequeuePreInit}, nil)
 		}
 	}
 	if hub.Status.Phase == v1beta1.HubStarting {
 		hub.Status.Phase = v1beta1.HubRunning
 	}
 
-	return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
+	return ret(ctx, ctrl.Result{RequeueAfter: hubRequeuePostInit}, nil)
 }
 
 type contextKey int
@@ -185,7 +187,7 @@ func withOriginalHub(ctx context.Context, hub *v1beta1.Hub) context.Context {
 }
 
 // cleanup cleans up a Hub and its associated resources.
-func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub, hubKubeconfig []byte) error {
+func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub, hubKubeconfig []byte) (bool, error) {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("cleanHub", "hub", hub.Name)
 
@@ -193,7 +195,7 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub, hubKubec
 	spokeList := &v1beta1.SpokeList{}
 	err := r.List(ctx, spokeList)
 	if err != nil {
-		return err
+		return true, err
 	}
 
 	spokes := spokeList.Items
@@ -201,28 +203,25 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub, hubKubec
 		// Mark all Spokes for deletion if they haven't been deleted yet
 		for i := range spokes {
 			spoke := &spokes[i]
-			if spoke.DeletionTimestamp.IsZero() {
-				if !spoke.IsManagedBy(hub.ObjectMeta) {
-					continue
-				}
-				logger.Info("Marking Spoke for deletion", "spoke", spoke.Name)
-				if err := r.Delete(ctx, spoke); err != nil && !kerrs.IsNotFound(err) {
-					return fmt.Errorf("failed to delete spoke %s: %w", spoke.Name, err)
-				}
+			if !spoke.IsManagedBy(hub.ObjectMeta) || !spoke.DeletionTimestamp.IsZero() {
+				continue
+			}
+			logger.Info("Marking Spoke for deletion", "spoke", spoke.Name)
+			if err := r.Delete(ctx, spoke); err != nil && !kerrs.IsNotFound(err) {
+				return true, fmt.Errorf("failed to delete spoke %s: %w", spoke.Name, err)
 			}
 		}
 
 		logger.V(1).Info("Waiting for all Spokes to be deleted before proceeding with Hub cleanup",
 			"remainingSpokes", len(spokes))
-		// Return a retriable error to requeue and check again later
-		return fmt.Errorf("waiting for background spoke deletion. Remaining: %d spokes", len(spokes))
+		return true, nil
 	}
 
 	logger.Info("All Spokes have been deleted, proceeding with Hub cleanup")
 
 	addonC, err := common.AddOnClient(hubKubeconfig)
 	if err != nil {
-		return fmt.Errorf("failed to create addon client for cleanup: %w", err)
+		return true, fmt.Errorf("failed to create addon client for cleanup: %w", err)
 	}
 
 	hubCopy := hub.DeepCopy()
@@ -230,11 +229,11 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub, hubKubec
 	hubCopy.Spec.HubAddOns = nil
 	_, err = handleAddonConfig(ctx, r.Client, addonC, hubCopy)
 	if err != nil {
-		return err
+		return true, err
 	}
 	_, err = handleHubAddons(ctx, addonC, hubCopy)
 	if err != nil {
-		return err
+		return true, err
 	}
 
 	purgeOperator := false
@@ -253,12 +252,15 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub, hubKubec
 	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm clean' to complete...")
 	if err != nil {
 		out := append(stdout, stderr...)
-		return fmt.Errorf("failed to clean hub cluster: %v, output: %s", err, string(out))
+		return true, fmt.Errorf("failed to clean hub cluster: %v, output: %s", err, string(out))
 	}
 	logger.V(1).Info("hub cleaned", "output", string(stdout))
 
-	return nil
+	hub.Finalizers = slices.DeleteFunc(hub.Finalizers, func(s string) bool {
+		return s == v1beta1.HubCleanupFinalizer
+	})
 
+	return false, nil
 }
 
 // handleHub manages Hub cluster init and upgrade operations

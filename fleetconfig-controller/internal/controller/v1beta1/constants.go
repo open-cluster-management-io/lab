@@ -7,9 +7,14 @@ import (
 
 // generic
 const (
-	clusteradm     = "clusteradm"
-	requeue        = 30 * time.Second
-	amwExistsError = "you should manually clean them, uninstall kluster will cause those works out of control."
+	clusteradm = "clusteradm"
+
+	hubRequeuePreInit    = 30 * time.Second
+	hubRequeuePostInit   = 2 * time.Minute
+	requeueDeleting      = 10 * time.Second
+	spokeRequeuePreJoin  = 15 * time.Second
+	spokeRequeuePostJoin = 1 * time.Minute
+	spokeWatchInterval   = 30 * time.Second
 )
 
 var csrSuffixPattern = regexp.MustCompile(`-[a-zA-Z0-9]{5}$`)
