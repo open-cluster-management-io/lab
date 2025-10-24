@@ -83,7 +83,7 @@ spec:
                     type: boolean
                   purgeAgentNamespace:
                     default: false
-                    description: If true, the agent will attempt to garbage collect
+                    description: If set, the agent will attempt to garbage collect
                       its own namespace after the spoke cluster is unjoined.
                     type: boolean
                   purgeKlusterletOperator:

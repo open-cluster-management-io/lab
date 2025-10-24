@@ -104,8 +104,7 @@ func allowHubUpdate(oldHub, newHub *v1beta1.Hub) error {
 // - spec.addOns
 // - spec.timeout
 // - spec.logVerbosity
-// - spec.cleanupConfig.purgeAgentNamespace
-// - spec.cleanupConfig.purgeKubeconfigSecret
+// - spec.cleanupConfig
 func allowSpokeUpdate(oldSpoke, newSpoke *v1beta1.Spoke) error {
 	if !reflect.DeepEqual(newSpoke.Spec, oldSpoke.Spec) {
 		oldSpokeCopy := oldSpoke.Spec.DeepCopy()
@@ -124,10 +123,8 @@ func allowSpokeUpdate(oldSpoke, newSpoke *v1beta1.Spoke) error {
 		newSpokeCopy.LogVerbosity = 0
 		oldSpokeCopy.Timeout = 0
 		newSpokeCopy.Timeout = 0
-		oldSpokeCopy.CleanupConfig.PurgeAgentNamespace = false
-		newSpokeCopy.CleanupConfig.PurgeAgentNamespace = false
-		oldSpokeCopy.CleanupConfig.PurgeKubeconfigSecret = false
-		newSpokeCopy.CleanupConfig.PurgeKubeconfigSecret = false
+		oldSpokeCopy.CleanupConfig = v1beta1.CleanupConfig{}
+		newSpokeCopy.CleanupConfig = v1beta1.CleanupConfig{}
 
 		if !reflect.DeepEqual(oldSpokeCopy, newSpokeCopy) {
 			return errors.New(errAllowedSpokeUpdate)

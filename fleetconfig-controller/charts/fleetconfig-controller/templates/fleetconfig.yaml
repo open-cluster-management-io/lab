@@ -78,6 +78,7 @@ spec:
     purgeKlusterletOperator: {{ .purgeKlusterletOperator | default true }}
     purgeKubeconfigSecret: {{ .purgeKubeconfigSecret | default false }}
     purgeAgentNamespace: {{ .purgeAgentNamespace | default false }}
+    forceClusterDrain: {{ .forceClusterDrain | default false }}
   {{- end }}
   hubRef:
     name: {{ .hubRef.name }}

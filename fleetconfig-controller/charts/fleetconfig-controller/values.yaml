@@ -184,6 +184,7 @@ fleetConfig:
   ## @param fleetConfig.spokes[0].cleanupConfig.purgeKlusterletOperator If set, the klusterlet operator will be purged and all open-cluster-management namespaces deleted when the klusterlet is unjoined from its Hub cluster.
   ## @param fleetConfig.spokes[0].cleanupConfig.purgeKubeconfigSecret If set, the kubeconfig secret will be automatically deleted after the agent has taken over managing the Spoke.
   ## @param fleetConfig.spokes[0].cleanupConfig.purgeAgentNamespace If true, the agent will attempt to garbage collect its own namespace after the spoke cluster is unjoined.
+  ## @param fleetConfig.spokes[0].cleanupConfig.forceClusterDrain If set, all ManifestWorks which were created using a Placement will be automatically descheduled from the Spoke cluster during deletion. This includes AddOns installed using installStrategy.type=Placements. If an AddOn must stay running to reconcile deletion of other ManifestWorks, it should tolerate the `fleetconfig.open-cluster-management.io/workload-cleanup` taint. Manually created ManifestWorks will not be affected and must be manually cleaned up for Spoke deletion to proceed.
   ## @param fleetConfig.spokes[0].kubeconfig.context The context to use in the kubeconfig file. Leave empty to use the current context.
   ## @param fleetConfig.spokes[0].kubeconfig.inCluster If set, the kubeconfig will be read from the cluster. Only applicable for same-cluster operations.
   ## @param fleetConfig.spokes[0].kubeconfig.secretReference.name The name of the secret.
@@ -216,6 +217,7 @@ fleetConfig:
       purgeKlusterletOperator: true
       purgeKubeconfigSecret: true
       purgeAgentNamespace: true
+      forceClusterDrain: false
     ## Kubeconfig details for the Spoke cluster.
     kubeconfig:
       context: ""
