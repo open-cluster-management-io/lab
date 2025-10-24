@@ -198,22 +198,24 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub, hubKubec
 		return true, err
 	}
 
-	spokes := spokeList.Items
-	if len(spokes) > 0 {
-		// Mark all Spokes for deletion if they haven't been deleted yet
-		for i := range spokes {
-			spoke := &spokes[i]
-			if !spoke.IsManagedBy(hub.ObjectMeta) || !spoke.DeletionTimestamp.IsZero() {
-				continue
-			}
-			logger.Info("Marking Spoke for deletion", "spoke", spoke.Name)
-			if err := r.Delete(ctx, spoke); err != nil && !kerrs.IsNotFound(err) {
-				return true, fmt.Errorf("failed to delete spoke %s: %w", spoke.Name, err)
+	managedRemaining := 0
+	for i := range spokeList.Items {
+		s := &spokeList.Items[i]
+		if !s.IsManagedBy(hub.ObjectMeta) {
+			continue
+		}
+		if s.DeletionTimestamp.IsZero() {
+			logger.Info("Marking Spoke for deletion", "spoke", s.Name)
+			if err := r.Delete(ctx, s); err != nil && !kerrs.IsNotFound(err) {
+				return true, fmt.Errorf("failed to delete spoke %s: %w", s.Name, err)
 			}
 		}
-
-		logger.V(1).Info("Waiting for all Spokes to be deleted before proceeding with Hub cleanup",
-			"remainingSpokes", len(spokes))
+		// Count managed spokes until they're fully deleted
+		managedRemaining++
+	}
+	if managedRemaining > 0 {
+		logger.V(1).Info("Waiting for managed Spokes to be deleted before proceeding with Hub cleanup",
+			"remainingSpokes", managedRemaining)
 		return true, nil
 	}
 

@@ -75,7 +75,11 @@ metadata:
 spec:
   {{- with .cleanupConfig }}
   cleanupConfig:
-    purgeKlusterletOperator: {{ .purgeKlusterletOperator | default true }}
+    {{- if hasKey . "purgeKlusterletOperator" }}
+    purgeKlusterletOperator: {{ .purgeKlusterletOperator }}
+    {{- else }}
+    purgeKlusterletOperator: true
+    {{- end }}
     purgeKubeconfigSecret: {{ .purgeKubeconfigSecret | default false }}
     purgeAgentNamespace: {{ .purgeAgentNamespace | default false }}
     forceClusterDrain: {{ .forceClusterDrain | default false }}
