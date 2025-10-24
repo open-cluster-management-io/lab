@@ -332,7 +332,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 				return nil
 			}, 5*time.Minute, 10*time.Second).Should(Succeed())
 
-			By("deleting the Hub and ensuring that it isn't deleted until the ManifestWork is deleted")
+			By("deleting the Hub and ensuring that the Hub and Spoke aren't deleted until the ManifestWork is deleted")
 			ExpectWithOffset(1, tc.kClient.Delete(tc.ctx, hubClone)).To(Succeed())
 			EventuallyWithOffset(1, func() error {
 				if err := tc.kClient.Get(tc.ctx, v1beta1hubNN, hubClone); err != nil {
@@ -344,20 +344,31 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 					utils.WarnError(err, "Hub deletion not started")
 					return err
 				}
-				conditions := make([]metav1.Condition, len(hubClone.Status.Conditions))
-				for i, c := range hubClone.Status.Conditions {
+				if err := tc.kClient.Get(tc.ctx, v1beta1hubAsSpokeNN, hubAsSpokeClone); err != nil {
+					utils.WarnError(err, "failed to get Spoke")
+					return err
+				}
+				if hubAsSpokeClone.Status.Phase != v1beta1.Deleting {
+					err := fmt.Errorf("expected %s, got %s", v1beta1.Deleting, hubAsSpokeClone.Status.Phase)
+					utils.WarnError(err, "Spoke deletion not started")
+					return err
+				}
+				conditions := make([]metav1.Condition, len(hubAsSpokeClone.Status.Conditions))
+				for i, c := range hubAsSpokeClone.Status.Conditions {
 					conditions[i] = c.Condition
 				}
 				if err := utils.AssertConditions(conditions, map[string]metav1.ConditionStatus{
-					v1beta1.HubInitialized:   metav1.ConditionTrue,
+					v1beta1.SpokeJoined:      metav1.ConditionTrue,
 					v1beta1.CleanupFailed:    metav1.ConditionTrue,
 					v1beta1.AddonsConfigured: metav1.ConditionTrue,
-					v1beta1.HubUpgradeFailed: metav1.ConditionFalse,
+					v1beta1.KlusterletSynced: metav1.ConditionTrue,
+					v1beta1.PivotComplete:    metav1.ConditionTrue,
 				}); err != nil {
 					utils.WarnError(err, "Hub deletion not blocked")
 					return err
 				}
 				return nil
+
 			}, 5*time.Minute, 10*time.Second).Should(Succeed())
 
 			By("deleting the manifest work from the hub")
