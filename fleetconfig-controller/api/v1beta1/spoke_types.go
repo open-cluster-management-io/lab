@@ -89,7 +89,7 @@ type SpokeSpec struct {
 
 // CleanupConfig is the configuration for cleaning up resources during Spoke cleanup.
 type CleanupConfig struct {
-	// If true, the agent will attempt to garbage collect its own namespace after the spoke cluster is unjoined.
+	// If set, the agent will attempt to garbage collect its own namespace after the spoke cluster is unjoined.
 	// +kubebuilder:default:=false
 	// +optional
 	PurgeAgentNamespace bool `json:"purgeAgentNamespace,omitempty"`
@@ -104,6 +104,14 @@ type CleanupConfig struct {
 	// +kubebuilder:default:=false
 	// +optional
 	PurgeKubeconfigSecret bool `json:"purgeKubeconfigSecret,omitempty"`
+
+	// If set, all ManifestWorks which were created using a Placement will be automatically descheduled from the Spoke cluster during deletion.
+	// This includes AddOns installed using installStrategy.type=Placements. If an AddOn must stay running to reconcile deletion of other ManifestWorks,
+	// it should tolerate the `fleetconfig.open-cluster-management.io/workload-cleanup` taint.
+	// Manually created ManifestWorks will not be affected and must be manually cleaned up for Spoke deletion to proceed.
+	// +kubebuilder:default:=false
+	// +optional
+	ForceClusterDrain bool `json:"forceClusterDrain,omitempty"`
 }
 
 // HubRef is the information required to get a Hub resource.

@@ -73,6 +73,14 @@ spec:
                 description: CleanupConfig is used to configure which resources should
                   be automatically garbage collected during cleanup.
                 properties:
+                  forceClusterDrain:
+                    default: false
+                    description: |-
+                      If set, all ManifestWorks which were created using a Placement will be automatically descheduled from the Spoke cluster during deletion.
+                      This includes AddOns installed using installStrategy.type=Placements. If an AddOn must stay running to reconcile deletion of other ManifestWorks,
+                      it should tolerate the `fleetconfig.open-cluster-management.io/workload-cleanup` taint.
+                      Manually created ManifestWorks will not be affected and must be manually cleaned up for Spoke deletion to proceed.
+                    type: boolean
                   purgeAgentNamespace:
                     default: false
                     description: If true, the agent will attempt to garbage collect

@@ -559,16 +559,18 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 		return true, fmt.Errorf("unexpected error listing managedClusters: %w", err)
 	}
 
-	// Apply workload-cleanup taint to remove non-addon workloads via Placement descheduling.
-	// Addons should tolerate this taint if they need to continue running during initial cleanup.
-	if !slices.ContainsFunc(managedCluster.Spec.Taints, func(t clusterv1.Taint) bool {
-		return t.Key == managedClusterWorkloadCleanupTaint.Key && t.Effect == managedClusterWorkloadCleanupTaint.Effect
-	}) {
-		managedCluster.Spec.Taints = append(managedCluster.Spec.Taints, managedClusterWorkloadCleanupTaint)
-		if err := common.UpdateManagedCluster(ctx, clusterC, managedCluster); err != nil {
-			return true, fmt.Errorf("failed to add workload-cleanup taint to ManagedCluster: %w", err)
+	if spoke.Spec.CleanupConfig.ForceClusterDrain {
+		// Apply workload-cleanup taint to remove non-addon workloads via Placement descheduling.
+		// Addons should tolerate this taint if they need to continue running during initial cleanup.
+		if !slices.ContainsFunc(managedCluster.Spec.Taints, func(t clusterv1.Taint) bool {
+			return t.Key == managedClusterWorkloadCleanupTaint.Key && t.Effect == managedClusterWorkloadCleanupTaint.Effect
+		}) {
+			managedCluster.Spec.Taints = append(managedCluster.Spec.Taints, managedClusterWorkloadCleanupTaint)
+			if err := common.UpdateManagedCluster(ctx, clusterC, managedCluster); err != nil {
+				return true, fmt.Errorf("failed to add workload-cleanup taint to ManagedCluster: %w", err)
+			}
+			logger.V(1).Info("added workload-cleanup taint to ManagedCluster", "spokeName", spoke.Name, "taint", managedClusterWorkloadCleanupTaint.Key)
 		}
-		logger.V(1).Info("added workload-cleanup taint to ManagedCluster", "spokeName", spoke.Name, "taint", managedClusterWorkloadCleanupTaint.Key)
 	}
 
 	manifestWorks, err := workC.WorkV1().ManifestWorks(managedCluster.Name).List(ctx, metav1.ListOptions{})
