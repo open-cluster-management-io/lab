@@ -163,10 +163,14 @@ sequenceDiagram
     HubController->>HubK8s: Set phase to "Deleting"
 
     Note over HubK8s, HubController: Hub Pre-Flight Cleanup Phase
+    alt ForceClusterDrain is set
+        HubController->>HubK8s: Set `workload-cleanup` taint on ManagedCluster
+    end
     HubController->>HubK8s: Check for active, non-addon ManifestWorks
     alt Active ManifestWorks
         HubController->>HubController: Requeue with error
     end
+    HubController->>HubK8s: Set `terminating` taint on ManagedCluster
     HubController->>HubK8s: Disable addons (except fleetconfig-controller-agent)
     HubController->>HubK8s: Remove HubCleanupPreflightFinalizer
     
@@ -177,7 +181,6 @@ sequenceDiagram
     end
     SpokeController->>SpokeK8s: Remove Klusterlet and OCM namespaces (clusteradm unjoin)
     SpokeController->>HubK8s: Remove SpokeCleanupFinalizer
-    SpokeController->>SpokeK8s: Remove AppliedManifestWork (which removes FCC-agent)
 
     Note over HubK8s, HubController: Final Hub Cleanup
     HubController->>HubK8s: SpokeCleanupFinalizer removed?
@@ -188,6 +191,7 @@ sequenceDiagram
     HubController->>HubK8s: Remove HubCleanupFinalizer
     
     HubK8s->>User: Spoke resource deleted
+    SpokeController->>SpokeK8s: Remove AppliedManifestWork (which removes FCC-agent)
 
     Note over HubK8s, HubController: Special Cases
     Note right of HubK8s: Hub-as-spoke: Hub does both hub and spoke cleanup
