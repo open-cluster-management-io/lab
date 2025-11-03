@@ -5,7 +5,7 @@ kind: ClusterIssuer
 metadata:
   name: fleetconfig-controller
   annotations:
-    helm.sh/hook: pre-install,pre-upgrade
+  {{ include "chart.annotations" . | nindent 4 }}
 spec:
   {{ .Values.certificates.clusterIssuer.spec | toYaml | indent 2 }}
 {{- end -}}

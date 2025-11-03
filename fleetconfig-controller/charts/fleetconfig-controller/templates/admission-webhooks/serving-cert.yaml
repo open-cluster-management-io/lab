@@ -6,7 +6,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
   annotations:
   {{- include "chart.annotations" . | nindent 4 }}
-    "helm.sh/hook": pre-install,pre-upgrade
   labels:
   {{- include "chart.labels" . | nindent 4 }}
 spec:
