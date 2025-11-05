@@ -83,7 +83,7 @@ var _ = BeforeSuite(func() {
 			filepath.Join(root, "charts", "fleetconfig-controller", "crds"),
 			filepath.Join(root, "config", "crds"),
 		},
-		ErrorIfCRDPathMissing: false,
+		ErrorIfCRDPathMissing: true,
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
 			Paths: []string{filepath.Join("..", "..", "config", "webhook")},
 		},
