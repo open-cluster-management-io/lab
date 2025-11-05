@@ -116,7 +116,7 @@ var _ = Describe("Spoke Controller", Ordered, func() {
 
 			By("Verifying the Spoke's finalizer")
 			Expect(k8sClient.Get(ctx, spokeNN, spoke)).To(Succeed())
-			Expect(spoke.Finalizers).To(ContainElement(v1beta1.SpokeCleanupFinalizer),
+			Expect(spoke.Finalizers).To(ContainElement(v1beta1.HubCleanupFinalizer),
 				"Spoke %s wasn't given a finalizer", spokeNN.Name)
 		})
 
