@@ -49,7 +49,6 @@ pipelines:
     run_dependencies --all
     build_images fleetconfig-controller-dev
     create_deployments cert-manager
-    kubectl apply -f ./hack/dev/cluster-issuer.yaml
     create_deployments fleetconfig-controller-dev
     start_dev fleetconfig-controller-dev-hub
   deploy: |-
@@ -62,7 +61,6 @@ pipelines:
   deploy-local: |-
     run_pipelines load-local
     create_deployments cert-manager
-    kubectl apply -f ./hack/dev/cluster-issuer.yaml
     create_deployments fleetconfig-controller-local
   debug: |-
     run_dependencies --all

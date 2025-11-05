@@ -221,6 +221,22 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub, hubKubec
 
 	logger.Info("All Spokes have been deleted, proceeding with Hub cleanup")
 
+	operatorC, err := common.OperatorClient(hubKubeconfig)
+	if err != nil {
+		return true, fmt.Errorf("failed to create operator client for cleanup: %w", err)
+	}
+	_, err = operatorC.OperatorV1().ClusterManagers().Get(ctx, "cluster-manager", metav1.GetOptions{})
+	if err != nil {
+		if kerrs.IsNotFound(err) {
+			logger.Info("ClusterManager not found; skip cleanup.", "hub", hub.Name)
+			hub.Finalizers = slices.DeleteFunc(hub.Finalizers, func(s string) bool {
+				return s == v1beta1.HubCleanupFinalizer
+			})
+			return false, nil
+		}
+		return true, fmt.Errorf("failed to get ClusterManager: %w", err)
+	}
+
 	addonC, err := common.AddOnClient(hubKubeconfig)
 	if err != nil {
 		return true, fmt.Errorf("failed to create addon client for cleanup: %w", err)

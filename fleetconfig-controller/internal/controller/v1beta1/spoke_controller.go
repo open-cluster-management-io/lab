@@ -97,38 +97,38 @@ func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		spoke.Status.Phase = v1beta1.Unhealthy
 	}
 
-	switch r.InstanceType {
-	case v1beta1.InstanceTypeManager:
-		if !slices.Contains(spoke.Finalizers, v1beta1.HubCleanupFinalizer) {
-			setDefaults(ctx, spoke, hubMeta)
-			spoke.Finalizers = append(
-				spoke.Finalizers,
-				v1beta1.HubCleanupPreflightFinalizer, // removed by the hub to signal to the spoke that preflight is completed
-				v1beta1.HubCleanupFinalizer,          // removed by the hub after post-unjoin cleanup is finished
-			)
-			if spoke.IsHubAsSpoke() {
-				spoke.Finalizers = append(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer)
+	if spoke.DeletionTimestamp.IsZero() {
+		switch r.InstanceType {
+		case v1beta1.InstanceTypeManager:
+			if !slices.Contains(spoke.Finalizers, v1beta1.HubCleanupFinalizer) {
+				setDefaults(ctx, spoke, hubMeta)
+				spoke.Finalizers = append(
+					spoke.Finalizers,
+					v1beta1.HubCleanupPreflightFinalizer, // removed by the hub to signal to the spoke that preflight is completed
+					v1beta1.HubCleanupFinalizer,          // removed by the hub after post-unjoin cleanup is finished
+				)
+				return ret(ctx, ctrl.Result{RequeueAfter: spokeRequeuePreJoin}, nil)
 			}
-			return ret(ctx, ctrl.Result{RequeueAfter: spokeRequeuePreJoin}, nil)
+		case v1beta1.InstanceTypeUnified:
+			if !slices.Contains(spoke.Finalizers, v1beta1.HubCleanupFinalizer) {
+				setDefaults(ctx, spoke, hubMeta)
+				spoke.Finalizers = append(
+					spoke.Finalizers,
+					v1beta1.HubCleanupPreflightFinalizer, // removed by the hub to signal to the spoke that preflight is completed
+					v1beta1.HubCleanupFinalizer,          // removed by the hub after post-unjoin cleanup is finished
+				)
+				// SpokeCleanupFinalizer is added later after successful join
+				return ret(ctx, ctrl.Result{RequeueAfter: spokeRequeuePreJoin}, nil)
+			}
+		case v1beta1.InstanceTypeAgent:
+			if !slices.Contains(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) {
+				spoke.Finalizers = append(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) // removed by the spoke to signal to the hub that unjoin succeeded
+				return ret(ctx, ctrl.Result{RequeueAfter: spokeRequeuePreJoin}, nil)
+			}
+		default:
+			// this is guarded against when the manager is initialized. should never reach this point
+			panic(fmt.Sprintf("unknown instance type %s. Must be one of %v", r.InstanceType, v1beta1.SupportedInstanceTypes))
 		}
-	case v1beta1.InstanceTypeUnified:
-		if !slices.Contains(spoke.Finalizers, v1beta1.HubCleanupFinalizer) {
-			setDefaults(ctx, spoke, hubMeta)
-			spoke.Finalizers = append(
-				spoke.Finalizers,
-				v1beta1.HubCleanupPreflightFinalizer, // removed by the hub to signal to the spoke that preflight is completed
-				v1beta1.SpokeCleanupFinalizer,        // removed by the hub after successful unjoin
-				v1beta1.HubCleanupFinalizer,          // removed by the hub after post-unjoin cleanup is finished
-			)
-		}
-	case v1beta1.InstanceTypeAgent:
-		if !slices.Contains(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) && spoke.DeletionTimestamp.IsZero() {
-			spoke.Finalizers = append(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) // removed by the spoke to signal to the hub that unjoin succeeded
-			return ret(ctx, ctrl.Result{RequeueAfter: spokeRequeuePreJoin}, nil)
-		}
-	default:
-		// this is guarded against when the manager is initialized. should never reach this point
-		panic(fmt.Sprintf("unknown instance type %s. Must be one of %v", r.InstanceType, v1beta1.SupportedInstanceTypes))
 	}
 
 	// Handle deletion logic with finalizer

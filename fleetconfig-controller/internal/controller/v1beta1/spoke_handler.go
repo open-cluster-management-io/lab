@@ -254,6 +254,12 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 		}
 	}
 
+	// Add SpokeCleanupFinalizer now that join succeeded and there's something to clean up
+	if r.InstanceType != v1beta1.InstanceTypeAgent && !slices.Contains(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) {
+		spoke.Finalizers = append(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer)
+		logger.V(1).Info("Added SpokeCleanupFinalizer after successful join")
+	}
+
 	// TODO - handle this via `klusterlet upgrade` once https://github.com/open-cluster-management-io/ocm/issues/1210 is resolved
 	if managedCluster != nil {
 		klusterletValuesAnnotations := map[string]string{}
@@ -686,6 +692,7 @@ func (r *SpokeReconciler) waitForAgentAddonDeleted(ctx context.Context, spoke *v
 // doSpokeCleanup handles all the required cleanup of a spoke cluster when deregistering a Spoke
 func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spoke, pivotComplete bool) (bool, error) {
 	logger := log.FromContext(ctx)
+
 	// requeue until preflight is complete by the hub's controller
 	if slices.Contains(spoke.Finalizers, v1beta1.HubCleanupPreflightFinalizer) {
 		logger.V(1).Info("Cleanup initiated, waiting for hub to complete preflight")
