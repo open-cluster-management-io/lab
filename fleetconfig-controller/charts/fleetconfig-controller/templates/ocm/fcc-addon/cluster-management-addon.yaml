@@ -4,9 +4,8 @@ apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: ClusterManagementAddOn
 metadata:
   name: fleetconfig-controller-agent
-  metadata:
-    annotations:
-      helm.sh/resource-policy: keep
+  annotations:
+    helm.sh/resource-policy: keep
 spec:
   addOnMeta:
     displayName: FleetConfig Controller Agent
