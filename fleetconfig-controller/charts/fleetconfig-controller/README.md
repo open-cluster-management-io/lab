@@ -143,9 +143,9 @@ Resource specifications for all klusterlet-managed containers.
 
 ### Topology Resources
 
-| Name                        | Description                                                                                                                                                                                                                                                                                                                                        | Value  |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| `topologyResources.enabled` | Whether to create Namespaces and ManagedClusterSetBindings for the default ManagedClusterSets created when a FleetConfig is created with the DefaultClusterSet feature gate enabled. Additionally, a Namespace, ManagedClusterSet, and Placement are created for targeting all managed clusters that are not the hub running in hub-as-spoke mode. | `true` |
+| Name                        | Description                                                                                                                                                                                                                                                                                                                                | Value  |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| `topologyResources.enabled` | Whether to create Namespaces and ManagedClusterSetBindings for the default ManagedClusterSets created when a Hub is created with the DefaultClusterSet feature gate enabled. Additionally, a Namespace, ManagedClusterSet, and Placement are created for targeting all managed clusters that are not the hub running in hub-as-spoke mode. | `true` |
 
 ### fleetconfig-controller parameters
 

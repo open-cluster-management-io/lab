@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"dario.cat/mergo"
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -19,6 +20,7 @@ import (
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
 	clusterapi "open-cluster-management.io/api/client/cluster/clientset/versioned"
@@ -531,11 +533,17 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 		return true, err
 	}
 
-	// remove ManagedCluster
+	// remove ManagedCluster and block until deleted
 	err = clusterC.ClusterV1().ManagedClusters().Delete(ctx, spoke.Name, metav1.DeleteOptions{})
 	if err != nil && !kerrs.IsNotFound(err) {
 		return true, err
 	}
+
+	err = r.waitForManagedClusterDeleted(ctx, spoke.Name, clusterC)
+	if err != nil {
+		return true, err
+	}
+
 	// remove Namespace
 	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: spoke.Name}}
 	err = r.Delete(ctx, ns)
@@ -686,6 +694,39 @@ func (r *SpokeReconciler) waitForAgentAddonDeleted(ctx context.Context, spoke *v
 		))
 		return fmt.Errorf("addon manifestWorks cleanup failed: %w", err)
 	}
+	return nil
+}
+
+// waitForManagedClusterDeleted waits for the ManagedCluster resource to be completely deleted
+func (r *SpokeReconciler) waitForManagedClusterDeleted(ctx context.Context, clusterName string, clusterC *clusterapi.Clientset) error {
+	logger := log.FromContext(ctx)
+	logger.V(1).Info("waiting for ManagedCluster deletion", "clusterName", clusterName)
+
+	timeout := 30 * time.Second
+	pollInterval := 2 * time.Second
+
+	err := wait.PollUntilContextTimeout(ctx, pollInterval, timeout, true, func(ctx context.Context) (bool, error) {
+		_, err := clusterC.ClusterV1().ManagedClusters().Get(ctx, clusterName, metav1.GetOptions{})
+		if err != nil {
+			if kerrs.IsNotFound(err) {
+				// ManagedCluster is deleted
+				logger.V(1).Info("ManagedCluster deleted", "clusterName", clusterName)
+				return true, nil
+			}
+			// Log error but continue polling on transient errors
+			logger.V(3).Info("failed to get ManagedCluster during deletion wait", "error", err)
+			return false, nil
+		}
+
+		logger.V(3).Info("ManagedCluster still exists, waiting for deletion", "clusterName", clusterName)
+		// Continue polling
+		return false, nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("timeout waiting for ManagedCluster deletion for cluster %s: %w", clusterName, err)
+	}
+
 	return nil
 }
 

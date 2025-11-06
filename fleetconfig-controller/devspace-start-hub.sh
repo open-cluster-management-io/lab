@@ -5,7 +5,7 @@ COLOR_CYAN="\033[0;36m"
 COLOR_RESET="\033[0m"
 
 export CGO_ENABLED=0
-FLAGS="--use-webhook=true --webhook-port=9443 --webhook-cert-dir=/etc/k8s-webhook-certs  --instance-type=manager"
+FLAGS="--use-webhook=true --webhook-port=9443 --webhook-cert-dir=/etc/k8s-webhook-certs  --instance-type=manager --enable-topology-resources=true"
 RUN_CMD="go run ./cmd/main.go $FLAGS"
 DEBUG_CMD="dlv debug ./cmd/main.go --listen=0.0.0.0:2344 --api-version=2 --output /tmp/__debug_bin --headless -- $FLAGS"
 

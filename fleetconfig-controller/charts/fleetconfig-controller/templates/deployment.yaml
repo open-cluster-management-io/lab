@@ -44,6 +44,7 @@ spec:
         - "--instance-type=unified"
         {{- end }}
         - "--enable-legacy-controllers={{ .Values.enableLegacyControllers | default false }}"
+        - "--enable-topology-resources={{ .Values.topologyResources.enabled | default true }}"
         command:
         - /manager
         env:

@@ -36,6 +36,8 @@ import (
 	apiv1alpha1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
 	apiv1beta1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/cmd/manager"
+	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -49,6 +51,8 @@ func init() {
 
 	utilruntime.Must(apiv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(apiv1beta1.AddToScheme(scheme))
+	utilruntime.Must(clusterv1beta1.AddToScheme(scheme))
+	utilruntime.Must(clusterv1beta2.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -70,6 +74,7 @@ func main() {
 	flag.IntVar(&mOpts.SpokeConcurrentReconciles, "spoke-concurrent-reconciles", apiv1beta1.SpokeDefaultMaxConcurrentReconciles, fmt.Sprintf("Maximum number of Spoke resources that may be reconciled in parallel. Defaults to %d.", apiv1beta1.SpokeDefaultMaxConcurrentReconciles))
 	flag.StringVar(&mOpts.InstanceType, "instance-type", apiv1beta1.InstanceTypeManager, fmt.Sprintf("The type of cluster that this controller instance is installed in. Defaults to %s", apiv1beta1.InstanceTypeManager))
 	flag.BoolVar(&mOpts.EnableLegacyControllers, "enable-legacy-controllers", false, "Enable legacy FleetConfig resource and controllers")
+	flag.BoolVar(&mOpts.EnableTopologyResources, "enable-topology-resources", true, "Enable automatic creation of topology resources (namespaces, cluster sets, bindings, and placements)")
 
 	zOpts := zap.Options{
 		Development: true,

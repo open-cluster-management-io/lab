@@ -3,6 +3,7 @@ package manager
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"os"
@@ -17,6 +18,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -42,6 +44,7 @@ type Options struct {
 	SpokeConcurrentReconciles int
 	InstanceType              string
 	EnableLegacyControllers   bool
+	EnableTopologyResources   bool
 	Scheme                    *runtime.Scheme
 }
 
@@ -100,34 +103,50 @@ func ForHub(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 		return nil, err
 	}
 
-	if err := (&controllerv1beta1.HubReconciler{
+	if opts.EnableTopologyResources {
+		setupLog.Info("creating topology resources")
+		// Wait for cache to sync before setting up controllers
+		if err = mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+			setupLog.Info("waiting for cache to sync")
+			if !mgr.GetCache().WaitForCacheSync(ctx) {
+				err = fmt.Errorf("cache sync failed")
+				setupLog.Error(err, "failed to sync cache")
+				return ctx.Err()
+			}
+
+			setupLog.Info("cache synced successfully")
+			if err := createTopologyResources(ctx, mgr.GetClient(), setupLog); err != nil {
+				setupLog.Error(err, "failed to create topology resources at startup")
+				return err
+			}
+			setupLog.Info("topology resources created successfully")
+			return nil
+		})); err != nil {
+			return nil, err
+		}
+	}
+
+	hubReconciler := &controllerv1beta1.HubReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("Hub"),
 		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Hub")
-		return nil, err
 	}
-	if err := (&controllerv1beta1.SpokeReconciler{
+
+	spokeReconciler := &controllerv1beta1.SpokeReconciler{
 		Client:               mgr.GetClient(),
 		Log:                  ctrl.Log.WithName("controllers").WithName("Spoke"),
 		ConcurrentReconciles: opts.SpokeConcurrentReconciles,
 		Scheme:               mgr.GetScheme(),
 		InstanceType:         opts.InstanceType,
-	}).SetupWithManagerForHub(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Spoke")
+	}
+	if err := hubReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Hub")
 		return nil, err
 	}
 
-	if opts.EnableLegacyControllers {
-		if err = (&controllerv1alpha1.FleetConfigReconciler{
-			Client: mgr.GetClient(),
-			Log:    ctrl.Log.WithName("controllers").WithName("FleetConfig"),
-			Scheme: mgr.GetScheme(),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "FleetConfig")
-			return nil, err
-		}
+	if err := spokeReconciler.SetupWithManagerForHub(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Spoke")
+		return nil, err
 	}
 
 	// nolint:goconst
@@ -140,13 +159,24 @@ func ForHub(setupLog logr.Logger, opts Options) (ctrl.Manager, error) {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Spoke")
 			return nil, err
 		}
-		if opts.EnableLegacyControllers {
-			if err = apiv1alpha1.SetupFleetConfigWebhookWithManager(mgr); err != nil {
-				setupLog.Error(err, "unable to create webhook", "webhook", "FleetConfig")
-				return nil, err
-			}
+	}
+
+	if opts.EnableLegacyControllers {
+		fleetConfigReconciler := &controllerv1alpha1.FleetConfigReconciler{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controllers").WithName("FleetConfig"),
+			Scheme: mgr.GetScheme(),
+		}
+		if err = fleetConfigReconciler.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "FleetConfig")
+			return nil, err
+		}
+		if err = apiv1alpha1.SetupFleetConfigWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "FleetConfig")
+			return nil, err
 		}
 	}
+
 	return mgr, nil
 }
 

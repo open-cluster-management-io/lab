@@ -222,3 +222,27 @@ const (
 	// BundleVersionDefault is the default OCM source version
 	BundleVersionDefault = "default"
 )
+
+// Topology resource names
+const (
+	// NamespaceManagedClusterSetGlobal is the namespace for the global managed cluster set
+	NamespaceManagedClusterSetGlobal = "managed-cluster-set-global"
+
+	// NamespaceManagedClusterSetDefault is the namespace for the default managed cluster set
+	NamespaceManagedClusterSetDefault = "managed-cluster-set-default"
+
+	// NamespaceManagedClusterSetSpokes is the namespace for the spokes managed cluster set
+	NamespaceManagedClusterSetSpokes = "managed-cluster-set-spokes"
+
+	// ManagedClusterSetGlobal is the name of the global managed cluster set
+	ManagedClusterSetGlobal = "global"
+
+	// ManagedClusterSetDefault is the name of the default managed cluster set
+	ManagedClusterSetDefault = "default"
+
+	// ManagedClusterSetSpokes is the name of the spokes managed cluster set
+	ManagedClusterSetSpokes = "spokes"
+
+	// PlacementSpokes is the name of the spokes placement
+	PlacementSpokes = "spokes"
+)
