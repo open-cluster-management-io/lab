@@ -370,12 +370,16 @@ func (r *SpokeReconciler) configureFCCAddOn(spoke *v1beta1.Spoke) {
 		return
 	}
 
-	fccIdx := 0
+	fccIdx := -1
 	for i, addon := range spoke.Spec.AddOns {
 		if addon.ConfigName == v1beta1.FCCAddOnName {
 			fccIdx = i
 			break
 		}
+	}
+
+	if fccIdx == -1 {
+		return
 	}
 
 	// Merge FCC-specific config with any existing config

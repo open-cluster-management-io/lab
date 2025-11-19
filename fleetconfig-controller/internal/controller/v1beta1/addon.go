@@ -352,14 +352,7 @@ func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke *v
 	// do disables first, then enables/updates
 	err = handleAddonDisable(ctx, spoke, addonsToDisable)
 	if err != nil {
-		// Return current enabled addons minus disabled ones
-		currentEnabled := make([]string, 0)
-		for _, name := range enabledAddons {
-			if !slices.Contains(addonsToDisable, name) {
-				currentEnabled = append(currentEnabled, name)
-			}
-		}
-		return currentEnabled, err
+		return enabledAddons, err
 	}
 
 	// Remove disabled addons from enabled list
