@@ -23,6 +23,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 )
 
@@ -279,13 +280,14 @@ type AddOn struct {
 	// +required
 	ConfigName string `json:"configName"`
 
-	// The namespace to install the add-on in. If left empty, installs into the "open-cluster-management-addon" namespace.
-	// +optional
-	InstallNamespace string `json:"installNamespace,omitempty"`
-
 	// Annotations to apply to the add-on.
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// DeploymentConfig provides additional configuration for the add-on deployment.
+	// If specified, this will be used to create an AddOnDeploymentConfig resource.
+	// +optional
+	DeploymentConfig *addonv1alpha1.AddOnDeploymentConfigSpec `json:"deploymentConfig,omitempty"`
 }
 
 // SpokeStatus defines the observed state of Spoke.

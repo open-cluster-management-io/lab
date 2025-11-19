@@ -7,4 +7,14 @@ data:
     apiVersion: v1
     kind: Namespace
     metadata:
-      name: test-addon-2
+      name: test-addon
+    ---
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: addon-variables-test
+      namespace: test-addon
+    data:
+      CLUSTER_NAME: '{{CLUSTER_NAME}}'
+      FOO: '{{FOO}}'
+      NEW_KEY: new-value
