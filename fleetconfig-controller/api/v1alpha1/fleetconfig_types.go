@@ -533,7 +533,7 @@ type Klusterlet struct {
 	// +optional
 	FeatureGates string `json:"featureGates,omitempty"`
 
-	// Deployent mode for klusterlet
+	// Deployment mode for klusterlet
 	// +kubebuilder:validation:Enum=Default;Hosted
 	// +kubebuilder:default:="Default"
 	// +optional

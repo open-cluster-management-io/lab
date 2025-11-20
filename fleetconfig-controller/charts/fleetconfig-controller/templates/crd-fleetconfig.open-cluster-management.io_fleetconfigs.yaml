@@ -444,7 +444,7 @@ spec:
                           type: object
                         mode:
                           default: Default
-                          description: Deployent mode for klusterlet
+                          description: Deployment mode for klusterlet
                           enum:
                           - Default
                           - Hosted
