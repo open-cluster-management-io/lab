@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"reflect"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -337,41 +338,16 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 	}
 
 	if !spoke.IsHubAsSpoke() {
-		adc := &addonv1alpha1.AddOnDeploymentConfig{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      v1beta1.FCCAddOnName,
-				Namespace: spoke.Name,
-			},
-			Spec: addonv1alpha1.AddOnDeploymentConfigSpec{
-				AgentInstallNamespace: os.Getenv(v1beta1.ControllerNamespaceEnvVar),
-				CustomizedVariables: []addonv1alpha1.CustomizedVariable{
-					{
-						Name:  v1beta1.HubNamespaceEnvVar,
-						Value: spoke.Spec.HubRef.Namespace,
-					},
-					{
-						Name:  v1beta1.SpokeNamespaceEnvVar,
-						Value: spoke.Namespace,
-					},
-					{
-						Name:  v1beta1.PurgeAgentNamespaceEnvVar,
-						Value: strconv.FormatBool(spoke.Spec.CleanupConfig.PurgeAgentNamespace),
-					},
-				},
-			},
-		}
-		_, err = addonC.AddonV1alpha1().AddOnDeploymentConfigs(spoke.Name).Create(ctx, adc, metav1.CreateOptions{})
-		if err != nil && !kerrs.IsAlreadyExists(err) {
-			return err
-		}
-
 		err = r.bindAddonAgent(ctx, spoke)
 		if err != nil {
 			return err
 		}
 	}
 
-	enabledAddons, err := handleSpokeAddons(ctx, addonC, spoke)
+	spokeCopy := spoke.DeepCopy()
+	r.configureFCCAddOn(spokeCopy)
+
+	enabledAddons, err := handleSpokeAddons(ctx, addonC, spokeCopy)
 	if err != nil {
 		msg := fmt.Sprintf("failed to enable addons for spoke cluster %s: %s", spoke.Name, err.Error())
 		spoke.SetConditions(true, v1beta1.NewCondition(
@@ -379,8 +355,86 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 		))
 		return err
 	}
+
+	if len(enabledAddons) > 0 {
+		spoke.SetConditions(true, v1beta1.NewCondition(
+			v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
+		))
+	}
 	spoke.Status.EnabledAddons = enabledAddons
 	return nil
+}
+
+func (r *SpokeReconciler) configureFCCAddOn(spoke *v1beta1.Spoke) {
+	if spoke.IsHubAsSpoke() || r.InstanceType == v1beta1.InstanceTypeUnified {
+		return
+	}
+
+	fccIdx := -1
+	for i, addon := range spoke.Spec.AddOns {
+		if addon.ConfigName == v1beta1.FCCAddOnName {
+			fccIdx = i
+			break
+		}
+	}
+
+	if fccIdx == -1 {
+		return
+	}
+
+	// Merge FCC-specific config with any existing config
+	if spoke.Spec.AddOns[fccIdx].DeploymentConfig == nil {
+		spoke.Spec.AddOns[fccIdx].DeploymentConfig = &addonv1alpha1.AddOnDeploymentConfigSpec{}
+	}
+
+	// Set agent install namespace if not already set
+	if spoke.Spec.AddOns[fccIdx].DeploymentConfig.AgentInstallNamespace == "" {
+		spoke.Spec.AddOns[fccIdx].DeploymentConfig.AgentInstallNamespace = os.Getenv(v1beta1.ControllerNamespaceEnvVar)
+	}
+
+	// Append FCC-required customized variables
+	fccVariables := []addonv1alpha1.CustomizedVariable{
+		{
+			Name:  v1beta1.HubNamespaceEnvVar,
+			Value: spoke.Spec.HubRef.Namespace,
+		},
+		{
+			Name:  v1beta1.SpokeNamespaceEnvVar,
+			Value: spoke.Namespace,
+		},
+		{
+			Name:  v1beta1.PurgeAgentNamespaceEnvVar,
+			Value: strconv.FormatBool(spoke.Spec.CleanupConfig.PurgeAgentNamespace),
+		},
+	}
+
+	// Merge variables - default controller variables take precedence
+	existingVars := spoke.Spec.AddOns[fccIdx].DeploymentConfig.CustomizedVariables
+	varMap := make(map[string]string)
+
+	for _, v := range existingVars {
+		varMap[v.Name] = v.Value
+	}
+
+	for _, v := range fccVariables {
+		varMap[v.Name] = v.Value
+	}
+
+	// Convert back to slice
+	mergedVars := make([]addonv1alpha1.CustomizedVariable, 0, len(varMap))
+	for name, value := range varMap {
+		mergedVars = append(mergedVars, addonv1alpha1.CustomizedVariable{
+			Name:  name,
+			Value: value,
+		})
+	}
+
+	// Sort by name to ensure deterministic ordering and prevent false hash drift
+	sort.Slice(mergedVars, func(i, j int) bool {
+		return mergedVars[i].Name < mergedVars[j].Name
+	})
+
+	spoke.Spec.AddOns[fccIdx].DeploymentConfig.CustomizedVariables = mergedVars
 }
 
 func (r *SpokeReconciler) createAgentNamespace(ctx context.Context, spoke *v1beta1.Spoke) error {
@@ -609,6 +663,7 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 
 	if !shouldCleanAll {
 		spokeCopy.Spec.AddOns = append(spokeCopy.Spec.AddOns, v1beta1.AddOn{ConfigName: v1beta1.FCCAddOnName})
+		r.configureFCCAddOn(spokeCopy)
 	}
 	if _, err := handleSpokeAddons(ctx, addonC, spokeCopy); err != nil {
 		spoke.SetConditions(true, v1beta1.NewCondition(
@@ -616,6 +671,10 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 		))
 		return true, err
 	}
+	// Success - addons disabled/cleaned up
+	spoke.SetConditions(true, v1beta1.NewCondition(
+		v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
+	))
 
 	// Apply terminating taint to remove all remaining workloads including addons.
 	// This taint should not be tolerated by anything - it signals final cluster termination.
@@ -659,6 +718,10 @@ func (r *SpokeReconciler) waitForAgentAddonDeleted(ctx context.Context, spoke *v
 		))
 		return err
 	}
+	// Success - addon deleted
+	spoke.SetConditions(true, v1beta1.NewCondition(
+		v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
+	))
 
 	// at this point, klusterlet-work-agent is uninstalled, so nothing can remove this finalizer. all resources are cleaned up by the spoke's controller, so to prevent a dangling mw/namespace, we remove the finalizer manually
 	mwList, err := workC.WorkV1().ManifestWorks(spoke.Name).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", manifestWorkAddOnLabelKey, v1beta1.FCCAddOnName)})

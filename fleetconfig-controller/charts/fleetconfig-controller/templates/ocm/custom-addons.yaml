@@ -3,7 +3,7 @@
 {{- $labels := include "chart.labels" . }}
 {{- $annotations := include "chart.annotations" . }}
 {{- range .Values.fleetConfig.hub.addOnConfigs }}
-{{ $versionedName := printf "%s-%s" .name .version }}
+{{- $versionedName := printf "%s-%s" .name (default "v0.0.1" .version) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,9 +11,8 @@ metadata:
   namespace: {{ $namespace }}
   annotations:
     {{- $annotations | nindent 4 }}
-    helm.sh/hook: pre-install,pre-upgrade
   labels:
-  {{- $labels | nindent 4 }}
+    {{- $labels | nindent 4 }}
 data:
   {{- if or (hasPrefix "http://" .manifests) (hasPrefix "https://" .manifests) }}
   manifestsURL: {{ .manifests }}

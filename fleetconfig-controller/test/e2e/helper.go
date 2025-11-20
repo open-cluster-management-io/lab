@@ -40,6 +40,12 @@ const (
 	kubeconfigSecretKey        = "value"
 	hubAsSpokeName             = v1alpha1.ManagedClusterTypeHubAsSpoke
 	spokeName                  = v1alpha1.ManagedClusterTypeSpoke
+
+	// addon variable ConfigMap and data keys
+	addonVariablesConfigMapName = "addon-variables-test"
+	addonClusterNameKey         = "CLUSTER_NAME"
+	addonFooKey                 = "FOO"
+	addonNewKey                 = "NEW_KEY"
 )
 
 var (
@@ -72,7 +78,7 @@ var (
 		},
 		{
 			name:      "test-addon",
-			namespace: "test-addon-2",
+			namespace: "test-addon",
 			version:   "v2.0.0",
 		},
 	}
@@ -413,6 +419,54 @@ func ensureAddonCreated(tc *E2EContext, addonIdx int) {
 	}, 2*time.Minute, 1*time.Second).Should(Succeed())
 }
 
+func ensureAddonVariablesResolved(tc *E2EContext, addonIdx int, expectedClusterName, expectedFooValue string) {
+	By("verifying that addon variables are correctly resolved in deployed resources")
+	EventuallyWithOffset(1, func() error {
+		addon := addonData[addonIdx]
+		// Check ConfigMap data
+		cm := corev1.ConfigMap{}
+		if err := tc.kClientSpoke.Get(tc.ctx, ktypes.NamespacedName{Name: addonVariablesConfigMapName, Namespace: addon.namespace}, &cm); err != nil {
+			utils.WarnError(err, "failed to get ConfigMap %s in namespace %s", addonVariablesConfigMapName, addon.namespace)
+			return err
+		}
+
+		if clusterNameData, ok := cm.Data[addonClusterNameKey]; !ok {
+			err := fmt.Errorf("%s data key not found in ConfigMap", addonClusterNameKey)
+			utils.WarnError(err, "ConfigMap missing expected data key")
+			return err
+		} else if clusterNameData != expectedClusterName {
+			err := fmt.Errorf("wrong %s data value. want %s, got %s", addonClusterNameKey, expectedClusterName, clusterNameData)
+			utils.WarnError(err, fmt.Sprintf("%s data mismatch", addonClusterNameKey))
+			return err
+		}
+
+		if fooData, ok := cm.Data[addonFooKey]; !ok {
+			err := fmt.Errorf("%s data key not found in ConfigMap", addonFooKey)
+			utils.WarnError(err, "ConfigMap missing expected data key")
+			return err
+		} else if fooData != expectedFooValue {
+			err := fmt.Errorf("wrong %s data value. want %s, got %s", addonFooKey, expectedFooValue, fooData)
+			utils.WarnError(err, fmt.Sprintf("%s data mismatch", addonFooKey))
+			return err
+		}
+
+		if addonIdx == 1 {
+			if newKeyData, ok := cm.Data[addonNewKey]; !ok {
+				err := fmt.Errorf("%s data key not found in ConfigMap", addonNewKey)
+				utils.WarnError(err, "ConfigMap missing expected data key")
+				return err
+			} else if newKeyData != "new-value" {
+				err := fmt.Errorf("wrong %s data value. want %s, got %s", addonNewKey, "new-value", newKeyData)
+				utils.WarnError(err, fmt.Sprintf("%s data mismatch", addonNewKey))
+				return err
+			}
+		}
+
+		utils.Info(fmt.Sprintf("verified addon variables resolved correctly: %s=%s, %s=%s", addonClusterNameKey, expectedClusterName, addonFooKey, expectedFooValue))
+		return nil
+	}, 2*time.Minute, 1*time.Second).Should(Succeed())
+}
+
 func updateFleetConfigAddon(tc *E2EContext, fc *v1alpha1.FleetConfig) {
 	By("creating a configmap containing the source manifests")
 	EventuallyWithOffset(1, func() error { return createAddOnConfigMap(tc) }, 1*time.Minute, 1*time.Second).Should(Succeed())
@@ -439,7 +493,7 @@ func updateHubAddon(tc *E2EContext, hub *v1beta1.Hub) {
 	By("adding a new version of test-addon")
 	addon := addonData[1]
 	if err := tc.kClient.Get(tc.ctx, v1beta1hubNN, hub); err != nil {
-		utils.WarnError(err, "failed to get FleetConfig")
+		utils.WarnError(err, "failed to get Hub")
 		ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	}
 	hub.Spec.AddOnConfigs = append(hub.Spec.AddOnConfigs, v1beta1.AddOnConfig{

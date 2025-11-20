@@ -29,6 +29,7 @@ import (
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ktypes "k8s.io/apimachinery/pkg/types"
+	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -101,6 +102,11 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 
 		It("should verify addons configured on the hub and enabled on the spoke", func() {
 			ensureAddonCreated(tc, 0)
+		})
+
+		It("should verify initial addon variables are correctly resolved", func() {
+			By("verifying that the initial FOO and CLUSTER_NAME variables are resolved in deployed resources")
+			ensureAddonVariablesResolved(tc, 0, spokeName, "initial-foo-value")
 		})
 
 		It("should verify spoke cluster annotations", func() {
@@ -235,9 +241,50 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 			Expect(utils.UpdateHubFeatureGates(tc.ctx, tc.kClient, hub, patchFeatureGates)).ToNot(Succeed())
 		})
 
-		It("should update an addon and make sure its propagated to the spoke", func() {
+		It("should update addon variable values and verify resources are updated", func() {
+			By("updating the spoke addon config to change the FOO variable value")
+			EventuallyWithOffset(1, func() error {
+				err := tc.kClient.Get(tc.ctx, v1beta1spokeNN, spokeClone)
+				if err != nil {
+					utils.WarnError(err, "failed to get spoke")
+					return err
+				}
+
+				// Find the test-addon in the addons list and update the FOO variable value
+				for i, addon := range spokeClone.Spec.AddOns {
+					if addon.ConfigName == "test-addon" {
+						if spokeClone.Spec.AddOns[i].DeploymentConfig == nil {
+							spokeClone.Spec.AddOns[i].DeploymentConfig = &addonv1alpha1.AddOnDeploymentConfigSpec{}
+						}
+						// Update FOO variable value (keep CLUSTER_NAME the same)
+						spokeClone.Spec.AddOns[i].DeploymentConfig.CustomizedVariables = []addonv1alpha1.CustomizedVariable{
+							{
+								Name:  "FOO",
+								Value: "updated-foo-value",
+							},
+						}
+						break
+					}
+				}
+
+				err = tc.kClient.Update(tc.ctx, spokeClone)
+				if err != nil {
+					utils.WarnError(err, "failed to update spoke")
+					return err
+				}
+				return nil
+			}, 1*time.Minute, 5*time.Second).Should(Succeed())
+
+			By("verifying that the updated FOO variable is correctly resolved in deployed resources")
+			ensureAddonVariablesResolved(tc, 0, spokeName, "updated-foo-value")
+		})
+
+		It("should update addon template version and verify new resources are deployed", func() {
 			updateHubAddon(tc, hub)
 			ensureAddonCreated(tc, 1)
+
+			By("verifying that the new addon template (v2.0.0) has variables correctly resolved")
+			ensureAddonVariablesResolved(tc, 1, spokeName, "updated-foo-value")
 		})
 
 		It("should delete a Spoke", func() {

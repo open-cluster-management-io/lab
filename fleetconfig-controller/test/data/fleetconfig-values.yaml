@@ -10,6 +10,15 @@ fleetConfig:
         kind: Namespace
         metadata:
           name: test-addon
+        ---
+        apiVersion: v1
+        kind: ConfigMap
+        metadata:
+          name: addon-variables-test
+          namespace: test-addon
+        data:
+          CLUSTER_NAME: '{{CLUSTER_NAME}}'
+          FOO: '{{FOO}}'
       clusterRoleBinding: ""
       hubRegistration: false
       overwrite: false
@@ -38,6 +47,13 @@ fleetConfig:
       namespace: fleetconfig-system
     addOns:
     - configName: test-addon
+      deploymentConfig:
+        agentInstallNamespace: test-addon
+        customizedVariables:
+        - name: CLUSTER_NAME
+          value: spoke
+        - name: FOO
+          value: initial-foo-value
     - configName: fleetconfig-controller-agent
     createNamespace: true
     syncLabels: false

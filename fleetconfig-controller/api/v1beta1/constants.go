@@ -162,6 +162,13 @@ const (
 	LabelAddOnManagedBy = "addon.open-cluster-management.io/managedBy"
 )
 
+// FleetConfig addon annotations
+const (
+	// AnnotationAddOnDeploymentConfigHash is the annotation key for storing the hash of an addon's deployment configuration.
+	// Used to detect when the configuration changes and trigger a redeploy.
+	AnnotationAddOnDeploymentConfigHash = "fleetconfig.open-cluster-management.io/configHash"
+)
+
 // Registration driver types
 const (
 	// CSRRegistrationDriver is the default CSR-based registration driver.
