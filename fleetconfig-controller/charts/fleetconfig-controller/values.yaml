@@ -294,8 +294,9 @@ imageRegistry: ""
 ## @param image.pullPolicy Image pull policy
 image:
   repository: quay.io/open-cluster-management/fleetconfig-controller
-  tag: v0.1.8
+  tag: v0.1.9
   pullPolicy: IfNotPresent
+
 
 ## @param imagePullSecrets Image pull secrets
 imagePullSecrets: []
@@ -416,3 +417,6 @@ devspaceEnabled: false
 
 ## @param fullnameOverride Fullname override
 fullnameOverride: fleetconfig-controller
+
+## @param imageOverride Override the image and tag used for the fleetconfig-controller manager
+imageOverride: ""

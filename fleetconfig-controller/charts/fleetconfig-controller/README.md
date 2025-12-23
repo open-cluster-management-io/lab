@@ -158,7 +158,7 @@ Resource specifications for all klusterlet-managed containers.
 | `replicas`                                          | fleetconfig-controller replica count                                                                                                                                       | `1`                                                      |
 | `imageRegistry`                                     | Image registry                                                                                                                                                             | `""`                                                     |
 | `image.repository`                                  | Image repository                                                                                                                                                           | `quay.io/open-cluster-management/fleetconfig-controller` |
-| `image.tag`                                         | Image tag                                                                                                                                                                  | `v0.1.8`                                                 |
+| `image.tag`                                         | Image tag                                                                                                                                                                  | `v0.1.9`                                                 |
 | `image.pullPolicy`                                  | Image pull policy                                                                                                                                                          | `IfNotPresent`                                           |
 | `imagePullSecrets`                                  | Image pull secrets                                                                                                                                                         | `[]`                                                     |
 | `serviceAccount.annotations`                        | Annotations to add to the service account                                                                                                                                  | `{}`                                                     |
@@ -202,7 +202,8 @@ Resource specifications for all klusterlet-managed containers.
 
 ### dev parameters
 
-| Name               | Description       | Value                    |
-| ------------------ | ----------------- | ------------------------ |
-| `devspaceEnabled`  | devspace enabled  | `false`                  |
-| `fullnameOverride` | Fullname override | `fleetconfig-controller` |
+| Name               | Description                                                            | Value                    |
+| ------------------ | ---------------------------------------------------------------------- | ------------------------ |
+| `devspaceEnabled`  | devspace enabled                                                       | `false`                  |
+| `fullnameOverride` | Fullname override                                                      | `fleetconfig-controller` |
+| `imageOverride`    | Override the image and tag used for the fleetconfig-controller manager | `""`                     |

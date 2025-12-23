@@ -109,8 +109,12 @@ For managed kubernetes providers, the image tag is suffixed with the provider na
 These images are bundled with provider-specific auth binaries.
 For generic kubernetes providers, the image tag is used as is.
 This image has no additional binaries bundled, other than clusteradm.
+imageOverride overrides the base image, tag and provider suffix.
 */}}
 {{- define "controller.image" -}}
+{{- if .Values.imageOverride -}}
+{{- .Values.imageOverride -}}
+{{- else -}}
 {{- $baseImage := include "controller.baseImage" . -}}
 {{- $provider := include "kubernetesProvider" . -}}
 {{- if eq $provider "eks" -}}
@@ -119,6 +123,7 @@ This image has no additional binaries bundled, other than clusteradm.
 {{- printf "%s-%s" $baseImage "gke" -}}
 {{- else -}}
 {{- $baseImage -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 
