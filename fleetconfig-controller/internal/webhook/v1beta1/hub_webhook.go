@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"open-cluster-management.io/api/client/addon/clientset/versioned"
 	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -61,7 +60,7 @@ func SetupHubWebhookWithManager(mgr ctrl.Manager) error {
 // as this struct is used only for temporary operations and does not need to be deeply copied.
 type HubCustomValidator struct {
 	client client.Client
-	addonC *versioned.Clientset
+	addonC *addonapi.Clientset
 }
 
 var _ webhook.CustomValidator = &HubCustomValidator{}
