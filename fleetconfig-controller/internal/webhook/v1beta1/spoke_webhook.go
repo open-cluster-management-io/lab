@@ -23,7 +23,7 @@ import (
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"open-cluster-management.io/api/client/addon/clientset/versioned"
+	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,8 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
-	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
-	"github.com/open-cluster-management-io/lab/fleetconfig-controller/pkg/common"
 )
 
 // nolint:unused
@@ -42,11 +40,7 @@ var spokelog = logf.Log.WithName("spoke-resource")
 
 // SetupSpokeWebhookWithManager registers the webhook for Spoke in the manager.
 func SetupSpokeWebhookWithManager(mgr ctrl.Manager, instanceType string) error {
-	kubeconfig, err := kube.RawFromInClusterRestConfig()
-	if err != nil {
-		return err
-	}
-	addonC, err := common.AddOnClient(kubeconfig)
+	addonC, err := addonapi.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		return err
 	}
@@ -66,7 +60,7 @@ func SetupSpokeWebhookWithManager(mgr ctrl.Manager, instanceType string) error {
 // as this struct is used only for temporary operations and does not need to be deeply copied.
 type SpokeCustomValidator struct {
 	client       client.Client
-	addonC       *versioned.Clientset
+	addonC       *addonapi.Clientset
 	instanceType string
 }
 
