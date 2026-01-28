@@ -172,6 +172,17 @@ jobs:
           kubectl config use-context kind-${{ steps.format-cluster-name.outputs.cluster_name }}
           kubectl create namespace ocm-labs
 
+      - name: Install cert-manager
+        if: steps.list-changed.outputs.changed == 'true' && inputs.repo == 'fleetconfig-controller'
+        run: |
+          helm repo add jetstack https://charts.jetstack.io
+          helm repo update jetstack
+          helm install cert-manager jetstack/cert-manager \
+            --namespace cert-manager \
+            --create-namespace \
+            --set crds.enabled=true \
+            --wait
+
       - name: Run chart-testing (install)
         if: steps.list-changed.outputs.changed == 'true'
         run: |
@@ -179,4 +190,4 @@ jobs:
             --namespace ocm-labs \
             --chart-dirs ${{ inputs.repo }}/charts \
             --helm-extra-set-args \
-              '--set=image.repository=${{ env.IMAGE }} --set=image.tag=${{ env.IMAGE_TAG }}'
+              '--set=image.repository=${{ env.IMAGE }} --set=image.tag=${{ env.IMAGE_TAG }} --set=cert-manager.enabled=false'
