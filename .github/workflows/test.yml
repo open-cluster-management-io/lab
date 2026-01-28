@@ -111,22 +111,27 @@ jobs:
         run: |
           set -e
 
-          dependency_count=$(yq eval '.dependencies | length' ${{ inputs.repo }}/charts/${{ inputs.repo }}/Chart.yaml)
+          chart_path="${{ inputs.repo }}/charts/${{ inputs.repo }}"
+          dependency_count=$(yq eval '.dependencies | length' "$chart_path/Chart.yaml")
           if [[ "$dependency_count" -lt 1 ]]; then
             echo "No dependencies found in Chart.yaml. Skipping helm repo operations."
             exit 0
           fi
 
-          yq eval '.dependencies[] | .name + " " + .repository' ${{ inputs.repo }}/charts/${{ inputs.repo }}/Chart.yaml | while read -r repo_name repo_url; do
+          repos_added=0
+          while read -r repo_name repo_url; do
             if [[ ! "$repo_url" =~ ^(oci://|file://) ]]; then
               helm repo add "$repo_name" "$repo_url"
+              repos_added=$((repos_added + 1))
             else
               echo "Skipping repository $repo_url for $repo_name"
             fi
-          done
+          done < <(yq eval '.dependencies[] | .name + " " + .repository' "$chart_path/Chart.yaml")
 
-          helm repo update
-          helm dependency update ${{ inputs.repo }}/charts/${{ inputs.repo }}
+          if [[ "$repos_added" -gt 0 ]]; then
+            helm repo update
+          fi
+          helm dependency update "$chart_path"
 
       - name: Run chart-testing (lint)
         if: steps.list-changed.outputs.changed == 'true'

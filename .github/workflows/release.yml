@@ -93,14 +93,18 @@ jobs:
           chart_path="../${{ matrix.repository }}/charts/${{ matrix.repository }}"
           dependency_count=$(yq eval '.dependencies | length' "$chart_path/Chart.yaml")
           if [[ "$dependency_count" -gt 0 ]]; then
-            yq eval '.dependencies[] | .name + " " + .repository' "$chart_path/Chart.yaml" | while read -r repo_name repo_url; do
+            repos_added=0
+            while read -r repo_name repo_url; do
               if [[ ! "$repo_url" =~ ^(oci://|file://) ]]; then
                 helm repo add "$repo_name" "$repo_url"
+                repos_added=$((repos_added + 1))
               else
                 echo "Skipping repository $repo_url for $repo_name"
               fi
-            done
-            helm repo update
+            done < <(yq eval '.dependencies[] | .name + " " + .repository' "$chart_path/Chart.yaml")
+            if [[ "$repos_added" -gt 0 ]]; then
+              helm repo update
+            fi
             helm dependency build "$chart_path"
           fi
           helm package ../${{ matrix.repository }}/charts/${{ matrix.repository }} \
