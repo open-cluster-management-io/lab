@@ -16,6 +16,24 @@ For the deprecated `v1alpha1` `FleetConfig` API, addon mode is not supported.
 
 The controller is installed via Helm.
 
+### Prerequisites
+
+[cert-manager](https://cert-manager.io/) must be installed before deploying the fleetconfig-controller chart. cert-manager is used to provision TLS certificates for the admission webhooks.
+
+```bash
+# Add the Jetstack Helm repository
+helm repo add jetstack https://charts.jetstack.io
+helm repo update jetstack
+
+# Install cert-manager with CRDs
+helm install cert-manager jetstack/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --set crds.enabled=true
+```
+
+### Install fleetconfig-controller
+
 ```bash
 helm repo add ocm https://open-cluster-management.io/helm-charts
 helm repo update ocm

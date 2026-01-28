@@ -366,15 +366,6 @@ livenessProbe:
 ## @param kubernetesClusterDomain kubernetes cluster domain
 kubernetesClusterDomain: cluster.local
 
-## @section cert-manager
-
-## @param cert-manager.enabled Whether to install cert-manager.
-cert-manager:
-  enabled: true
-
-  # Add any additional values to pass to the cert-manager Helm chart.
-  # See: https://artifacthub.io/packages/helm/cert-manager/cert-manager
-
 ## @section certificates
 
 ## @param certificates.clusterIssuer.spec.selfSigned Use a self-signed ClusterIssuer by default.

@@ -6,8 +6,3 @@ version: 1.0.0
 appVersion: latest
 maintainers:
   - name: TylerGillson
-dependencies:
-  - name: cert-manager
-    condition: cert-manager.enabled
-    version: v1.18.1
-    repository: https://charts.jetstack.io

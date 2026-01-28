@@ -15,10 +15,6 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# cert-manager
-curl -fsL "https://github.com/cert-manager/cert-manager/releases/download/$CERT_MANAGER_VERSION/cert-manager.crds.yaml" \
-  -o "$chart_dir/crds/cert-manager-$CERT_MANAGER_VERSION-crds.yaml"
-
 # ocm
 wget "https://github.com/open-cluster-management-io/api/archive/refs/tags/v$OCM_VERSION.tar.gz" -O "$tmp_dir/$ocm_tarball"
 tar -xzf "$tmp_dir/$ocm_tarball" -C "$tmp_dir"
