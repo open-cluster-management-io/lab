@@ -1,7 +1,6 @@
 package v1beta1
 
 import (
-	"regexp"
 	"time"
 )
 
@@ -16,8 +15,6 @@ const (
 	spokeRequeuePostJoin = 1 * time.Minute
 	spokeWatchInterval   = 30 * time.Second
 )
-
-var csrSuffixPattern = regexp.MustCompile(`-[a-zA-Z0-9]{5}$`)
 
 // addon
 const (

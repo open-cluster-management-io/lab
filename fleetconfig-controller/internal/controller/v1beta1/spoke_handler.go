@@ -569,17 +569,8 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 		return true, nil
 	}
 
-	csrList := &certificatesv1.CertificateSigningRequestList{}
-	if err := r.List(ctx, csrList, client.HasLabels{"open-cluster-management.io/cluster-name"}); err != nil {
+	if err := r.DeleteAllOf(ctx, &certificatesv1.CertificateSigningRequest{}, client.MatchingLabels{"open-cluster-management.io/cluster-name": spoke.Name}); err != nil {
 		return true, err
-	}
-	for _, c := range csrList.Items {
-		trimmedName := csrSuffixPattern.ReplaceAllString(c.Name, "")
-		if trimmedName == spoke.Name {
-			if err := r.Delete(ctx, &c); err != nil {
-				return true, err
-			}
-		}
 	}
 
 	err = r.waitForAgentAddonDeleted(ctx, spoke, spoke.DeepCopy(), addonC, workC)
@@ -648,9 +639,12 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 
 	// check that the number of manifestWorks is the same as the number of addons enabled for that spoke
 	if len(manifestWorks.Items) > 0 && !allOwnersAddOns(manifestWorks.Items) {
-		msg := fmt.Sprintf("Found manifestWorks for ManagedCluster %s; cannot unjoin spoke cluster while it has active ManifestWorks", managedCluster.Name)
+		msg := fmt.Sprintf("Waiting for non-addon ManifestWorks to be removed from ManagedCluster %s before cleanup can proceed", managedCluster.Name)
 		logger.Info(msg)
-		return true, errors.New(msg)
+		spoke.SetConditions(true, v1beta1.NewCondition(
+			msg, v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
+		))
+		return true, nil
 	}
 
 	// remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
@@ -696,10 +690,12 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 	if len(spoke.Status.EnabledAddons) > 0 {
 		// Wait for addon manifestWorks to be fully cleaned up before proceeding with unjoin
 		if err := waitForAddonManifestWorksCleanup(ctx, workC, spoke.Name, addonCleanupTimeout, shouldCleanAll); err != nil {
+			msg := fmt.Sprintf("Waiting for addon ManifestWorks cleanup for spoke %s: %v", spoke.Name, err)
+			logger.Info(msg)
 			spoke.SetConditions(true, v1beta1.NewCondition(
-				err.Error(), v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionFalse,
+				msg, v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionFalse,
 			))
-			return true, fmt.Errorf("addon manifestWorks cleanup failed: %w", err)
+			return true, nil
 		}
 		spoke.SetConditions(true, v1beta1.NewCondition(
 			v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionFalse,
