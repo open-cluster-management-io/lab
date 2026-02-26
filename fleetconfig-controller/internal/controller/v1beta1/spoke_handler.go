@@ -43,6 +43,14 @@ import (
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/pkg/common"
 )
 
+type preflightStatus string
+
+const (
+	preflightDone    preflightStatus = "done"
+	preflightWaiting preflightStatus = "waiting"
+	preflightSkipped preflightStatus = "skipped"
+)
+
 var (
 	// Taint to drain non-addon workloads (addons can tolerate this)
 	managedClusterWorkloadCleanupTaint = clusterv1.Taint{
@@ -550,12 +558,16 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 		return true, fmt.Errorf("failed to create addon client for cleanup: %w", err)
 	}
 
-	requeue, err := r.hubCleanupPreflight(ctx, spoke, addonC, workC, clusterC, pivotComplete)
+	status, err := r.hubCleanupPreflight(ctx, spoke, addonC, workC, clusterC, pivotComplete)
 	if err != nil {
-		return requeue, err
+		return true, err
 	}
-	if !requeue {
-		return requeue, nil
+	switch status {
+	case preflightSkipped:
+		return false, nil
+	case preflightWaiting:
+		return true, nil
+	case preflightDone:
 	}
 
 	// remove preflight cleanup finalizer - this lets the spoke's controller know to proceed with unjoin.
@@ -603,7 +615,7 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 	return false, nil
 }
 
-func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta1.Spoke, addonC *addonapi.Clientset, workC *workapi.Clientset, clusterC *clusterapi.Clientset, pivotComplete bool) (bool, error) {
+func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta1.Spoke, addonC *addonapi.Clientset, workC *workapi.Clientset, clusterC *clusterapi.Clientset, pivotComplete bool) (preflightStatus, error) {
 	logger := log.FromContext(ctx)
 	// skip clean up if the ManagedCluster resource is not found or if any manifestWorks exist
 	managedCluster, err := clusterC.ClusterV1().ManagedClusters().Get(ctx, spoke.Name, metav1.GetOptions{})
@@ -613,9 +625,9 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 		spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
 			return s == v1beta1.HubCleanupPreflightFinalizer || s == v1beta1.HubCleanupFinalizer
 		})
-		return false, nil
+		return preflightSkipped, nil
 	} else if err != nil {
-		return true, fmt.Errorf("unexpected error listing managedClusters: %w", err)
+		return "", fmt.Errorf("unexpected error listing managedClusters: %w", err)
 	}
 
 	if spoke.Spec.CleanupConfig.ForceClusterDrain {
@@ -626,7 +638,7 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 		}) {
 			managedCluster.Spec.Taints = append(managedCluster.Spec.Taints, managedClusterWorkloadCleanupTaint)
 			if err := common.UpdateManagedCluster(ctx, clusterC, managedCluster); err != nil {
-				return true, fmt.Errorf("failed to add workload-cleanup taint to ManagedCluster: %w", err)
+				return "", fmt.Errorf("failed to add workload-cleanup taint to ManagedCluster: %w", err)
 			}
 			logger.V(1).Info("added workload-cleanup taint to ManagedCluster", "spokeName", spoke.Name, "taint", managedClusterWorkloadCleanupTaint.Key)
 		}
@@ -634,7 +646,7 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 
 	manifestWorks, err := workC.WorkV1().ManifestWorks(managedCluster.Name).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return true, fmt.Errorf("failed to list manifestWorks for managedCluster %s: %w", managedCluster.Name, err)
+		return "", fmt.Errorf("failed to list manifestWorks for managedCluster %s: %w", managedCluster.Name, err)
 	}
 
 	// check that the number of manifestWorks is the same as the number of addons enabled for that spoke
@@ -644,7 +656,7 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 		spoke.SetConditions(true, v1beta1.NewCondition(
 			msg, v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
 		))
-		return true, nil
+		return preflightWaiting, nil
 	}
 
 	// remove addons only after confirming that the cluster can be unjoined - this avoids leaving dangling resources that may rely on the addon
@@ -663,7 +675,7 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 		spoke.SetConditions(true, v1beta1.NewCondition(
 			err.Error(), v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionFalse,
 		))
-		return true, err
+		return "", err
 	}
 	// Success - addons disabled/cleaned up
 	spoke.SetConditions(true, v1beta1.NewCondition(
@@ -675,14 +687,14 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 	// We need to re-fetch the ManagedCluster to get the latest version after the first taint.
 	managedCluster, err = clusterC.ClusterV1().ManagedClusters().Get(ctx, spoke.Name, metav1.GetOptions{})
 	if err != nil && !kerrs.IsNotFound(err) {
-		return true, fmt.Errorf("failed to get ManagedCluster for terminating taint: %w", err)
+		return "", fmt.Errorf("failed to get ManagedCluster for terminating taint: %w", err)
 	}
 	if managedCluster != nil && !slices.ContainsFunc(managedCluster.Spec.Taints, func(t clusterv1.Taint) bool {
 		return t.Key == managedClusterTerminatingTaint.Key && t.Effect == managedClusterTerminatingTaint.Effect
 	}) {
 		managedCluster.Spec.Taints = append(managedCluster.Spec.Taints, managedClusterTerminatingTaint)
 		if err := common.UpdateManagedCluster(ctx, clusterC, managedCluster); err != nil {
-			return true, fmt.Errorf("failed to add terminating taint to ManagedCluster: %w", err)
+			return "", fmt.Errorf("failed to add terminating taint to ManagedCluster: %w", err)
 		}
 		logger.V(1).Info("added terminating taint to ManagedCluster", "spokeName", spoke.Name, "taint", managedClusterTerminatingTaint.Key)
 	}
@@ -695,14 +707,14 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 			spoke.SetConditions(true, v1beta1.NewCondition(
 				msg, v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionFalse,
 			))
-			return true, nil
+			return preflightWaiting, nil
 		}
 		spoke.SetConditions(true, v1beta1.NewCondition(
 			v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionFalse, metav1.ConditionFalse,
 		))
 	}
 
-	return true, nil
+	return preflightDone, nil
 }
 
 func (r *SpokeReconciler) waitForAgentAddonDeleted(ctx context.Context, spoke *v1beta1.Spoke, spokeCopy *v1beta1.Spoke, addonC *addonapi.Clientset, workC *workapi.Clientset) error {
