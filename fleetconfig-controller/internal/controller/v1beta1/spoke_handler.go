@@ -568,6 +568,8 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 	case preflightWaiting:
 		return true, nil
 	case preflightDone:
+	default:
+		return true, fmt.Errorf("unexpected preflight status: %q", status)
 	}
 
 	// remove preflight cleanup finalizer - this lets the spoke's controller know to proceed with unjoin.
