@@ -1,4 +1,6 @@
-// Package common contains reusable helped functions
+// Package common contains reusable helper functions for hub/spoke clients.
+//
+//nolint:revive // name matches import path pkg/common; "common" is established in this module
 package common
 
 import (

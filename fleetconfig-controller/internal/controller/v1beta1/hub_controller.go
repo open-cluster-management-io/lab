@@ -258,12 +258,14 @@ func (r *HubReconciler) cleanHub(ctx context.Context, hub *v1beta1.Hub, hubKubec
 	if hub.Spec.ClusterManager != nil {
 		purgeOperator = hub.Spec.ClusterManager.PurgeOperator
 	}
-	cleanArgs := []string{
+	baseArgs := hub.BaseArgs()
+	cleanArgs := make([]string, 0, 2+len(baseArgs))
+	cleanArgs = append(cleanArgs,
 		"clean",
 		// name is omitted, as the default name, 'cluster-manager', is always used
 		fmt.Sprintf("--purge-operator=%t", purgeOperator),
-	}
-	cleanArgs = append(cleanArgs, hub.BaseArgs()...)
+	)
+	cleanArgs = append(cleanArgs, baseArgs...)
 
 	logger.V(7).Info("running", "command", clusteradm, "args", arg_utils.SanitizeArgs(cleanArgs))
 	cmd := exec.Command(clusteradm, cleanArgs...)

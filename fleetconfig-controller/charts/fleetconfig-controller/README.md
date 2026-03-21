@@ -71,11 +71,11 @@ If provided, deploy a singleton control plane instead of Cluster Manager.
 To enable singleton mode, `fleetConfig.hub.clusterManager` must be commented out and `fleetConfig.hub.singletonControlPlane` must be uncommented and configured with the following options:
 - **name**: The name of the singleton control plane (default: "singleton-controlplane")
 - **helm**: Helm configuration for the multicluster-controlplane Helm chart
-  - **values**: Raw, YAML-formatted Helm values
-  - **set**: List of comma-separated Helm values (e.g., key1=val1,key2=val2)
-  - **setJson**: List of comma-separated Helm JSON values
-  - **setLiteral**: List of comma-separated Helm literal STRING values
-  - **setString**: List of comma-separated Helm STRING values
+- **values**: Raw, YAML-formatted Helm values
+- **set**: List of comma-separated Helm values (e.g., key1=val1,key2=val2)
+- **setJson**: List of comma-separated Helm JSON values
+- **setLiteral**: List of comma-separated Helm literal STRING values
+- **setString**: List of comma-separated Helm STRING values
 
 Refer to the [Multicluster Controlplane configuration](https://github.com/open-cluster-management-io/multicluster-controlplane/blob/main/charts/multicluster-controlplane/values.yaml) for more details.
 Helm configuration for the multicluster-controlplane Helm chart.
@@ -173,7 +173,7 @@ Resource specifications for all klusterlet-managed containers.
 | `replicas`                                          | fleetconfig-controller replica count                                                                                                                                       | `1`                                                      |
 | `imageRegistry`                                     | Image registry                                                                                                                                                             | `""`                                                     |
 | `image.repository`                                  | Image repository                                                                                                                                                           | `quay.io/open-cluster-management/fleetconfig-controller` |
-| `image.tag`                                         | Image tag                                                                                                                                                                  | `v0.2.2`                                                 |
+| `image.tag`                                         | Image tag                                                                                                                                                                  | `v0.2.3`                                                 |
 | `image.pullPolicy`                                  | Image pull policy                                                                                                                                                          | `IfNotPresent`                                           |
 | `imagePullSecrets`                                  | Image pull secrets                                                                                                                                                         | `[]`                                                     |
 | `serviceAccount.annotations`                        | Annotations to add to the service account                                                                                                                                  | `{}`                                                     |
@@ -182,8 +182,7 @@ Resource specifications for all klusterlet-managed containers.
 | `containerSecurityContext.capabilities.drop`        | capabilities to drop                                                                                                                                                       | `["ALL"]`                                                |
 | `containerSecurityContext.runAsNonRoot`             | runAsNonRoot                                                                                                                                                               | `true`                                                   |
 | `env`                                               | Additional environment variables to pass to the fleetconfig-controller pod.                                                                                                | `[]`                                                     |
-| `resources.limits.cpu`                              | fleetconfig controller's cpu limit                                                                                                                                         | `500m`                                                   |
-| `resources.limits.memory`                           | fleetconfig controller's memory limit                                                                                                                                      | `512Mi`                                                  |
+| `resources.limits`                                  | limits for the fleetconfig-controller pod.                                                                                                                                 | `{}`                                                     |
 | `resources.requests.cpu`                            | fleetconfig controller's cpu request                                                                                                                                       | `200m`                                                   |
 | `resources.requests.memory`                         | fleetconfig controller's memory request                                                                                                                                    | `256Mi`                                                  |
 | `healthCheck.port`                                  | port the liveness & readiness probes are bound to                                                                                                                          | `9440`                                                   |

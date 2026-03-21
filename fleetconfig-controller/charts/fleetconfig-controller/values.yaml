@@ -294,7 +294,7 @@ imageRegistry: ""
 ## @param image.pullPolicy Image pull policy
 image:
   repository: quay.io/open-cluster-management/fleetconfig-controller
-  tag: v0.2.2
+  tag: v0.2.3
   pullPolicy: IfNotPresent
 
 
@@ -325,14 +325,11 @@ containerSecurityContext:
 ## @param env Additional environment variables to pass to the fleetconfig-controller pod.
 env: []
 
-## @param resources.limits.cpu fleetconfig controller's cpu limit
-## @param resources.limits.memory fleetconfig controller's memory limit
+## @param resources.limits limits for the fleetconfig-controller pod.
 ## @param resources.requests.cpu fleetconfig controller's cpu request
 ## @param resources.requests.memory fleetconfig controller's memory request
 resources:
-  limits:
-    cpu: 500m
-    memory: 512Mi
+  limits: {}
   requests:
     cpu: 200m
     memory: 256Mi

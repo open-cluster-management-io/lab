@@ -18,12 +18,6 @@ const (
 
 // addon
 const (
-	// commands
-	addon   = "addon"
-	create  = "create"
-	enable  = "enable"
-	disable = "disable"
-
 	install   = "install"
 	uninstall = "uninstall"
 	hubAddon  = "hub-addon"

@@ -1,9 +1,12 @@
 package v1beta1
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"maps"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -16,8 +19,9 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"sigs.k8s.io/yaml"
+	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"k8s.io/apimachinery/pkg/types"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -26,29 +30,12 @@ import (
 	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	sigyaml "sigs.k8s.io/yaml"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 	arg_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/args"
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
-	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
-	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/hash"
 )
-
-// getManagedClusterAddOns returns the list of ManagedClusterAddOns currently installed on a spoke cluster
-func getManagedClusterAddOns(ctx context.Context, addonC *addonapi.Clientset, spokeName string) ([]string, error) {
-	managedClusterAddOns, err := addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).List(ctx, metav1.ListOptions{
-		LabelSelector: v1beta1.ManagedBySelector.String(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list ManagedClusterAddOns for spoke %s: %w", spokeName, err)
-	}
-
-	addons := make([]string, len(managedClusterAddOns.Items))
-	for i, addon := range managedClusterAddOns.Items {
-		addons[i] = addon.Name
-	}
-	return addons, nil
-}
 
 // getHubAddOns returns the list of hub addons (ClusterManagementAddOns without managed-by label)
 func getHubAddOns(ctx context.Context, addonC *addonapi.Clientset) ([]string, error) {
@@ -119,7 +106,7 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 		return true, err
 	}
 
-	err = handleAddonCreate(ctx, kClient, hub, addonsToCreate)
+	err = handleAddonCreate(ctx, kClient, addonC, hub, addonsToCreate)
 	if err != nil {
 		return true, err
 	}
@@ -127,7 +114,7 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 	return true, nil
 }
 
-func handleAddonCreate(ctx context.Context, kClient client.Client, hub *v1beta1.Hub, addons []v1beta1.AddOnConfig) error {
+func handleAddonCreate(ctx context.Context, kClient client.Client, addonC *addonapi.Clientset, hub *v1beta1.Hub, addons []v1beta1.AddOnConfig) error {
 	if len(addons) == 0 {
 		return nil
 	}
@@ -135,72 +122,197 @@ func handleAddonCreate(ctx context.Context, kClient client.Client, hub *v1beta1.
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("createAddOns")
 
-	// set up array of clusteradm addon create commands
 	for _, a := range addons {
-		// look up manifests CM for the addon
+		templateName := fmt.Sprintf("%s-%s", a.Name, a.Version)
+
 		cm := corev1.ConfigMap{}
 		cmName := fmt.Sprintf("%s-%s-%s", v1beta1.AddonConfigMapNamePrefix, a.Name, a.Version)
-		err := kClient.Get(ctx, types.NamespacedName{Name: cmName, Namespace: hub.Namespace}, &cm)
-		if err != nil {
+		if err := kClient.Get(ctx, types.NamespacedName{Name: cmName, Namespace: hub.Namespace}, &cm); err != nil {
 			return errors.Wrapf(err, "could not load configuration for add-on %s version %s", a.Name, a.Version)
 		}
 
-		args := append([]string{
-			addon,
-			create,
-			a.Name,
-			fmt.Sprintf("--version=%s", a.Version),
-			fmt.Sprintf("--labels=%v", v1beta1.ManagedBySelector.String()),
-		}, hub.BaseArgs()...)
-
-		// Extract manifest configuration from ConfigMap
-		// validation was already done by the webhook, so simply check if raw manifests are provided and if not, use the URL.
-		manifestsRaw, ok := cm.Data[v1beta1.AddonConfigMapManifestRawKey]
-		if ok {
-			// Write raw manifests to temporary file
-			filename, cleanup, err := file.TmpFile([]byte(manifestsRaw), "yaml")
-			if cleanup != nil {
-				defer cleanup()
-			}
-			if err != nil {
-				return err
-			}
-			args = append(args, fmt.Sprintf("--filename=%s", filename))
-		} else {
-			manifestsURL := cm.Data[v1beta1.AddonConfigMapManifestURLKey]
-			url, err := url.Parse(manifestsURL)
-			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("failed to create addon %s version %s", a.Name, a.Version))
-			}
-			switch url.Scheme {
-			case "http", "https":
-				// pass URL directly
-				args = append(args, fmt.Sprintf("--filename=%s", manifestsURL))
-			default:
-				return fmt.Errorf("unsupported URL scheme %s for addon %s version %s. Must be one of %v", url.Scheme, a.Name, a.Version, v1beta1.AllowedAddonURLSchemes)
-			}
-		}
-
-		if a.HubRegistration {
-			args = append(args, "--hub-registration")
-		}
-		if a.Overwrite {
-			args = append(args, "--overwrite")
-		}
-		if a.ClusterRoleBinding != "" {
-			args = append(args, fmt.Sprintf("--cluster-role-bind=%s", a.ClusterRoleBinding))
-		}
-
-		logger.V(7).Info("running", "command", clusteradm, "args", arg_utils.SanitizeArgs(args))
-		cmd := exec.Command(clusteradm, args...)
-		stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm addon create' to complete...")
+		manifests, err := loadManifests(ctx, cm, a.Name, a.Version)
 		if err != nil {
-			out := append(stdout, stderr...)
-			return fmt.Errorf("failed to create addon: %v, output: %s", err, string(out))
+			return err
 		}
-		logger.V(0).Info("created addon", "AddOnTemplate", a.Name, "output", string(stdout))
+
+		if err := applyCMA(ctx, addonC, a, templateName); err != nil {
+			return err
+		}
+		if err := applyTemplate(ctx, addonC, a, templateName, manifests); err != nil {
+			return err
+		}
+		logger.V(0).Info("created addon", "AddOnTemplate", templateName)
 	}
 	return nil
+}
+
+// applyCMA creates or updates the ClusterManagementAddOn for a custom addon template.
+func applyCMA(ctx context.Context, addonC *addonapi.Clientset, a v1beta1.AddOnConfig, templateName string) error {
+	cma := &addonv1alpha1.ClusterManagementAddOn{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   a.Name,
+			Labels: v1beta1.ManagedByLabels,
+			Annotations: map[string]string{
+				"addon.open-cluster-management.io/lifecycle": "addon-manager",
+			},
+		},
+		Spec: addonv1alpha1.ClusterManagementAddOnSpec{
+			SupportedConfigs: []addonv1alpha1.ConfigMeta{
+				{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
+						Group:    addonv1alpha1.GroupVersion.Group,
+						Resource: "addontemplates",
+					},
+					DefaultConfig: &addonv1alpha1.ConfigReferent{
+						Name: templateName,
+					},
+				},
+			},
+			InstallStrategy: addonv1alpha1.InstallStrategy{
+				Type: addonv1alpha1.AddonInstallStrategyManual,
+			},
+		},
+	}
+
+	existing, err := addonC.AddonV1alpha1().ClusterManagementAddOns().Get(ctx, a.Name, metav1.GetOptions{})
+	if kerrs.IsNotFound(err) {
+		_, err = addonC.AddonV1alpha1().ClusterManagementAddOns().Create(ctx, cma, metav1.CreateOptions{})
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	if !a.Overwrite {
+		return nil
+	}
+	cma.ResourceVersion = existing.ResourceVersion
+	_, err = addonC.AddonV1alpha1().ClusterManagementAddOns().Update(ctx, cma, metav1.UpdateOptions{})
+	return err
+}
+
+// applyTemplate creates or updates the AddOnTemplate for a custom addon.
+func applyTemplate(ctx context.Context, addonC *addonapi.Clientset, a v1beta1.AddOnConfig, templateName string, manifests []workv1.Manifest) error {
+	tmpl := &addonv1alpha1.AddOnTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   templateName,
+			Labels: v1beta1.ManagedByLabels,
+		},
+		Spec: addonv1alpha1.AddOnTemplateSpec{
+			AddonName: a.Name,
+			AgentSpec: workv1.ManifestWorkSpec{
+				Workload: workv1.ManifestsTemplate{
+					Manifests: manifests,
+				},
+			},
+			Registration: []addonv1alpha1.RegistrationSpec{},
+		},
+	}
+
+	if a.HubRegistration {
+		regSpec := addonv1alpha1.RegistrationSpec{
+			Type: addonv1alpha1.RegistrationTypeKubeClient,
+			KubeClient: &addonv1alpha1.KubeClientRegistrationConfig{
+				HubPermissions: []addonv1alpha1.HubPermissionConfig{},
+			},
+		}
+		if a.ClusterRoleBinding != "" {
+			regSpec.KubeClient.HubPermissions = append(regSpec.KubeClient.HubPermissions,
+				addonv1alpha1.HubPermissionConfig{
+					Type: addonv1alpha1.HubPermissionsBindingCurrentCluster,
+					CurrentCluster: &addonv1alpha1.CurrentClusterBindingConfig{
+						ClusterRoleName: a.ClusterRoleBinding,
+					},
+				})
+		}
+		tmpl.Spec.Registration = []addonv1alpha1.RegistrationSpec{regSpec}
+	}
+
+	existing, err := addonC.AddonV1alpha1().AddOnTemplates().Get(ctx, templateName, metav1.GetOptions{})
+	if kerrs.IsNotFound(err) {
+		_, err = addonC.AddonV1alpha1().AddOnTemplates().Create(ctx, tmpl, metav1.CreateOptions{})
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	if !a.Overwrite {
+		return nil
+	}
+	tmpl.ResourceVersion = existing.ResourceVersion
+	_, err = addonC.AddonV1alpha1().AddOnTemplates().Update(ctx, tmpl, metav1.UpdateOptions{})
+	return err
+}
+
+const maxManifestBytes = 10 << 20 // 10 MiB safety cap for URL-fetched manifests
+
+// loadManifests reads addon manifests from a ConfigMap (raw YAML or URL) and
+// returns them as workv1.Manifest objects matching clusteradm's --filename behavior.
+func loadManifests(ctx context.Context, cm corev1.ConfigMap, addonName, version string) ([]workv1.Manifest, error) {
+	if raw, ok := cm.Data[v1beta1.AddonConfigMapManifestRawKey]; ok {
+		return parseMultiDocYAML([]byte(raw))
+	}
+
+	manifestsURL := cm.Data[v1beta1.AddonConfigMapManifestURLKey]
+	u, err := url.Parse(manifestsURL)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("failed to create addon %s version %s", addonName, version))
+	}
+	switch u.Scheme {
+	case "http", "https":
+	default:
+		return nil, fmt.Errorf("unsupported URL scheme %s for addon %s version %s. Must be one of %v",
+			u.Scheme, addonName, version, v1beta1.AllowedAddonURLSchemes)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, manifestsURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build request for addon manifests: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch addon manifests from %s: %w", manifestsURL, err)
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.FromContext(ctx).V(1).Info("close addon manifest response body", "url", manifestsURL, "error", closeErr)
+		}
+	}()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d fetching addon manifests from %s", resp.StatusCode, manifestsURL)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxManifestBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read addon manifests from %s: %w", manifestsURL, err)
+	}
+	return parseMultiDocYAML(body)
+}
+
+// parseMultiDocYAML splits a multi-document YAML byte slice into workv1.Manifest objects.
+func parseMultiDocYAML(data []byte) ([]workv1.Manifest, error) {
+	var manifests []workv1.Manifest
+	reader := yaml.NewYAMLReader(bufio.NewReader(strings.NewReader(string(data))))
+	for {
+		doc, err := reader.Read()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, fmt.Errorf("failed to read YAML document: %w", err)
+		}
+		doc = []byte(strings.TrimSpace(string(doc)))
+		if len(doc) == 0 {
+			continue
+		}
+		jsonDoc, err := sigyaml.YAMLToJSON(doc)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert YAML document to JSON: %w", err)
+		}
+		manifests = append(manifests, workv1.Manifest{
+			RawExtension: runtime.RawExtension{Raw: jsonDoc},
+		})
+	}
+	return manifests, nil
 }
 
 func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, addons []string) error {
@@ -280,92 +392,42 @@ func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke *v
 	logger := log.FromContext(ctx)
 	addons := spoke.Spec.AddOns
 
-	// Get actual enabled addons from cluster
-	enabledAddons, err := getManagedClusterAddOns(ctx, addonC, spoke.Name)
-	if err != nil {
-		logger.V(1).Info("failed to get ManagedClusterAddOns, assuming none enabled", "error", err, "spokeName", spoke.Name)
-		enabledAddons = []string{}
-	}
-
-	// Build a map of MCA objects to read their current config hash annotations
 	mcas, err := addonC.AddonV1alpha1().ManagedClusterAddOns(spoke.Name).List(ctx, metav1.ListOptions{
 		LabelSelector: v1beta1.ManagedBySelector.String(),
 	})
 	if err != nil {
-		logger.V(1).Info("failed to list ManagedClusterAddOns", "error", err, "spokeName", spoke.Name)
+		logger.V(1).Info("failed to list ManagedClusterAddOns, assuming none enabled", "error", err, "spokeName", spoke.Name)
 		mcas = &addonv1alpha1.ManagedClusterAddOnList{}
 	}
 
-	mcaMap := make(map[string]addonv1alpha1.ManagedClusterAddOn)
+	currentAddons := make(map[string]struct{}, len(mcas.Items))
 	for _, mca := range mcas.Items {
-		mcaMap[mca.Name] = mca
+		currentAddons[mca.Name] = struct{}{}
 	}
 
-	if len(addons) == 0 && len(enabledAddons) == 0 {
-		// nothing to do
-		return enabledAddons, nil
+	if len(addons) == 0 && len(currentAddons) == 0 {
+		return nil, nil
 	}
 
-	// Build a map of requested addons
-	requestedAddonMap := make(map[string]v1beta1.AddOn)
+	// Determine which addons to remove (present on cluster but no longer requested)
+	requestedSet := make(map[string]struct{}, len(addons))
 	for _, addon := range addons {
-		requestedAddonMap[addon.ConfigName] = addon
+		requestedSet[addon.ConfigName] = struct{}{}
 	}
-
-	// Find addons that need to be enabled or re-enabled due to config changes
-	addonsToEnable := make([]v1beta1.AddOn, 0)
-	addonsToDisable := make([]string, 0)
-
-	for _, addon := range addons {
-		// Calculate hash of the deployment config
-		configHash, err := hash.ComputeHash(addon)
-		if err != nil {
-			logger.V(1).Info("failed to compute config hash, will re-enable addon", "addon", addon.ConfigName, "error", err)
-			configHash = ""
-		}
-
-		// Check if addon needs to be enabled/re-enabled
-		isCurrentlyEnabled := slices.Contains(enabledAddons, addon.ConfigName)
-		var previousHash string
-		if mca, exists := mcaMap[addon.ConfigName]; exists {
-			previousHash = mca.Annotations[v1beta1.AnnotationAddOnDeploymentConfigHash]
-		}
-
-		// Enable if: not currently enabled OR config hash has changed
-		if !isCurrentlyEnabled {
-			addonsToEnable = append(addonsToEnable, addon)
-		} else if isCurrentlyEnabled && previousHash != configHash {
-			// Config hash changed - need to disable first, then re-enable. clusteradm does not support in-place update
-			logger.V(1).Info("addon config changed, will disable then re-enable", "addon", addon.ConfigName,
-				"oldHash", previousHash, "newHash", configHash)
-			addonsToDisable = append(addonsToDisable, addon.ConfigName)
-			addonsToEnable = append(addonsToEnable, addon)
+	var addonsToDisable []string
+	for name := range currentAddons {
+		if _, requested := requestedSet[name]; !requested {
+			addonsToDisable = append(addonsToDisable, name)
 		}
 	}
 
-	for _, enabledAddonName := range enabledAddons {
-		if _, requested := requestedAddonMap[enabledAddonName]; !requested {
-			addonsToDisable = append(addonsToDisable, enabledAddonName)
-		}
+	if err := handleAddonDisable(ctx, addonC, spoke.Name, addonsToDisable); err != nil {
+		return nil, err
 	}
 
-	// do disables first, then enables/updates
-	err = handleAddonDisable(ctx, spoke, addonsToDisable)
-	if err != nil {
-		return enabledAddons, err
-	}
-
-	// Remove disabled addons from enabled list
-	for _, disabledAddon := range addonsToDisable {
-		enabledAddons = slices.DeleteFunc(enabledAddons, func(ea string) bool {
-			return ea == disabledAddon
-		})
-	}
-
-	// Enable new addons and updated addons
-	newEnabledAddons, err := handleAddonEnable(ctx, spoke, addonsToEnable)
-	// even if an error is returned, any addon which was successfully enabled is tracked, so append before returning
-	enabledAddons = append(enabledAddons, newEnabledAddons...)
+	// Enable/update all requested addons — applyMCA and applyAddOnDeploymentConfig
+	// are idempotent and converge the spec directly, no hash comparison needed.
+	enabledAddons, err := handleAddonEnable(ctx, addonC, spoke.Name, addons)
 	if err != nil {
 		return enabledAddons, err
 	}
@@ -373,81 +435,59 @@ func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke *v
 	return enabledAddons, nil
 }
 
-func handleAddonEnable(ctx context.Context, spoke *v1beta1.Spoke, addons []v1beta1.AddOn) ([]string, error) {
+func handleAddonEnable(ctx context.Context, addonC *addonapi.Clientset, spokeName string, addons []v1beta1.AddOn) ([]string, error) {
 	if len(addons) == 0 {
 		return nil, nil
 	}
 
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("enableAddOns", "managedcluster", spoke.Name)
-
-	baseArgs := append([]string{
-		addon,
-		enable,
-		fmt.Sprintf("--cluster=%s", spoke.Name),
-		fmt.Sprintf("--labels=%v", v1beta1.ManagedBySelector.String()),
-	}, spoke.BaseArgs()...)
+	logger.V(0).Info("enableAddOns", "managedcluster", spokeName)
 
 	var enableErrs []error
-	enabledAddons := make([]string, 0)
+	enabledAddons := make([]string, 0, len(addons))
 	for _, a := range addons {
-		args := []string{
-			fmt.Sprintf("--names=%s", a.ConfigName),
-		}
+		annotations := make(map[string]string)
+		maps.Copy(annotations, a.Annotations)
 
-		// Calculate the deployment config hash
-		configHash, err := hash.ComputeHash(a)
-		if err != nil {
-			logger.V(1).Info("failed to compute config hash for addon", "addon", a.ConfigName, "error", err)
-			configHash = ""
-		}
-
-		// Build annotations map, including the deployment config hash
-		annotMap := make(map[string]string)
-		maps.Copy(annotMap, a.Annotations)
-
-		// Add the deployment config hash annotation
-		if configHash != "" {
-			annotMap[v1beta1.AnnotationAddOnDeploymentConfigHash] = configHash
-		}
-
-		// Convert annotations map to comma-separated string
-		if len(annotMap) > 0 {
-			annots := make([]string, 0, len(annotMap))
-			for k, v := range annotMap {
-				annots = append(annots, fmt.Sprintf("%s=%s", k, v))
-			}
-			annot := strings.Join(annots, ",")
-			args = append(args, fmt.Sprintf("--annotate=%s", annot))
-		}
-
-		// If DeploymentConfig is provided, generate the config file
+		var mcaConfigs []addonv1alpha1.AddOnConfig
 		if a.DeploymentConfig != nil {
-			configFilePath, cleanup, err := createAddonDeploymentConfigFile(a.ConfigName, spoke.Name, a.DeploymentConfig)
-			if cleanup != nil {
-				defer cleanup()
-			}
-			if err != nil {
-				enableErrs = append(enableErrs, fmt.Errorf("failed to create addon deployment config for %s: %v", a.ConfigName, err))
+			if err := applyAddOnDeploymentConfig(ctx, addonC, a.ConfigName, spokeName, a.DeploymentConfig); err != nil {
+				enableErrs = append(enableErrs, fmt.Errorf("failed to apply addon deployment config for %s: %v", a.ConfigName, err))
 				continue
 			}
-
-			args = append(args, fmt.Sprintf("--config-file=%s", configFilePath))
+			mcaConfigs = []addonv1alpha1.AddOnConfig{
+				{
+					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{
+						Group:    addonv1alpha1.GroupVersion.Group,
+						Resource: AddOnDeploymentConfigResource,
+					},
+					ConfigReferent: addonv1alpha1.ConfigReferent{
+						Namespace: spokeName,
+						Name:      a.ConfigName,
+					},
+				},
+			}
 		}
 
-		args = append(baseArgs, args...)
-		logger.V(7).Info("running", "command", clusteradm, "args", arg_utils.SanitizeArgs(args))
-		cmd := exec.Command(clusteradm, args...)
-		stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm addon enable' to complete...")
+		mca := &addonv1alpha1.ManagedClusterAddOn{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        a.ConfigName,
+				Namespace:   spokeName,
+				Labels:      v1beta1.ManagedByLabels,
+				Annotations: annotations,
+			},
+			Spec: addonv1alpha1.ManagedClusterAddOnSpec{
+				Configs: mcaConfigs,
+			},
+		}
 
-		if err != nil {
-			out := append(stdout, stderr...)
-			enableErrs = append(enableErrs, fmt.Errorf("failed to enable addon: %v, output: %s", err, string(out)))
+		if err := applyMCA(ctx, addonC, mca); err != nil {
+			enableErrs = append(enableErrs, fmt.Errorf("failed to enable addon %s: %v", a.ConfigName, err))
 			continue
 		}
 
 		enabledAddons = append(enabledAddons, a.ConfigName)
-		logger.V(1).Info("enabled addon", "managedcluster", spoke.Name, "addon", a.ConfigName, "configHash", configHash, "output", string(stdout))
+		logger.V(1).Info("enabled addon", "managedcluster", spokeName, "addon", a.ConfigName)
 	}
 
 	if len(enableErrs) > 0 {
@@ -456,15 +496,43 @@ func handleAddonEnable(ctx context.Context, spoke *v1beta1.Spoke, addons []v1bet
 	return enabledAddons, nil
 }
 
-// createAddonDeploymentConfigFile creates a temporary file containing an AddOnDeploymentConfig resource
-// that can be passed to clusteradm addon enable via --config-file.
-func createAddonDeploymentConfigFile(addonName, namespace string, config *addonv1alpha1.AddOnDeploymentConfigSpec) (string, func(), error) {
-	// Build the AddOnDeploymentConfig resource
-	addonDeploymentConfig := &addonv1alpha1.AddOnDeploymentConfig{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "addon.open-cluster-management.io/v1alpha1",
-			Kind:       "AddOnDeploymentConfig",
-		},
+// applyMCA creates or updates a ManagedClusterAddOn, matching upstream ApplyAddon semantics.
+func applyMCA(ctx context.Context, addonC *addonapi.Clientset, mca *addonv1alpha1.ManagedClusterAddOn) error {
+	existing, err := addonC.AddonV1alpha1().ManagedClusterAddOns(mca.Namespace).Get(ctx, mca.Name, metav1.GetOptions{})
+	if kerrs.IsNotFound(err) {
+		_, err = addonC.AddonV1alpha1().ManagedClusterAddOns(mca.Namespace).Create(ctx, mca, metav1.CreateOptions{})
+		return err
+	}
+	if err != nil {
+		return err
+	}
+
+	// Overlay desired labels/annotations: keys from the Spoke win; keys only on the live object stay.
+	// Keys removed from the Spoke are not deleted here. maps.Copy requires a non-nil dst, so clone when nil.
+	// We do not set ManagedClusterAddOn.spec.installNamespace: OCM/addon-manager uses AddOnDeploymentConfig
+	// (namespaced in the managed cluster namespace) and related defaults for install placement.
+	if len(mca.Labels) > 0 {
+		if existing.Labels == nil {
+			existing.Labels = maps.Clone(mca.Labels)
+		} else {
+			maps.Copy(existing.Labels, mca.Labels)
+		}
+	}
+	if len(mca.Annotations) > 0 {
+		if existing.Annotations == nil {
+			existing.Annotations = maps.Clone(mca.Annotations)
+		} else {
+			maps.Copy(existing.Annotations, mca.Annotations)
+		}
+	}
+	existing.Spec.Configs = mca.Spec.Configs
+	_, err = addonC.AddonV1alpha1().ManagedClusterAddOns(mca.Namespace).Update(ctx, existing, metav1.UpdateOptions{})
+	return err
+}
+
+// applyAddOnDeploymentConfig creates or updates an AddOnDeploymentConfig resource.
+func applyAddOnDeploymentConfig(ctx context.Context, addonC *addonapi.Clientset, addonName, namespace string, config *addonv1alpha1.AddOnDeploymentConfigSpec) error {
+	adc := &addonv1alpha1.AddOnDeploymentConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      addonName,
 			Namespace: namespace,
@@ -472,56 +540,45 @@ func createAddonDeploymentConfigFile(addonName, namespace string, config *addonv
 		Spec: *config,
 	}
 
-	// Serialize to YAML
-	yamlBytes, err := yaml.Marshal(addonDeploymentConfig)
+	existing, err := addonC.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Get(ctx, addonName, metav1.GetOptions{})
+	if kerrs.IsNotFound(err) {
+		_, err = addonC.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Create(ctx, adc, metav1.CreateOptions{})
+		return err
+	}
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to marshal AddOnDeploymentConfig to YAML: %w", err)
+		return err
 	}
 
-	// Write to temporary file
-	tmpFile, cleanup, err := file.TmpFile(yamlBytes, "yaml")
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to create temporary config file: %w", err)
-	}
-
-	return tmpFile, cleanup, nil
+	existing.Spec = adc.Spec
+	_, err = addonC.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Update(ctx, existing, metav1.UpdateOptions{})
+	return err
 }
 
-func handleAddonDisable(ctx context.Context, spoke *v1beta1.Spoke, enabledAddons []string) error {
-	if len(enabledAddons) == 0 {
+func handleAddonDisable(ctx context.Context, addonC *addonapi.Clientset, spokeName string, addonNames []string) error {
+	if len(addonNames) == 0 {
 		return nil
 	}
 
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("disableAddOns", "managedcluster", spoke.Name)
+	logger.V(0).Info("disableAddOns", "managedcluster", spokeName)
 
-	args := append([]string{
-		addon,
-		disable,
-		fmt.Sprintf("--names=%s", strings.Join(enabledAddons, ",")),
-		fmt.Sprintf("--clusters=%s", spoke.Name),
-	}, spoke.BaseArgs()...)
-
-	logger.V(7).Info("running", "command", clusteradm, "args", arg_utils.SanitizeArgs(args))
-	cmd := exec.Command(clusteradm, args...)
-	stdout, stderr, err := exec_utils.CmdWithLogs(ctx, cmd, "waiting for 'clusteradm addon disable' to complete...")
-	if err != nil {
-		out := append(stdout, stderr...)
-		outStr := string(out)
-
-		// Check if the error is due to addon not being found or cluster not found - these are success cases
-		if strings.Contains(outStr, "add-on not found") {
-			logger.V(5).Info("addon already disabled (not found)", "managedcluster", spoke.Name, "addons", enabledAddons, "output", outStr)
-			return nil
+	var errs []error
+	for _, name := range addonNames {
+		err := addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).Delete(ctx, name, metav1.DeleteOptions{})
+		if kerrs.IsNotFound(err) {
+			logger.V(5).Info("addon already disabled (not found)", "managedcluster", spokeName, "addon", name)
+			continue
 		}
-		if strings.Contains(outStr, "managedclusters.cluster.open-cluster-management.io") && strings.Contains(outStr, "not found") {
-			logger.V(5).Info("addon disable skipped (cluster not found)", "managedcluster", spoke.Name, "addons", enabledAddons, "output", outStr)
-			return nil
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to disable addon %s: %w", name, err))
+			continue
 		}
-
-		return fmt.Errorf("failed to disable addons: %v, output: %s", err, outStr)
+		logger.V(1).Info("disabled addon", "managedcluster", spokeName, "addon", name)
 	}
-	logger.V(1).Info("disabled addons", "managedcluster", spoke.Name, "addons", enabledAddons, "output", string(stdout))
+
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to disable addons: %v", errs)
+	}
 	return nil
 }
 

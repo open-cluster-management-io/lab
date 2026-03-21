@@ -1,4 +1,6 @@
 // Package hash provides hashing utilities.
+//
+//nolint:revive // package name matches directory internal/hash; avoids churn vs stdlib "crypto/hash"
 package hash
 
 import (
