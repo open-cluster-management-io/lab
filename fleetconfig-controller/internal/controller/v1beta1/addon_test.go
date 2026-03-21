@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -49,7 +50,7 @@ func cleanupADCs(t *testing.T, ctx context.Context, c *addonapi.Clientset, ns st
 func ensureNamespace(t *testing.T, ctx context.Context, ns string) {
 	t.Helper()
 	err := k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
-	if err != nil {
+	if err != nil && !kerrs.IsAlreadyExists(err) {
 		t.Fatalf("failed to create namespace %s: %v", ns, err)
 	}
 }
