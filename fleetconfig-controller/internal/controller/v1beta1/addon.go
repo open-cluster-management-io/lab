@@ -149,6 +149,8 @@ func handleAddonCreate(ctx context.Context, kClient client.Client, addonC *addon
 
 // applyCMA creates or updates the ClusterManagementAddOn for a custom addon template.
 func applyCMA(ctx context.Context, addonC *addonapi.Clientset, a v1beta1.AddOnConfig, templateName string) error {
+	logger := log.FromContext(ctx)
+
 	cma := &addonv1alpha1.ClusterManagementAddOn{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   a.Name,
@@ -184,6 +186,7 @@ func applyCMA(ctx context.Context, addonC *addonapi.Clientset, a v1beta1.AddOnCo
 		return err
 	}
 	if !a.Overwrite {
+		logger.V(1).Info("overwrite is false - skipping updating ClusterManagementAddOn to use new AddOnTemplate")
 		return nil
 	}
 	cma.ResourceVersion = existing.ResourceVersion
@@ -193,6 +196,8 @@ func applyCMA(ctx context.Context, addonC *addonapi.Clientset, a v1beta1.AddOnCo
 
 // applyTemplate creates or updates the AddOnTemplate for a custom addon.
 func applyTemplate(ctx context.Context, addonC *addonapi.Clientset, a v1beta1.AddOnConfig, templateName string, manifests []workv1.Manifest) error {
+	logger := log.FromContext(ctx)
+
 	tmpl := &addonv1alpha1.AddOnTemplate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   templateName,
@@ -237,6 +242,7 @@ func applyTemplate(ctx context.Context, addonC *addonapi.Clientset, a v1beta1.Ad
 		return err
 	}
 	if !a.Overwrite {
+		logger.V(1).Info("overwrite is false - skipping updating AddOnTemplate in-place")
 		return nil
 	}
 	tmpl.ResourceVersion = existing.ResourceVersion
