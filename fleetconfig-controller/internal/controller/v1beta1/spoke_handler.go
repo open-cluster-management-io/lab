@@ -468,7 +468,8 @@ func (r *SpokeReconciler) createAgentNamespace(ctx context.Context, spoke *v1bet
 	agentNamespace := os.Getenv(v1beta1.ControllerNamespaceEnvVar) // manager.go enforces that this is not ""
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: agentNamespace,
+			Name:   agentNamespace,
+			Labels: maps.Clone(v1beta1.ManagedByLabels),
 		},
 	}
 	err = spokeCli.Create(ctx, ns)

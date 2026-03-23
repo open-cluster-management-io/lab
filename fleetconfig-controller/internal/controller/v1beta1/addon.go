@@ -252,6 +252,10 @@ func applyTemplate(ctx context.Context, addonC *addonapi.Clientset, a v1beta1.Ad
 
 const maxManifestBytes = 10 << 20 // 10 MiB safety cap for URL-fetched manifests
 
+var manifestClient = http.Client{
+	Timeout: 30 * time.Second,
+}
+
 // loadManifests reads addon manifests from a ConfigMap (raw YAML or URL) and
 // returns them as workv1.Manifest objects matching clusteradm's --filename behavior.
 func loadManifests(ctx context.Context, cm corev1.ConfigMap, addonName, version string) ([]workv1.Manifest, error) {
@@ -275,7 +279,8 @@ func loadManifests(ctx context.Context, cm corev1.ConfigMap, addonName, version 
 	if err != nil {
 		return nil, fmt.Errorf("failed to build request for addon manifests: %w", err)
 	}
-	resp, err := http.DefaultClient.Do(req)
+
+	resp, err := manifestClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch addon manifests from %s: %w", manifestsURL, err)
 	}
@@ -542,6 +547,7 @@ func applyAddOnDeploymentConfig(ctx context.Context, addonC *addonapi.Clientset,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      addonName,
 			Namespace: namespace,
+			Labels:    maps.Clone(v1beta1.ManagedByLabels),
 		},
 		Spec: *config,
 	}
@@ -556,6 +562,13 @@ func applyAddOnDeploymentConfig(ctx context.Context, addonC *addonapi.Clientset,
 	}
 
 	existing.Spec = adc.Spec
+	if len(adc.Labels) > 0 {
+		if existing.Labels == nil {
+			existing.Labels = maps.Clone(adc.Labels)
+		} else {
+			maps.Copy(existing.Labels, adc.Labels)
+		}
+	}
 	_, err = addonC.AddonV1alpha1().AddOnDeploymentConfigs(namespace).Update(ctx, existing, metav1.UpdateOptions{})
 	return err
 }
@@ -873,14 +886,14 @@ func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spo
 func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.RoleRef, namespace, spokeName string) error {
 	logger := log.FromContext(ctx)
 
+	bindingLabels := maps.Clone(v1beta1.ManagedByLabels)
+	bindingLabels[addonv1alpha1.AddonLabelKey] = v1beta1.FCCAddOnName
 	binding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("open-cluster-management:%s:%s:agent-%s",
 				v1beta1.FCCAddOnName, strings.ToLower(roleRef.Kind), spokeName),
 			Namespace: namespace,
-			Labels: map[string]string{
-				addonv1alpha1.AddonLabelKey: v1beta1.FCCAddOnName,
-			},
+			Labels:    bindingLabels,
 		},
 		RoleRef: roleRef,
 		Subjects: []rbacv1.Subject{

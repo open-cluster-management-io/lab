@@ -284,6 +284,9 @@ func TestHandleAddonEnable(t *testing.T) {
 		if err != nil {
 			t.Fatalf("get ADC: %v", err)
 		}
+		if adc.Labels[v1beta1.LabelAddOnManagedBy] != "fleetconfig-controller" {
+			t.Errorf("ADC missing fleetconfig managed-by label: %v", adc.Labels)
+		}
 		if len(adc.Spec.CustomizedVariables) != 1 || adc.Spec.CustomizedVariables[0].Value != "quay.io/test:v1" {
 			t.Errorf("ADC spec mismatch: %+v", adc.Spec)
 		}
