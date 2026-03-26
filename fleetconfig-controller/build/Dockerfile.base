@@ -3,8 +3,8 @@
 ARG OS
 ARG ARCH
 
-ARG GO_BASE_IMAGE=golang:1.24.4-alpine3.22
-ARG PYTHON_BASE_IMAGE=python:3.13-alpine
+ARG GO_BASE_IMAGE=golang:1.26.1-alpine3.23
+ARG PYTHON_BASE_IMAGE=python:3.14-alpine
 ARG DISTROLESS_IMAGE=gcr.io/distroless/static:nonroot
 
 ## Stage 1: Build the manager binary

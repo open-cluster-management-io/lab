@@ -57,7 +57,7 @@ Support for orchestration of OCM multi-clusters varies based on the Kubernetes d
 
 ### Prerequisites
 
-- `go` version v1.22.0+
+- `go` version v1.26+
 - `docker` version 17.03+
 - `kind` version v0.23.0+
 - `kubectl` version v1.11.3+
