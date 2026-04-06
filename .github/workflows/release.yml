@@ -73,7 +73,7 @@ jobs:
           cat /home/runner/work/changelog.txt
 
       - name: setup helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@v5
 
       - name: chart package
         if: github.event_name != 'pull_request'
