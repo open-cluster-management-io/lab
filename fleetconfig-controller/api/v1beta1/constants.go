@@ -3,6 +3,11 @@ package v1beta1
 import "k8s.io/apimachinery/pkg/labels"
 
 const (
+	// AnnotationSpokeForceDelete may be set on a deleting Spoke so the hub controller assumes the spoke is
+	// unreachable: it clears ManifestWork finalizers in the cluster namespace and drops cleanup gate finalizers
+	// so hub cleanup can proceed without OCM work agents or the FCC spoke agent.
+	AnnotationSpokeForceDelete = "fleetconfig.open-cluster-management.io/force-delete"
+
 	// HubCleanupPreflightFinalizer is the finalizer for cleanup preflight checks hub cluster's controller instance. Used to signal to the spoke's controller that unjoin can proceed.
 	HubCleanupPreflightFinalizer = "fleetconfig.open-cluster-management.io/hub-cleanup-preflight"
 
