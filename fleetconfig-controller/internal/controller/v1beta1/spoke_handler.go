@@ -558,9 +558,6 @@ func spokeForceDeleteEnabled(spoke *v1beta1.Spoke) bool {
 	if !ok {
 		return false
 	}
-	if v == "" {
-		return true
-	}
 	b, err := strconv.ParseBool(v)
 	return err == nil && b
 }
@@ -570,9 +567,6 @@ func spokeForceDeleteEnabled(spoke *v1beta1.Spoke) bool {
 func forceDeleteManifestWorksInNamespace(ctx context.Context, workC *workapi.Clientset, namespace string) error {
 	logger := log.FromContext(ctx)
 	if err := workC.WorkV1().ManifestWorks(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
-		if kerrs.IsNotFound(err) {
-			return nil
-		}
 		return fmt.Errorf("delete collection ManifestWorks in %q: %w", namespace, err)
 	}
 	logger.V(1).Info("requested delete collection for ManifestWorks (force-delete)", "namespace", namespace)
@@ -584,27 +578,26 @@ func forceDeleteManifestWorksInNamespace(ctx context.Context, workC *workapi.Cli
 		}
 		return fmt.Errorf("re-list ManifestWorks in %q: %w", namespace, err)
 	}
+	patchBytes, err := json.Marshal(map[string]any{
+		"metadata": map[string]any{
+			"finalizers": []string{},
+		},
+	})
+	if err != nil {
+		return err
+	}
 	for i := range mwList.Items {
 		mw := &mwList.Items[i]
 		if len(mw.Finalizers) == 0 {
 			continue
 		}
-		patchBytes, err := json.Marshal(map[string]any{
-			"metadata": map[string]any{
-				"finalizers": []string{},
-			},
-		})
-		if err != nil {
-			return err
-		}
-		_, err = workC.WorkV1().ManifestWorks(namespace).Patch(
+		if _, err := workC.WorkV1().ManifestWorks(namespace).Patch(
 			ctx,
 			mw.Name,
 			types.MergePatchType,
 			patchBytes,
 			metav1.PatchOptions{},
-		)
-		if err != nil && !kerrs.IsNotFound(err) {
+		); err != nil && !kerrs.IsNotFound(err) {
 			return fmt.Errorf("patch ManifestWork %s/%s: %w", namespace, mw.Name, err)
 		}
 		logger.V(1).Info("cleared ManifestWork finalizers (force-delete)", "namespace", namespace, "manifestWork", mw.Name)
