@@ -241,7 +241,11 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 	if managedCluster == nil {
 		spokeKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, spoke.Spec.Kubeconfig, spoke.Namespace)
 		if err != nil {
-			return fmt.Errorf("failed to load spoke kubeconfig: %v", err)
+			loadErr := fmt.Errorf("failed to load spoke kubeconfig: %w", err)
+			spoke.SetConditions(true, v1beta1.NewCondition(
+				loadErr.Error(), v1beta1.SpokeJoined, metav1.ConditionFalse, metav1.ConditionTrue,
+			))
+			return loadErr
 		}
 		if err := r.joinSpoke(ctx, spoke, hubMeta, klusterletValues, spokeKubeconfig); err != nil {
 			spoke.SetConditions(true, v1beta1.NewCondition(
@@ -293,6 +297,9 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 	err = r.createAgentNamespace(ctx, spoke)
 	if err != nil {
 		logger.Error(err, "failed to create agent namespace", "spoke", spoke.Name)
+		spoke.SetConditions(true, v1beta1.NewCondition(
+			err.Error(), v1beta1.SpokeJoined, metav1.ConditionFalse, metav1.ConditionTrue,
+		))
 		return err
 	}
 
@@ -543,6 +550,73 @@ func (r *SpokeReconciler) doSpokeWork(ctx context.Context, spoke *v1beta1.Spoke,
 	return nil
 }
 
+func spokeForceDeleteEnabled(spoke *v1beta1.Spoke) bool {
+	if spoke.Annotations == nil {
+		return false
+	}
+	v, ok := spoke.Annotations[v1beta1.AnnotationSpokeForceDelete]
+	if !ok {
+		return false
+	}
+	b, err := strconv.ParseBool(v)
+	return err == nil && b
+}
+
+// forceDeleteManifestWorksInNamespace requests deletion of every ManifestWork in the managed cluster namespace,
+// then clears finalizers so objects can finish deleting without a connected work agent.
+func forceDeleteManifestWorksInNamespace(ctx context.Context, workC *workapi.Clientset, namespace string) error {
+	logger := log.FromContext(ctx)
+	if err := workC.WorkV1().ManifestWorks(namespace).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+		return fmt.Errorf("delete collection ManifestWorks in %q: %w", namespace, err)
+	}
+	logger.V(1).Info("requested delete collection for ManifestWorks (force-delete)", "namespace", namespace)
+
+	mwList, err := workC.WorkV1().ManifestWorks(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		if kerrs.IsNotFound(err) {
+			return nil
+		}
+		return fmt.Errorf("re-list ManifestWorks in %q: %w", namespace, err)
+	}
+	patchBytes, err := json.Marshal(map[string]any{
+		"metadata": map[string]any{
+			"finalizers": []string{},
+		},
+	})
+	if err != nil {
+		return err
+	}
+	for i := range mwList.Items {
+		mw := &mwList.Items[i]
+		if len(mw.Finalizers) == 0 {
+			continue
+		}
+		if _, err := workC.WorkV1().ManifestWorks(namespace).Patch(
+			ctx,
+			mw.Name,
+			types.MergePatchType,
+			patchBytes,
+			metav1.PatchOptions{},
+		); err != nil && !kerrs.IsNotFound(err) {
+			return fmt.Errorf("patch ManifestWork %s/%s: %w", namespace, mw.Name, err)
+		}
+		logger.V(1).Info("cleared ManifestWork finalizers (force-delete)", "namespace", namespace, "manifestWork", mw.Name)
+	}
+	return nil
+}
+
+// hubForceDeleteUnreachableSpoke performs the hub-side escape hatch for an unreachable spoke: delete ManifestWorks,
+// clear their finalizers, and drop finalizers that gate on the spoke/FCC agent or OCM work cleanup.
+func hubForceDeleteUnreachableSpoke(ctx context.Context, spoke *v1beta1.Spoke, workC *workapi.Clientset) error {
+	if err := forceDeleteManifestWorksInNamespace(ctx, workC, spoke.Name); err != nil {
+		return err
+	}
+	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
+		return s == v1beta1.SpokeCleanupFinalizer || s == v1beta1.HubCleanupPreflightFinalizer
+	})
+	return nil
+}
+
 // doHubCleanup handles all the required cleanup of a hub cluster when deregistering a Spoke
 func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke, hubKubeconfig []byte, pivotComplete bool) (bool, error) {
 	logger := log.FromContext(ctx)
@@ -559,9 +633,24 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 		return true, fmt.Errorf("failed to create addon client for cleanup: %w", err)
 	}
 
-	status, err := r.hubCleanupPreflight(ctx, spoke, addonC, workC, clusterC, pivotComplete)
-	if err != nil {
-		return true, err
+	skipPreflight := false
+	if spokeForceDeleteEnabled(spoke) {
+		logger.Info("Spoke has force-delete annotation; assuming unreachable spoke: clearing ManifestWork finalizers and hub/spoke cleanup gate finalizers",
+			"spoke", spoke.Name)
+		if err := hubForceDeleteUnreachableSpoke(ctx, spoke, workC); err != nil {
+			return true, err
+		}
+		skipPreflight = true
+	}
+
+	var status preflightStatus
+	if skipPreflight {
+		status = preflightDone
+	} else {
+		status, err = r.hubCleanupPreflight(ctx, spoke, addonC, workC, clusterC, pivotComplete)
+		if err != nil {
+			return true, err
+		}
 	}
 	switch status {
 	case preflightSkipped:
@@ -812,6 +901,12 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 	if slices.Contains(spoke.Finalizers, v1beta1.HubCleanupPreflightFinalizer) {
 		logger.V(1).Info("Cleanup initiated, waiting for hub to complete preflight")
 		return true, nil
+	}
+
+	// Hub force-delete may clear SpokeCleanup so the hub can proceed; there is nothing left to unjoin here.
+	if !slices.Contains(spoke.Finalizers, v1beta1.SpokeCleanupFinalizer) {
+		logger.V(1).Info("SpokeCleanup finalizer not present; skipping spoke unjoin", "spoke", spoke.Name)
+		return false, nil
 	}
 
 	var (
