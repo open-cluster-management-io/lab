@@ -1,3 +1,4 @@
+// Copyright Contributors to the Open Cluster Management project
 package v1
 
 import (
@@ -28,7 +29,7 @@ type Klusterlet struct {
 
 // KlusterletSpec represents the desired deployment configuration of Klusterlet agent.
 type KlusterletSpec struct {
-	// Namespace is the namespace to deploy the agent on the managed cluster.
+	// namespace is the namespace to deploy the agent on the managed cluster.
 	// The namespace must have a prefix of "open-cluster-management-", and if it is not set,
 	// the namespace of "open-cluster-management-agent" is used to deploy agent.
 	// In addition, the add-ons are deployed to the namespace of "{Namespace}-addon".
@@ -56,7 +57,7 @@ type KlusterletSpec struct {
 	// +optional
 	ImagePullSpec string `json:"imagePullSpec,omitempty"`
 
-	// ClusterName is the name of the managed cluster to be created on hub.
+	// clusterName is the name of the managed cluster to be created on hub.
 	// The Klusterlet agent generates a random name if it is not set, or discovers the appropriate cluster name on OpenShift.
 	// +optional
 	// +kubebuilder:validation:MaxLength=63
@@ -151,6 +152,10 @@ type RegistrationConfiguration struct {
 	// +optional
 	ClusterAnnotations map[string]string `json:"clusterAnnotations,omitempty"`
 
+	// ClusterLabels is labels set on ManagedCluster when creating only, other actors can update it afterwards.
+	// +optional
+	ClusterLabels map[string]string `json:"clusterLabels,omitempty"`
+
 	// KubeAPIQPS indicates the maximum QPS while talking with apiserver on the spoke cluster.
 	// If it is set empty, use the default value: 50
 	// +optional
@@ -173,9 +178,13 @@ type RegistrationConfiguration struct {
 	// +optional
 	BootstrapKubeConfigs BootstrapKubeConfigs `json:"bootstrapKubeConfigs,omitempty"`
 
-	// This provides driver details required to register with hub
+	// This provides driver details required to register klusterlet agent with hub
 	// +optional
 	RegistrationDriver RegistrationDriver `json:"registrationDriver,omitempty"`
+
+	// This provides driver details required to register add-ons with hub for kubeClient type
+	// +optional
+	AddOnKubeClientRegistrationDriver *AddOnRegistrationDriver `json:"addOnKubeClientRegistrationDriver,omitempty"`
 
 	// ClusterClaimConfiguration represents the configuration of ClusterClaim
 	// Effective only when the `ClusterClaim` feature gate is enabled.
@@ -203,7 +212,7 @@ type RegistrationDriver struct {
 	// Type of the authentication used by managedcluster to register as well as pull work from hub. Possible values are csr and awsirsa.
 	// +required
 	// +kubebuilder:default:=csr
-	// +kubebuilder:validation:Enum=csr;awsirsa
+	// +kubebuilder:validation:Enum=csr;awsirsa;grpc
 	AuthType string `json:"authType,omitempty"`
 
 	// Contain the details required for registering with hub cluster (ie: an EKS cluster) using AWS IAM roles for service account.
@@ -225,6 +234,30 @@ type AwsIrsa struct {
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Pattern=`^arn:aws:eks:([a-zA-Z0-9-]+):(\d{12}):cluster/([a-zA-Z0-9-]+)$`
 	ManagedClusterArn string `json:"managedClusterArn"`
+}
+
+type AddOnRegistrationDriver struct {
+	// AuthType is the authentication driver used for add-on registration.
+	// Possible values are csr and token.
+	// Currently, this field only affects kubeClient type add-on registration. The csr type add-on registration always uses csr driver.
+	// In the future, this may be extended to customize authentication for csr type add-on registration as well.
+	// +optional
+	// +kubebuilder:validation:Enum=csr;token
+	AuthType string `json:"authType,omitempty"`
+
+	// Token contains the configuration for token-based registration.
+	// +optional
+	Token *TokenConfig `json:"token,omitempty"`
+}
+
+type TokenConfig struct {
+	// ExpirationSeconds represents the seconds of a token to expire.
+	// If it is not set or 0, the default duration will be used, which is
+	// the same as the certificate expiration set by the hub cluster's
+	// kube-controller-manager (typically 1 year).
+	// The minimum valid value for production use is 3600 (1 hour), though smaller values are allowed for testing.
+	// +optional
+	ExpirationSeconds int64 `json:"expirationSeconds,omitempty"`
 }
 
 type TypeBootstrapKubeConfigs string
@@ -353,6 +386,8 @@ type KlusterletStatus struct {
 	// Progressing: Components in the managed cluster are in a transitioning state.
 	// Degraded: Components in the managed cluster do not match the desired configuration and only provide
 	// degraded service.
+	// +listType=map
+	// +listMapKey=type
 	Conditions []metav1.Condition `json:"conditions"`
 
 	// Generations are used to determine when an item needs to be reconciled or has changed in a way that needs a reaction.
