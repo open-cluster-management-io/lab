@@ -1,0 +1,325 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+      "config:recommended",
+      "helpers:pinGitHubActionDigests",
+      ":gitSignOff",
+      ":semanticCommitTypeAll(deps)",
+      "group:allNonMajor"
+    ],
+    "addLabels": [
+      "dependencies"
+    ],
+    "postUpdateOptions": [
+      "gomodTidy",
+      "gomodMassage"
+    ],
+    "packageRules": [
+      {
+        "matchUpdateTypes": [
+          "pin",
+          "pinDigest",
+          "digest"
+        ],
+        "addLabels": [
+          "pin"
+        ],
+        "automerge": true
+      },
+      {
+        "matchUpdateTypes": [
+          "minor",
+          "patch"
+        ],
+        "matchCurrentVersion": "!/^0/",
+        "automerge": true
+      },
+      {
+        "description": "Ginkgo. See also: https://github.com/renovatebot/renovate/discussions/35963",
+        "matchManagers": [
+          "gomod"
+        ],
+        "registryUrls": [
+          "https://github.com/onsi/ginkgo"
+        ],
+        "commitMessageSuffix": "(ginkgo)",
+        "addLabels": [
+          "go-dependencies",
+          "ginkgo"
+        ],
+        "automerge": true,
+        "groupName": "Ginkgo",
+        "matchPackageNames": [
+          "/^github.com/onsi/ginkgo/",
+          "/^github.com/onsi/gomega/"
+        ]
+      },
+      {
+        "matchManagers": [
+          "regex"
+        ],
+        "matchPackageNames": [
+          "onsi/ginkgo"
+        ],
+        "addLabels": [
+          "go-dependencies",
+          "ginkgo"
+        ],
+        "automerge": true,
+        "groupName": "Ginkgo"
+      },
+      {
+        "description": "Flux",
+        "matchManagers": [
+          "gomod"
+        ],
+        "commitMessageSuffix": "(flux)",
+        "addLabels": [
+          "go-dependencies",
+          "flux"
+        ],
+        "automerge": true,
+        "groupName": "Flux",
+        "matchPackageNames": [
+          "/^github.com/fluxcd/"
+        ]
+      },
+      {
+        "description": "Open Cluster Management",
+        "matchManagers": [
+          "gomod"
+        ],
+        "additionalBranchPrefix": "ocm-",
+        "commitMessageSuffix": "(ocm)",
+        "addLabels": [
+          "go-dependencies",
+          "ocm"
+        ],
+        "automerge": false,
+        "groupName": "Open Cluster Management",
+        "matchPackageNames": [
+          "/^open-cluster-management\\.io/"
+        ]
+      },
+      {
+        "description": "Kubernetes",
+        "matchManagers": [
+          "gomod"
+        ],
+        "additionalBranchPrefix": "k8s-",
+        "commitMessageSuffix": "(kubernetes)",
+        "addLabels": [
+          "go-dependencies",
+          "kubernetes"
+        ],
+        "automerge": true,
+        "groupName": "Kubernetes packages",
+        "versioning": "regex:^v?(?<major>0)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
+        "matchPackageNames": [
+          "/k8s/",
+          "/kubernetes/"
+        ]
+      },
+      {
+        "description": "Stay on the v0.x line for client-go (ignore old tags w/ non-zero major versions)",
+        "matchManagers": [
+          "gomod"
+        ],
+        "matchDepNames": [
+          "k8s.io/client-go",
+          "k8s.io/client-go/rest"
+        ],
+        "allowedVersions": "^0"
+      },
+      {
+        "description": "FleetConfig Controller - Go core packages",
+        "matchManagers": [
+          "gomod"
+        ],
+        "matchFileNames": [
+          "fleetconfig-controller/go.mod"
+        ],
+        "additionalBranchPrefix": "fcc-go-core-",
+        "commitMessageSuffix": "(fcc go-core)",
+        "addLabels": [
+          "go-dependencies",
+          "go-core"
+        ],
+        "automerge": true,
+        "groupName": "FleetConfig Controller - Go core packages",
+        "matchPackageNames": [
+          "/^go/",
+          "/^golang/"
+        ]
+      },
+      {
+        "description": "FleetConfig Controller - Other Go dependencies",
+        "matchManagers": [
+          "gomod"
+        ],
+        "matchFileNames": [
+          "fleetconfig-controller/go.mod"
+        ],
+        "additionalBranchPrefix": "fcc-",
+        "commitMessageSuffix": "(fcc)",
+        "addLabels": [
+          "go-dependencies"
+        ],
+        "automerge": true,
+        "groupName": "FleetConfig Controller - Other Go dependencies",
+        "matchPackageNames": [
+          "/.*/",
+          "!/k8s/",
+          "!/kubernetes/",
+          "!/^go/",
+          "!/^golang/",
+          "!/^github.com/onsi/ginkgo/",
+          "!/^github.com/onsi/gomega/",
+          "!/^open-cluster-management\\.io/",
+          "!/^helm\\.sh\\/helm\\/v3$/"
+        ]
+      },
+      {
+        "matchManagers": [
+          "github-actions"
+        ],
+        "matchUpdateTypes": [
+          "major"
+        ],
+        "addLabels": [
+          "github_actions"
+        ],
+        "automerge": false
+      },
+      {
+        "matchManagers": [
+          "github-actions"
+        ],
+        "matchUpdateTypes": [
+          "minor",
+          "patch",
+          "pin",
+          "digest",
+          "pinDigest"
+        ],
+        "addLabels": [
+          "github_actions"
+        ],
+        "automerge": true
+      },
+      {
+        "matchManagers": [
+          "dockerfile"
+        ],
+        "addLabels": [
+          "docker"
+        ],
+        "automerge": true
+      },
+      {
+        "matchManagers": [
+          "kustomize"
+        ],
+        "addLabels": [
+          "kustomize"
+        ],
+        "automerge": true
+      },
+      {
+        "description": "Helm charts and values",
+        "matchManagers": [
+          "helm-values",
+          "helmv3"
+        ],
+        "addLabels": [
+          "helm",
+          "test-regression",
+          "skip-ci",
+          "skip-unit-integration-tests"
+        ],
+        "automerge": false,
+        "groupName": "helm",
+        "groupSlug": "helm"
+      },
+      {
+        "description": "Helm Go module",
+        "matchManagers": [
+          "gomod"
+        ],
+        "matchPackageNames": [
+          "helm.sh/helm/v3"
+        ],
+        "addLabels": [
+          "go-dependencies",
+          "helm"
+        ],
+        "automerge": false,
+        "groupName": "helm-go",
+        "groupSlug": "helm-go"
+      },
+      {
+        "matchManagers": [
+          "regex"
+        ],
+        "matchPackageNames": [
+          "cert-manager",
+          "cert-manager/cert-manager"
+        ],
+        "addLabels": [
+          "helm",
+          "test-regression",
+          "skip-ci",
+          "skip-unit-integration-tests"
+        ],
+        "automerge": false,
+        "groupName": "helm",
+        "groupSlug": "helm"
+      },
+      {
+        "matchManagers": [
+          "github-actions"
+        ],
+        "addLabels": [
+          "python"
+        ],
+        "automerge": true,
+        "groupName": "python",
+        "groupSlug": "python",
+        "matchPackageNames": [
+          "/^python/"
+        ]
+      },
+      {
+        "matchManagers": [
+          "npm"
+        ],
+        "addLabels": [
+          "npm"
+        ],
+        "automerge": false,
+        "enabled": false,
+        "groupName": "NPM packages",
+        "groupSlug": "npm"
+      }
+    ],
+    "customManagers": [
+      {
+        "customType": "regex",
+        "managerFilePatterns": [
+          "/(^|\\/)Makefile$/",
+          "/(^|\\/)Dockerfile/",
+          "/(^|\\/).*\\.ya?ml$/",
+          "/(^|\\/).*\\.toml$/",
+          "/(^|\\/).*\\.sh$/",
+          "/(^|\\/).*\\.env$/",
+          "/(^|\\/).*\\.mk$/",
+          "/(^|\\/).*\\.tf$/"
+        ],
+        "matchStrings": [
+          "# renovate: datasource=(?<datasource>.+?) depName=(?<depName>.+?)\\s.*?_VERSION ?(\\??=|\\: ?) ?\\\"?(?<currentValue>.+?)?\\\"?\\s",
+          "# renovate: datasource=(?<datasource>.+?) depName=(?<depName>.+?)\\s.*?tag:? ?\\\"?(?<currentValue>.+?)?\\\"?\\s",
+          "# renovate: datasource=(?<datasource>.+?) depName=(?<depName>.+?)\\n\\s*default\\s*=\\s*\\\"(?<currentValue>.+?)\\\""
+        ]
+      }
+    ]
+  }
