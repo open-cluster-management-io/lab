@@ -105,7 +105,7 @@ export interface Placement {
 
 // Backend API base URL - configurable for production
 // In production, use relative path so requests go through the same host/ingress
-const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.PROD ? '' : 'http://localhost:8080');
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 // Helper to determine if a placement is succeeded based on PlacementSatisfied condition
 const determineSucceededStatus = (conditions?: { type: string; status: string }[]): boolean => {

@@ -44,18 +44,19 @@ A dashboard for displaying and monitoring Open Cluster Management (OCM) clusters
 
 The OCM Dashboard follows a modern architecture pattern for Kubernetes dashboards:
 
-- **Frontend**: React + TypeScript SPA with Material UI and real-time updates
+- **Frontend**: React + TypeScript SPA with Material UI (Red Hat branded theme) and real-time updates
 - **Backend**: Go API service that connects to the Kubernetes API for OCM resources
 
 ### Frontend Components
 
 - **Authentication**: Bearer token authentication (JWT) stored in localStorage
-- **Overview Page**: High-level KPIs for clusters, cluster sets, and placements
+- **Overview Page**: High-level KPIs with pie and bar charts for cluster status, placement success, and cluster set distribution
 - **Cluster List & Detail**: Table view and detail drawer for clusters, including status, version, claims, and addons
 - **Placement List & Detail**: Table view and detail drawer for placements, including status, predicates, and decisions
 - **ClusterSet List & Detail**: Table view and detail drawer for ManagedClusterSets, including cluster and binding counts
 - **ManifestWorks List**: View manifest works for clusters, including manifest and condition details
 - **Addons List**: View managed cluster addons, including status, registrations, and supported configs
+- **Activity Timeline**: Chronological timeline of cluster, cluster set, and placement events
 - **Login Page**: Token-based login with development mode support
 - **Layout**: Responsive layout with navigation drawer and app bar
 - **API Service Layer**: Abstraction for backend communication using `fetch`
@@ -92,9 +93,11 @@ The OCM Dashboard follows a modern architecture pattern for Kubernetes dashboard
 - Read-only view of clusters, placements, cluster sets, manifest works, and addons
 - Table and detail views for all major OCM resources
 - Real-time cluster status updates via SSE
+- Overview dashboard with KPI cards, pie charts, and bar charts (via `@mui/x-charts`)
+- Activity timeline page showing recent cluster, placement, and cluster set events (via `@mui/lab`)
 - Authentication flow with token support (bearer token in localStorage)
-- Responsive UI with Material UI components
-- Overview dashboard with KPIs
+- Red Hat branded UI with Red Hat Display/Text fonts and PatternFly-inspired color palette
+- Responsive layout with animated transitions
 - Error handling and loading states
 
 **Backend:**
@@ -114,7 +117,7 @@ The OCM Dashboard follows a modern architecture pattern for Kubernetes dashboard
 
 ### Prerequisites
 
-- Node.js 18+ and npm/pnpm
+- Node.js 22+ and npm/pnpm
 - Go 1.22+ (for backend development)
 - Docker with buildx support (for building images)
 - Access to a Kubernetes cluster with OCM installed (for backend integration)
@@ -474,11 +477,9 @@ roleRef:
 1. Fully implement real-time updates using SSE with actual Kubernetes informers in the backend.
 2. Implement robust TokenReview authentication in the backend.
 3. Enhance error handling and user feedback in both frontend and backend.
-4. Create a Helm chart for deployment.
-5. Add comprehensive unit and integration tests for both frontend and backend.
-6. Improve UI/UX, potentially adding more visualizations or actions.
-7. Add support for more OCM resource types and actions as needed.
-8. Optimize frontend testing and mock implementation.
+4. Add comprehensive unit and integration tests for both frontend and backend.
+5. Add support for more OCM resource types and actions as needed.
+6. Add dark mode support.
 
 ---
 

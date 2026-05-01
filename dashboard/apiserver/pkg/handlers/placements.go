@@ -17,7 +17,11 @@ import (
 
 // GetPlacements handles retrieving all placements across namespaces
 func GetPlacements(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
-	// Ensure we have a client before proceeding
+	if IsMockMode() {
+		MockGetPlacements(c)
+		return
+	}
+
 	if ocmClient == nil || ocmClient.ClusterClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "OCM client not initialized"})
 		return
@@ -42,9 +46,13 @@ func GetPlacements(c *gin.Context, ocmClient *client.OCMClient, ctx context.Cont
 
 // GetPlacementsByNamespace handles retrieving placements for a specific namespace
 func GetPlacementsByNamespace(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
+	if IsMockMode() {
+		MockGetPlacementsByNamespace(c)
+		return
+	}
+
 	namespace := c.Param("namespace")
 
-	// Ensure we have a client before proceeding
 	if ocmClient == nil || ocmClient.ClusterClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "OCM client not initialized"})
 		return
@@ -69,10 +77,14 @@ func GetPlacementsByNamespace(c *gin.Context, ocmClient *client.OCMClient, ctx c
 
 // GetPlacement handles retrieving a specific placement
 func GetPlacement(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
+	if IsMockMode() {
+		MockGetPlacement(c)
+		return
+	}
+
 	namespace := c.Param("namespace")
 	name := c.Param("name")
 
-	// Ensure we have a client before proceeding
 	if ocmClient == nil || ocmClient.ClusterClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "OCM client not initialized"})
 		return
@@ -93,10 +105,14 @@ func GetPlacement(c *gin.Context, ocmClient *client.OCMClient, ctx context.Conte
 
 // GetPlacementDecisions handles retrieving decisions for a placement
 func GetPlacementDecisions(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
+	if IsMockMode() {
+		MockGetPlacementDecisions(c)
+		return
+	}
+
 	namespace := c.Param("namespace")
 	placementName := c.Param("name")
 
-	// Ensure we have a client before proceeding
 	if ocmClient == nil || ocmClient.ClusterClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "OCM client not initialized"})
 		return

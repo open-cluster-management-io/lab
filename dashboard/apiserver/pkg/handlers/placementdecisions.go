@@ -16,7 +16,11 @@ import (
 
 // GetAllPlacementDecisions handles retrieving all placement decisions across namespaces
 func GetAllPlacementDecisions(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
-	// Ensure we have a client before proceeding
+	if IsMockMode() {
+		MockGetAllPlacementDecisions(c)
+		return
+	}
+
 	if ocmClient == nil || ocmClient.ClusterClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "OCM client not initialized"})
 		return
@@ -41,9 +45,13 @@ func GetAllPlacementDecisions(c *gin.Context, ocmClient *client.OCMClient, ctx c
 
 // GetPlacementDecisionsByNamespace handles retrieving placement decisions in a specific namespace
 func GetPlacementDecisionsByNamespace(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
+	if IsMockMode() {
+		MockGetPlacementDecisionsByNamespace(c)
+		return
+	}
+
 	namespace := c.Param("namespace")
 
-	// Ensure we have a client before proceeding
 	if ocmClient == nil || ocmClient.ClusterClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "OCM client not initialized"})
 		return
@@ -68,10 +76,14 @@ func GetPlacementDecisionsByNamespace(c *gin.Context, ocmClient *client.OCMClien
 
 // GetPlacementDecision handles retrieving a specific placement decision
 func GetPlacementDecision(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
+	if IsMockMode() {
+		MockGetPlacementDecision(c)
+		return
+	}
+
 	namespace := c.Param("namespace")
 	name := c.Param("name")
 
-	// Ensure we have a client before proceeding
 	if ocmClient == nil || ocmClient.ClusterClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "OCM client not initialized"})
 		return
@@ -92,10 +104,14 @@ func GetPlacementDecision(c *gin.Context, ocmClient *client.OCMClient, ctx conte
 
 // GetPlacementDecisionsByPlacement handles retrieving placement decisions for a specific placement
 func GetPlacementDecisionsByPlacement(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
+	if IsMockMode() {
+		MockGetPlacementDecisionsByPlacement(c)
+		return
+	}
+
 	namespace := c.Param("namespace")
 	name := c.Param("name")
 
-	// Ensure we have a client before proceeding
 	if ocmClient == nil || ocmClient.ClusterClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "OCM client not initialized"})
 		return

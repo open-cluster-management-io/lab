@@ -14,7 +14,11 @@ import (
 
 // GetClusterSets handles retrieving all cluster sets
 func GetClusterSets(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
-	// Ensure we have a client before proceeding
+	if IsMockMode() {
+		MockGetClusterSets(c)
+		return
+	}
+
 	if ocmClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Kubernetes client not initialized"})
 		return
@@ -66,9 +70,13 @@ func GetClusterSets(c *gin.Context, ocmClient *client.OCMClient, ctx context.Con
 
 // GetClusterSet handles retrieving a specific cluster set
 func GetClusterSet(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
+	if IsMockMode() {
+		MockGetClusterSet(c)
+		return
+	}
+
 	name := c.Param("name")
 
-	// Ensure we have a client before proceeding
 	if ocmClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Kubernetes client not initialized"})
 		return

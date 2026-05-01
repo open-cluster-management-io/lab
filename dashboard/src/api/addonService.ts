@@ -28,7 +28,7 @@ export interface ManagedClusterAddon {
 
 // Backend API base URL - configurable for production
 // In production, use relative path so requests go through the same host/ingress
-const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.PROD ? '' : 'http://localhost:8080');
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 // Fetch all addons for a specific cluster
 export const fetchClusterAddons = async (clusterName: string): Promise<ManagedClusterAddon[]> => {
@@ -153,7 +153,22 @@ export const fetchClusterAddons = async (clusterName: string): Promise<ManagedCl
       throw new Error(`API error: ${response.status}`);
     }
 
-    return await response.json();
+    const payload: unknown = await response.json();
+
+    if (Array.isArray(payload)) {
+      return payload as ManagedClusterAddon[];
+    }
+
+    // Some backends return Kubernetes-style list objects with `items`.
+    if (payload && typeof payload === 'object' && 'items' in payload) {
+      const items = (payload as { items?: unknown }).items;
+      if (Array.isArray(items)) {
+        return items as ManagedClusterAddon[];
+      }
+    }
+
+    console.error(`Unexpected addons payload shape for cluster ${clusterName}:`, payload);
+    return [];
   } catch (error) {
     console.error(`Error fetching addons for cluster ${clusterName}:`, error);
     return [];

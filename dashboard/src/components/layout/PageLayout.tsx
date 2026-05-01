@@ -11,9 +11,6 @@ interface PageLayoutProps {
   actions?: ReactNode;
 }
 
-/**
- * Layout component for displaying content in a full page
- */
 export default function PageLayout({
   children,
   title,
@@ -22,40 +19,56 @@ export default function PageLayout({
   actions
 }: PageLayoutProps) {
   return (
-    <Box sx={{ p: 3, height: '100%' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, justifyContent: 'space-between' }}>
-        <Box>
-          {backLink && (
-            <Button
-              component={Link}
-              to={backLink}
-              startIcon={<ArrowBackIcon />}
-              sx={{ mb: 2 }}
-              color="inherit"
-            >
-              {backLabel}
-            </Button>
-          )}
-          <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-            {title}
-          </Typography>
-        </Box>
-        {actions && (
-          <Box>
-            {actions}
-          </Box>
-        )}
-      </Box>
-
-      <Paper
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Box
         sx={{
-          p: 3,
-          borderRadius: 2,
-          bgcolor: (theme) => (theme.palette.mode === 'light' ? 'white' : 'background.paper'),
+          bgcolor: 'white',
+          borderBottom: '1px solid #e5e7ea',
+          px: 4,
+          py: 3,
+          boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06)',
         }}
       >
-        {children}
-      </Paper>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box>
+            {backLink && (
+              <Button
+                component={Link}
+                to={backLink}
+                startIcon={<ArrowBackIcon />}
+                sx={{ mb: 1, color: '#0066cc' }}
+              >
+                {backLabel}
+              </Button>
+            )}
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: 700,
+                color: '#1a1d21',
+                fontFamily: "'Red Hat Display', 'Helvetica Neue', Arial, sans-serif",
+              }}
+            >
+              {title}
+            </Typography>
+          </Box>
+          {actions && <Box>{actions}</Box>}
+        </Box>
+      </Box>
+
+      <Box sx={{ p: 3, flex: 1, overflow: 'auto', animation: 'fadeInUp 0.5s ease' }}>
+        <Paper
+          sx={{
+            p: 3,
+            borderRadius: '12px',
+            bgcolor: 'white',
+            border: '1px solid #e5e7ea',
+            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)',
+          }}
+        >
+          {children}
+        </Paper>
+      </Box>
     </Box>
   );
 }

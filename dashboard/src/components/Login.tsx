@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '../auth/useAuth';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -10,7 +10,6 @@ import {
   TextField,
   Button,
   Typography,
-  useTheme,
   Alert,
   CircularProgress,
   Accordion,
@@ -26,7 +25,6 @@ const Login = () => {
   const [testing, setTesting] = useState(false);
   const { login, isLoading, error: authError } = useAuth();
   const navigate = useNavigate();
-  const theme = useTheme();
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -36,7 +34,6 @@ const Login = () => {
       return;
     }
 
-    // Basic format validation
     if (token.trim().length < 10) {
       setError('Token seems too short');
       return;
@@ -46,7 +43,6 @@ const Login = () => {
     setTesting(true);
 
     try {
-      // Test the token by making a test API call
       const testToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
       const response = await fetch('/api/clusters', {
         headers: {
@@ -56,7 +52,6 @@ const Login = () => {
       });
 
       if (response.ok) {
-        // Token works, proceed with login
         login(testToken);
         navigate('/overview');
       } else if (response.status === 401) {
@@ -64,7 +59,7 @@ const Login = () => {
       } else {
         setError(`Authentication failed: ${response.status} ${response.statusText}`);
       }
-    } catch (err) {
+    } catch {
       setError('Failed to test token. Please check your connection and try again.');
     } finally {
       setTesting(false);
@@ -78,11 +73,15 @@ const Login = () => {
       </Typography>
 
       <Box component="pre" sx={{
-        backgroundColor: theme.palette.grey[100],
-        p: 1,
-        borderRadius: 1,
+        backgroundColor: '#1a1d21',
+        color: '#00ff00',
+        p: 2,
+        borderRadius: '6px',
         fontSize: '0.75rem',
-        overflow: 'auto'
+        overflow: 'auto',
+        borderLeft: '4px solid #0066cc',
+        fontFamily: 'Monaco, Menlo, monospace',
+        lineHeight: 1.5,
       }}>
 {`# Create a service account (if not exists)
 kubectl create serviceaccount dashboard-user -n default
@@ -111,7 +110,7 @@ kubectl create token dashboard-user --duration=24h`}
         justifyContent: 'center',
         minHeight: '100vh',
         width: '100%',
-        bgcolor: theme => theme.palette.background.default,
+        background: 'linear-gradient(135deg, #1a1d21 0%, #002952 100%)',
         p: 2,
       }}
     >
@@ -123,27 +122,62 @@ kubectl create token dashboard-user --duration=24h`}
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
+          animation: 'fadeInUp 0.5s ease',
         }}
       >
         <Card
           sx={{
             width: "100%",
-            boxShadow: theme.shadows[4],
-            borderRadius: 2,
+            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)',
+            borderRadius: '12px',
             p: 2,
+            position: 'relative',
+            overflow: 'hidden',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(90deg, #ee0000, #0066cc)',
+            },
           }}
         >
           <CardHeader
             sx={{ textAlign: "center", pb: 0 }}
             title={
               <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                <Typography variant="h5" component="h1" fontWeight="bold">
+                <Box
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    bgcolor: '#ee0000',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontSize: 24,
+                    fontWeight: 700,
+                  }}
+                >
+                  O
+                </Box>
+                <Typography
+                  variant="h5"
+                  component="h1"
+                  sx={{
+                    fontWeight: 700,
+                    fontFamily: "'Red Hat Display', 'Helvetica Neue', Arial, sans-serif",
+                  }}
+                >
                   OCM Dashboard
                 </Typography>
               </Box>
             }
             subheader={
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              <Typography variant="body2" sx={{ mt: 1, color: '#495057' }}>
                 Sign in with your Kubernetes <strong>Bearer Token</strong>
               </Typography>
             }
@@ -187,7 +221,7 @@ kubectl create token dashboard-user --duration=24h`}
                 disabled={testing}
               />
 
-              <Accordion sx={{ mb: 2 }}>
+              <Accordion sx={{ mb: 2, borderRadius: '8px', '&::before': { display: 'none' } }}>
                 <AccordionSummary
                   expandIcon={<ExpandMoreIcon />}
                   aria-controls="token-instructions-content"
@@ -208,7 +242,6 @@ kubectl create token dashboard-user --duration=24h`}
                   variant="contained"
                   fullWidth
                   disabled={!token.trim() || testing}
-                  sx={{ textTransform: "none" }}
                   startIcon={testing ? <CircularProgress size={20} /> : undefined}
                 >
                   {testing ? 'Testing Token...' : 'Sign In'}

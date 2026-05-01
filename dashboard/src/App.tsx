@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './auth/AuthContext';
+import { AuthProvider } from './auth/AuthContext';
+import { useAuth } from './auth/useAuth';
 import ClusterDetailPage from './components/ClusterDetailPage';
 import Login from './components/Login';
 import AppShell from './components/layout/AppShell';
@@ -8,6 +9,7 @@ import OverviewPage from './components/OverviewPage';
 import ClusterListPage from './components/ClusterListPage';
 import ClustersetList from './components/ClustersetList';
 import PlacementListPage from './components/PlacementListPage';
+import ActivityTimelinePage from './components/ActivityTimelinePage';
 import { MuiThemeProvider } from './theme/ThemeProvider';
 
 // Protected route component that redirects to login if not authenticated
@@ -47,6 +49,7 @@ function AppContent() {
           <Route path="clusters/:name" element={<ClusterDetailPage />} />
           <Route path="placements" element={<PlacementListPage />} />
           <Route path="clustersets" element={<ClustersetList />} />
+          <Route path="activity" element={<ActivityTimelinePage />} />
           <Route index element={<Navigate to="/overview" />} />
           <Route path="*" element={<Navigate to="/overview" />} />
         </Route>

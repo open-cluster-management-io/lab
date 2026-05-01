@@ -9,33 +9,38 @@ interface DrawerLayoutProps {
   onClose?: () => void;
 }
 
-/**
- * Layout component for displaying content in a drawer
- */
 export default function DrawerLayout({ children, title, icon, onClose }: DrawerLayoutProps) {
   return (
     <Box
       sx={{
         flex: '0 0 40%',
-        borderLeft: 1,
-        borderColor: 'divider',
+        borderLeft: '1px solid #e5e7ea',
+        boxShadow: '-2px 0 8px rgba(0,0,0,0.05)',
         p: 3,
         overflow: 'auto',
         backgroundColor: 'background.paper',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
+        animation: 'fadeInUp 0.3s ease',
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
           {icon}
-          <Typography variant="h6" sx={{ fontWeight: 'bold', ml: icon ? 1 : 0 }}>
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: 600,
+              ml: icon ? 1 : 0,
+              fontFamily: "'Red Hat Display', 'Helvetica Neue', Arial, sans-serif",
+            }}
+          >
             {title}
           </Typography>
         </Box>
         {onClose && (
-          <IconButton onClick={onClose}>
+          <IconButton onClick={onClose} sx={{ color: '#495057' }}>
             <ChevronLeftIcon />
           </IconButton>
         )}

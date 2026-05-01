@@ -54,7 +54,7 @@ export type { ClusterSetBinding as ClusterSetBindingType };
 
 // Backend API base URL - configurable for production
 // In production, use relative path so requests go through the same host/ingress
-const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.PROD ? '' : 'http://localhost:8080');
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 // Fetch all cluster set bindings for a namespace
 export const fetchNamespaceClusterSetBindings = async (namespace: string): Promise<ClusterSetBinding[]> => {

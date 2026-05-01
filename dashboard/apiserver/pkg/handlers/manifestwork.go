@@ -15,9 +15,13 @@ import (
 
 // GetManifestWorks retrieves all ManifestWorks for a specific namespace
 func GetManifestWorks(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
+	if IsMockMode() {
+		MockGetManifestWorks(c)
+		return
+	}
+
 	namespace := c.Param("namespace")
 
-	// Ensure we have a client before proceeding
 	if ocmClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Kubernetes client not initialized"})
 		return
@@ -105,10 +109,14 @@ func GetManifestWorks(c *gin.Context, ocmClient *client.OCMClient, ctx context.C
 
 // GetManifestWork retrieves a specific ManifestWork by name in a namespace
 func GetManifestWork(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
+	if IsMockMode() {
+		MockGetManifestWork(c)
+		return
+	}
+
 	namespace := c.Param("namespace")
 	name := c.Param("name")
 
-	// Ensure we have a client before proceeding
 	if ocmClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Kubernetes client not initialized"})
 		return

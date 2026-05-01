@@ -73,24 +73,8 @@ export default function ClusterListPage() {
       setLoading(true);
       const clusterData = await fetchClusters();
       setClusters(clusterData);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching cluster list:', error);
-      setLoading(false);
-    }
-  };
-
-  // Load clusters on component mount
-  useEffect(() => {
-    loadClusters();
-  }, []);
-
-  // Fetch addon counts/names for all clusters after clusters are loaded
-  useEffect(() => {
-    if (!clusters.length) return;
-    let cancelled = false;
-    async function fetchAllAddons() {
-      const updated = await Promise.all(clusters.map(async (cluster) => {
+      // Fetch addon counts/names for all clusters
+      const updated = await Promise.all(clusterData.map(async (cluster) => {
         try {
           const addons = await fetchClusterAddons(cluster.name);
           return {
@@ -102,13 +86,18 @@ export default function ClusterListPage() {
           return { ...cluster, addonCount: 0, addonNames: [] };
         }
       }));
-      if (!cancelled) {
-        setClusters(updated);
-      }
+      setClusters(updated);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching cluster list:', error);
+      setLoading(false);
     }
-    fetchAllAddons();
-    return () => { cancelled = true; };
-  }, [loading]);
+  };
+
+  // Load clusters on component mount
+  useEffect(() => {
+    loadClusters();
+  }, []);
 
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
@@ -161,7 +150,7 @@ export default function ClusterListPage() {
   });
 
   return (
-    <Box sx={{ display: "flex", height: "calc(100vh - 64px)" }}>
+    <Box sx={{ display: "flex", height: "calc(100vh - 64px)", animation: "fadeInUp 0.5s ease" }}>
       {/* Cluster list */}
       <Box
         sx={{
@@ -171,12 +160,20 @@ export default function ClusterListPage() {
           overflow: "auto",
         }}
       >
-        <Typography variant="h5" sx={{ mb: 3, fontWeight: "bold" }}>
+        <Typography
+          variant="h5"
+          sx={{
+            mb: 3,
+            fontWeight: 700,
+            color: "#1a1d21",
+            fontFamily: "'Red Hat Display', 'Helvetica Neue', Arial, sans-serif",
+          }}
+        >
           Clusters
         </Typography>
 
         {/* Filters and search */}
-        <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
+        <Paper sx={{ p: 2, mb: 3, borderRadius: '12px' }}>
           <Grid container spacing={2} alignItems="center" sx={{ width: '100%' }}>
             <Grid size={{ xs: 12, md: 4 }}>
               <TextField
@@ -216,7 +213,7 @@ export default function ClusterListPage() {
         </Paper>
 
         {/* Cluster Table */}
-        <TableContainer component={Paper}>
+        <TableContainer component={Paper} sx={{ borderRadius: '12px', overflow: 'hidden' }}>
           <Table size="small">
             <TableHead>
               <TableRow>

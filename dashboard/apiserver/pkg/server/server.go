@@ -208,7 +208,11 @@ func SetupServer(ocmClient *client.OCMClient, ctx context.Context, debugMode boo
 
 		// Register streaming routes
 		api.GET("/stream/clusters", authMiddleware, func(c *gin.Context) {
-			handlers.StreamClusters(c, ocmClient.Interface, ctx)
+			if ocmClient != nil {
+				handlers.StreamClusters(c, ocmClient.Interface, ctx)
+			} else {
+				handlers.MockStreamClusters(c)
+			}
 		})
 	}
 

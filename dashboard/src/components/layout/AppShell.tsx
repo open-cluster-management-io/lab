@@ -5,7 +5,7 @@ import AppBar from './AppBar.tsx';
 import Drawer from './Drawer.tsx';
 
 // Drawer width constant
-const DRAWER_WIDTH = 240;
+const DRAWER_WIDTH = 280;
 
 export default function AppShell() {
   const [open, setOpen] = useState(true);
@@ -43,7 +43,7 @@ export default function AppShell() {
           pt: '64px', // AppBar height
           backgroundColor: theme =>
             theme.palette.mode === 'light'
-              ? '#f5f5f9'
+              ? '#f8f9fa'
               : theme.palette.background.default,
           marginLeft: '0 !important',
           boxSizing: 'border-box',

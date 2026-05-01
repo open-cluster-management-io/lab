@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"os"
 
 	"open-cluster-management-io/lab/apiserver/pkg/client"
@@ -9,16 +10,16 @@ import (
 )
 
 func main() {
-	// Check if debug mode is enabled
 	debugMode := os.Getenv("DASHBOARD_DEBUG") == "true"
-
-	// Create a context
 	ctx := context.Background()
 
-	// Initialize Kubernetes client
-	ocmClient := client.CreateKubernetesClient()
+	var ocmClient *client.OCMClient
+	if os.Getenv("DASHBOARD_USE_MOCK") == "true" {
+		log.Println("Mock mode enabled — skipping Kubernetes client creation")
+	} else {
+		ocmClient = client.CreateKubernetesClient()
+	}
 
-	// Set up and run the server
 	r := server.SetupServer(ocmClient, ctx, debugMode)
 	server.RunServer(r)
 }

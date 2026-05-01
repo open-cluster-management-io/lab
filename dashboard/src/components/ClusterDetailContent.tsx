@@ -82,10 +82,9 @@ function TabPanel(props: TabPanelProps) {
       id={`simple-tabpanel-${index}`}
       aria-labelledby={`simple-tab-${index}`}
       {...other}
-      style={{ height: index === 1 ? 'calc(100% - 48px)' : 'auto' }}
     >
       {value === index && (
-        <Box sx={{ pt: 3, height: '100%' }}>
+        <Box sx={{ pt: 3 }}>
           {children}
         </Box>
       )}
@@ -364,19 +363,11 @@ export default function ClusterDetailContent({ cluster, compact = false }: Clust
       </TabPanel>
 
       <TabPanel value={tabValue} index={1}>
-        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-            <ClusterAddonsList addons={addons} loading={loading} error={error} />
-          </Box>
-        </Box>
+        <ClusterAddonsList addons={addons} loading={loading} error={error} />
       </TabPanel>
 
       <TabPanel value={tabValue} index={2}>
-        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-            <ClusterManifestWorksList manifestWorks={manifestWorks} loading={manifestWorksLoading} error={manifestWorksError} />
-          </Box>
-        </Box>
+        <ClusterManifestWorksList manifestWorks={manifestWorks} loading={manifestWorksLoading} error={manifestWorksError} />
       </TabPanel>
     </Box>
   );

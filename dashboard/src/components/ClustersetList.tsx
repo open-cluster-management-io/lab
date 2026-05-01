@@ -377,7 +377,7 @@ const ClustersetList = () => {
   );
 
   return (
-    <Box sx={{ display: "flex", height: "calc(100vh - 64px)" }}>
+    <Box sx={{ display: "flex", height: "calc(100vh - 64px)", animation: "fadeInUp 0.5s ease" }}>
       {/* Cluster set list */}
       <Box
         sx={{
@@ -387,11 +387,19 @@ const ClustersetList = () => {
           overflow: "auto",
         }}
       >
-        <Typography variant="h5" sx={{ mb: 3, fontWeight: "bold" }}>
+        <Typography
+          variant="h5"
+          sx={{
+            mb: 3,
+            fontWeight: 700,
+            color: "#1a1d21",
+            fontFamily: "'Red Hat Display', 'Helvetica Neue', Arial, sans-serif",
+          }}
+        >
           ClusterSets
         </Typography>
 
-        <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
+        <Paper sx={{ p: 2, mb: 3, borderRadius: '12px' }}>
           <Grid container spacing={2} alignItems="center" sx={{ width: '100%' }}>
             <Grid size={{ xs: 12, md: 6 }}>
               <TextField
@@ -447,7 +455,7 @@ const ClustersetList = () => {
             <CircularProgress />
           </Box>
         ) : (
-          <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
+          <TableContainer component={Paper} sx={{ borderRadius: '12px', overflow: 'hidden' }}>
             <Table size="small">
               <TableHead>
                 <TableRow>

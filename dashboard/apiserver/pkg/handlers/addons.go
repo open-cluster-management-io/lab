@@ -15,9 +15,13 @@ import (
 
 // GetClusterAddons handles retrieving all addons for a specific cluster
 func GetClusterAddons(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
+	if IsMockMode() {
+		MockGetClusterAddons(c)
+		return
+	}
+
 	clusterName := c.Param("name")
 
-	// Ensure we have a client before proceeding
 	if ocmClient == nil || ocmClient.AddonClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "OCM client not initialized"})
 		return
@@ -90,10 +94,14 @@ func GetClusterAddons(c *gin.Context, ocmClient *client.OCMClient, ctx context.C
 
 // GetClusterAddon handles retrieving a specific addon for a specific cluster
 func GetClusterAddon(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
+	if IsMockMode() {
+		MockGetClusterAddon(c)
+		return
+	}
+
 	clusterName := c.Param("name")
 	addonName := c.Param("addonName")
 
-	// Ensure we have a client before proceeding
 	if ocmClient == nil || ocmClient.AddonClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "OCM client not initialized"})
 		return

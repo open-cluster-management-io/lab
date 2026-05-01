@@ -6,14 +6,13 @@ import {
   Box,
   MenuItem,
   Tooltip,
-  useTheme,
   styled,
   Menu
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useState } from 'react';
-import { useAuth } from '../../auth/AuthContext';
+import { useAuth } from '../../auth/useAuth';
 import { useNavigate } from 'react-router-dom';
 
 interface AppBarProps {
@@ -29,6 +28,9 @@ const AppBarStyled = styled(MuiAppBar, {
   drawerWidth: number;
 }>(({ theme, open, drawerWidth }) => ({
   zIndex: theme.zIndex.drawer + 1,
+  background: 'linear-gradient(90deg, #1a1d21 0%, #002952 100%)',
+  borderBottom: '3px solid #ee0000',
+  boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)',
   transition: theme.transitions.create(['width', 'margin'], {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
@@ -44,7 +46,6 @@ const AppBarStyled = styled(MuiAppBar, {
 }));
 
 export default function AppBar({ open, drawerWidth, onDrawerToggle }: AppBarProps) {
-  const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -81,19 +82,51 @@ export default function AppBar({ open, drawerWidth, onDrawerToggle }: AppBarProp
 
         {/* Logo */}
         <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
-          <img
-            src="/favicons/android-chrome-192x192.png"
-            alt="OCM Logo"
-            style={{ width: '24px', height: '24px' }}
-          />
-          <Typography
-            variant="h6"
-            noWrap
-            component="div"
-            sx={{ display: { xs: 'none', sm: 'block' }, ml: 1, fontWeight: 'bold' }}
+          <Box
+            sx={{
+              width: 40,
+              height: 40,
+              bgcolor: '#ee0000',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontSize: '20px',
+              fontWeight: 700,
+              mr: 1.5,
+            }}
           >
-            OCM Dashboard
-          </Typography>
+            O
+          </Box>
+          <Box>
+            <Typography
+              variant="h6"
+              noWrap
+              component="div"
+              sx={{
+                display: { xs: 'none', sm: 'block' },
+                fontWeight: 600,
+                fontSize: '20px',
+                color: 'white',
+                lineHeight: 1.2,
+              }}
+            >
+              OCM Dashboard
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                display: { xs: 'none', sm: 'block' },
+                color: '#e5e7ea',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                fontSize: '11px',
+              }}
+            >
+              Open Cluster Management
+            </Typography>
+          </Box>
         </Box>
 
         <Box sx={{ flexGrow: 1 }} />
@@ -107,8 +140,14 @@ export default function AppBar({ open, drawerWidth, onDrawerToggle }: AppBarProp
               aria-label="user account"
               color="inherit"
               onClick={handleMenu}
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: '6px',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+              }}
             >
-              <SettingsIcon sx={{ color: theme.palette.common.white }} />
+              <SettingsIcon sx={{ color: 'white' }} />
             </IconButton>
           </Tooltip>
           <Menu

@@ -17,7 +17,11 @@ import (
 
 // StreamClusters handles streaming cluster updates via SSE
 func StreamClusters(c *gin.Context, dynamicClient dynamic.Interface, ctx context.Context) {
-	// Ensure we have a client before proceeding
+	if IsMockMode() {
+		MockStreamClusters(c)
+		return
+	}
+
 	if dynamicClient == nil {
 		c.JSON(500, gin.H{"error": "Kubernetes client not initialized"})
 		return

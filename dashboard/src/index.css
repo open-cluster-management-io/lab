@@ -1,5 +1,43 @@
+:root {
+  --rh-color-red-hat-red-100: #ee0000;
+  --rh-color-red-hat-red-90: #c9190b;
+  --rh-color-brand-primary: #0066cc;
+  --rh-color-brand-secondary: #002952;
+  --rh-color-status-success: #3e8635;
+  --rh-color-status-warning: #f0ab00;
+  --rh-color-status-danger: #c9190b;
+  --rh-color-status-info: #2b9af3;
+  --rh-color-neutral-50: #f8f9fa;
+  --rh-color-neutral-100: #f1f2f3;
+  --rh-color-neutral-200: #e5e7ea;
+  --rh-color-neutral-300: #d1d5da;
+  --rh-color-neutral-700: #495057;
+  --rh-color-neutral-800: #343a40;
+  --rh-color-neutral-900: #1a1d21;
+}
+
 html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
+}
+
+body {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }

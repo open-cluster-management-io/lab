@@ -14,7 +14,11 @@ import (
 
 // GetAllClusterSetBindings retrieves all ManagedClusterSetBindings across all namespaces
 func GetAllClusterSetBindings(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
-	// Ensure we have a client before proceeding
+	if IsMockMode() {
+		MockGetAllClusterSetBindings(c)
+		return
+	}
+
 	if ocmClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Kubernetes client not initialized"})
 		return
@@ -62,9 +66,13 @@ func GetAllClusterSetBindings(c *gin.Context, ocmClient *client.OCMClient, ctx c
 
 // GetClusterSetBindings retrieves all ManagedClusterSetBindings for a specific namespace
 func GetClusterSetBindings(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
+	if IsMockMode() {
+		MockGetClusterSetBindings(c)
+		return
+	}
+
 	namespace := c.Param("namespace")
 
-	// Ensure we have a client before proceeding
 	if ocmClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Kubernetes client not initialized"})
 		return
@@ -109,10 +117,14 @@ func GetClusterSetBindings(c *gin.Context, ocmClient *client.OCMClient, ctx cont
 
 // GetClusterSetBinding retrieves a specific ManagedClusterSetBinding by name in a namespace
 func GetClusterSetBinding(c *gin.Context, ocmClient *client.OCMClient, ctx context.Context) {
+	if IsMockMode() {
+		MockGetClusterSetBinding(c)
+		return
+	}
+
 	namespace := c.Param("namespace")
 	name := c.Param("name")
 
-	// Ensure we have a client before proceeding
 	if ocmClient == nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Kubernetes client not initialized"})
 		return

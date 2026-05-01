@@ -47,7 +47,7 @@ export type { ManifestWork as ManifestWorkType };
 
 // Backend API base URL - configurable for production
 // In production, use relative path so requests go through the same host/ingress
-const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.PROD ? '' : 'http://localhost:8080');
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 // Fetch all manifest works for a namespace
 export const fetchManifestWorks = async (namespace: string): Promise<ManifestWork[]> => {

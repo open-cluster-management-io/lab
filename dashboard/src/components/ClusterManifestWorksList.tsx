@@ -110,10 +110,10 @@ function ManifestWorkRow({ manifestWork }: ManifestWorkRowProps) {
 
                       return (
                         <TableRow key={idx}>
-                          <TableCell>{manifest.resourceMeta.kind || '-'}</TableCell>
-                          <TableCell>{manifest.resourceMeta.name || '-'}</TableCell>
-                          <TableCell>{manifest.resourceMeta.namespace || '-'}</TableCell>
-                          <TableCell>
+                          <TableCell sx={{ py: 1.5 }}>{manifest.resourceMeta.kind || '-'}</TableCell>
+                          <TableCell sx={{ py: 1.5 }}>{manifest.resourceMeta.name || '-'}</TableCell>
+                          <TableCell sx={{ py: 1.5 }}>{manifest.resourceMeta.namespace || '-'}</TableCell>
+                          <TableCell sx={{ py: 1.5 }}>
                             <Chip
                               label={status}
                               color={statusColor}
@@ -144,17 +144,17 @@ function ManifestWorkRow({ manifestWork }: ManifestWorkRowProps) {
                   <TableBody>
                     {manifestWork.conditions?.map((condition, idx) => (
                       <TableRow key={idx}>
-                        <TableCell>{condition.type}</TableCell>
-                        <TableCell>
+                        <TableCell sx={{ py: 1.5 }}>{condition.type}</TableCell>
+                        <TableCell sx={{ py: 1.5 }}>
                           <Chip
                             label={condition.status}
                             color={condition.status === 'True' ? 'success' : 'default'}
                             size="small"
                           />
                         </TableCell>
-                        <TableCell>{condition.reason || '-'}</TableCell>
-                        <TableCell>{condition.message || '-'}</TableCell>
-                        <TableCell>{formatDate(condition.lastTransitionTime)}</TableCell>
+                        <TableCell sx={{ py: 1.5 }}>{condition.reason || '-'}</TableCell>
+                        <TableCell sx={{ py: 1.5 }}>{condition.message || '-'}</TableCell>
+                        <TableCell sx={{ py: 1.5 }}>{formatDate(condition.lastTransitionTime)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
