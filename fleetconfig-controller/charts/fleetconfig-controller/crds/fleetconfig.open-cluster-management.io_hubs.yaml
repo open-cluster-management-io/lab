@@ -269,11 +269,57 @@ spec:
                       Options are:
                        - csr: Use the default CSR-based registration authentication.
                        - awsirsa: Use AWS IAM Role for Service Accounts (IRSA) registration authentication.
-                      The set of valid options is open for extension.
+                       - grpc: Use gRPC registration (requires grpc.join with joinServer and certificateAuthority).
                     enum:
                     - csr
                     - awsirsa
+                    - grpc
                     type: string
+                  grpc:
+                    description: GRPC holds gRPC-specific settings for clusteradm
+                      init and join.
+                    properties:
+                      init:
+                        description: Init holds clusteradm init gRPC settings (registration-drivers
+                          csr,grpc and related flags).
+                        properties:
+                          autoApprovedIdentities:
+                            description: AutoApprovedIdentities are passed to clusteradm
+                              init --auto-approved-grpc-identities (comma-separated
+                              list).
+                            items:
+                              type: string
+                            type: array
+                          endpointType:
+                            default: hostname
+                            description: EndpointType is the gRPC server endpoint
+                              type for clusteradm init (--grpc-endpoint-type).
+                            enum:
+                            - hostname
+                            - loadBalancer
+                            type: string
+                          hubServer:
+                            description: HubServer is the address for clusteradm init
+                              --grpc-server when configuring the hub.
+                            type: string
+                        type: object
+                      join:
+                        description: Join configures gRPC for clusteradm join when
+                          driver is grpc.
+                        properties:
+                          certificateAuthority:
+                            description: CertificateAuthority is PEM content for clusteradm
+                              join --grpc-ca-file.
+                            type: string
+                          joinServer:
+                            description: JoinServer is the address passed to clusteradm
+                              join --grpc-server (reachable from the spoke).
+                            type: string
+                        required:
+                        - certificateAuthority
+                        - joinServer
+                        type: object
+                    type: object
                   hubClusterARN:
                     description: The Hub cluster ARN for awsirsa registration authentication.
                       Required when Type is awsirsa, otherwise ignored.

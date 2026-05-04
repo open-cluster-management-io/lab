@@ -365,6 +365,19 @@ spec:
                 default: {}
                 description: Klusterlet configuration.
                 properties:
+                  addonKubeClientRegistrationAuth:
+                    description: AddonKubeClientRegistrationAuth is passed to clusteradm
+                      join --addon-kubeclient-registration-auth (csr or token).
+                    enum:
+                    - csr
+                    - token
+                    type: string
+                  addonTokenExpirationSeconds:
+                    description: |-
+                      AddonTokenExpirationSeconds is passed to clusteradm join --addon-token-expiration-seconds when addonKubeClientRegistrationAuth is token.
+                      Use 0 for the system default.
+                    format: int64
+                    type: integer
                   annotations:
                     additionalProperties:
                       type: string
@@ -2668,7 +2681,9 @@ spec:
                 type: array
               klusterletHash:
                 default: ""
-                description: KlusterletHash is a hash of the Spoke's .spec.klusterlet.values.
+                description: |-
+                  KlusterletHash is a hash of merged klusterlet chart values plus join-relevant klusterlet fields
+                  (e.g. addon kubeClient registration auth) used to detect upgrade/reconcile needs.
                 type: string
               phase:
                 description: Phase is the current phase of the Spoke reconcile.

@@ -175,6 +175,21 @@ const (
 
 	// AWSIRSARegistrationDriver is the AWS IAM Role for Service Accounts (IRSA) registration driver.
 	AWSIRSARegistrationDriver = "awsirsa"
+
+	// GRPCRegistrationDriver is the gRPC-based registration driver.
+	GRPCRegistrationDriver = "grpc"
+)
+
+// gRPC registration endpoint types (clusteradm init --grpc-endpoint-type).
+const (
+	GRPCEndpointTypeHostname     = "hostname"
+	GRPCEndpointTypeLoadBalancer = "loadBalancer"
+)
+
+// Addon kubeClient registration auth types (clusteradm join --addon-kubeclient-registration-auth).
+const (
+	AddonKubeClientRegistrationAuthCSR   = "csr"
+	AddonKubeClientRegistrationAuthToken = "token"
 )
 
 // Addon ConfigMap constants

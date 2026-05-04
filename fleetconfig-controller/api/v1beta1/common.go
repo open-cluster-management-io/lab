@@ -2,6 +2,7 @@ package v1beta1
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -134,17 +135,83 @@ func (c Condition) Equal(other Condition) bool {
 		c.Reason == other.Reason && c.Message == other.Message
 }
 
+// RegistrationAuthGRPCInit holds clusteradm init-only gRPC settings for the hub
+// (--grpc-endpoint-type, --grpc-server, --auto-approved-grpc-identities).
+// See open-cluster-management-io/clusteradm init.
+type RegistrationAuthGRPCInit struct {
+	// EndpointType is the gRPC server endpoint type for clusteradm init (--grpc-endpoint-type).
+	// +kubebuilder:validation:Enum=hostname;loadBalancer
+	// +kubebuilder:default:=hostname
+	// +optional
+	EndpointType string `json:"endpointType,omitempty"`
+
+	// HubServer is the address for clusteradm init --grpc-server when configuring the hub.
+	// +optional
+	HubServer string `json:"hubServer,omitempty"`
+
+	// AutoApprovedIdentities are passed to clusteradm init --auto-approved-grpc-identities (comma-separated list).
+	// +optional
+	AutoApprovedIdentities []string `json:"autoApprovedIdentities,omitempty"`
+}
+
+// RegistrationAuthGRPCJoin holds clusteradm join-only gRPC material when registrationAuth.driver is grpc
+// (--grpc-server spoke-reachable address, --grpc-ca-file PEM). Validated as required when driver is grpc.
+// See open-cluster-management-io/clusteradm join.
+type RegistrationAuthGRPCJoin struct {
+	// JoinServer is the address passed to clusteradm join --grpc-server (reachable from the spoke).
+	// +required
+	JoinServer string `json:"joinServer"`
+
+	// CertificateAuthority is PEM content for clusteradm join --grpc-ca-file.
+	// +required
+	CertificateAuthority string `json:"certificateAuthority"`
+}
+
+// RegistrationAuthGRPC groups clusteradm init and join gRPC settings. Init and Join may be set independently:
+// Init is used for clusteradm init; Join is used for clusteradm join when driver is grpc.
+type RegistrationAuthGRPC struct {
+	// Init holds clusteradm init gRPC settings (registration-drivers csr,grpc and related flags).
+	// +optional
+	Init *RegistrationAuthGRPCInit `json:"init,omitempty"`
+
+	// Join configures gRPC for clusteradm join when driver is grpc.
+	// +optional
+	Join *RegistrationAuthGRPCJoin `json:"join,omitempty"`
+}
+
+// GRPCInitEnabled reports whether clusteradm init should enable the csr,grpc registration driver and related init flags.
+func (r RegistrationAuth) GRPCInitEnabled() bool {
+	if r.Driver == AWSIRSARegistrationDriver {
+		return false
+	}
+	if r.Driver == GRPCRegistrationDriver {
+		return true
+	}
+	if r.GRPC == nil || r.GRPC.Init == nil {
+		return false
+	}
+	h := r.GRPC.Init
+	if h.HubServer != "" || len(h.AutoApprovedIdentities) > 0 {
+		return true
+	}
+	return strings.EqualFold(h.EndpointType, GRPCEndpointTypeLoadBalancer)
+}
+
 // RegistrationAuth provides specifications for registration authentication.
 type RegistrationAuth struct {
 	// The registration authentication driver to use.
 	// Options are:
 	//  - csr: Use the default CSR-based registration authentication.
 	//  - awsirsa: Use AWS IAM Role for Service Accounts (IRSA) registration authentication.
-	// The set of valid options is open for extension.
-	// +kubebuilder:validation:Enum=csr;awsirsa
+	//  - grpc: Use gRPC registration (requires grpc.join with joinServer and certificateAuthority).
+	// +kubebuilder:validation:Enum=csr;awsirsa;grpc
 	// +kubebuilder:default:="csr"
 	// +optional
 	Driver string `json:"driver,omitempty"`
+
+	// GRPC holds gRPC-specific settings for clusteradm init and join.
+	// +optional
+	GRPC *RegistrationAuthGRPC `json:"grpc,omitempty"`
 
 	// The Hub cluster ARN for awsirsa registration authentication. Required when Type is awsirsa, otherwise ignored.
 	// +optional

@@ -196,6 +196,16 @@ type Klusterlet struct {
 	// +optional
 	Singleton bool `json:"singleton,omitempty"`
 
+	// AddonKubeClientRegistrationAuth is passed to clusteradm join --addon-kubeclient-registration-auth (csr or token).
+	// +kubebuilder:validation:Enum=csr;token
+	// +optional
+	AddonKubeClientRegistrationAuth string `json:"addonKubeClientRegistrationAuth,omitempty"`
+
+	// AddonTokenExpirationSeconds is passed to clusteradm join --addon-token-expiration-seconds when addonKubeClientRegistrationAuth is token.
+	// Use 0 for the system default.
+	// +optional
+	AddonTokenExpirationSeconds int64 `json:"addonTokenExpirationSeconds,omitempty"`
+
 	// ValuesFrom is an optional reference to a ConfigMap containing values for the klusterlet Helm chart.
 	// optional
 	ValuesFrom *ConfigMapRef `json:"valuesFrom,omitempty"`
@@ -303,7 +313,8 @@ type SpokeStatus struct {
 	// +optional
 	EnabledAddons []string `json:"enabledAddons,omitempty"`
 
-	// KlusterletHash is a hash of the Spoke's .spec.klusterlet.values.
+	// KlusterletHash is a hash of merged klusterlet chart values plus join-relevant klusterlet fields
+	// (e.g. addon kubeClient registration auth) used to detect upgrade/reconcile needs.
 	// +kubebuilder:default:=""
 	// +optional
 	KlusterletHash string `json:"klusterletHash,omitempty"`
@@ -393,6 +404,20 @@ func (s *Spoke) GetCondition(cType string) *Condition {
 // SetConditions sets the supplied conditions on a Spoke, replacing any existing conditions.
 func (s *Spoke) SetConditions(cover bool, c ...Condition) {
 	s.Status.SetConditions(cover, c...)
+}
+
+// KlusterletReconcileHashInput combines merged chart values with klusterlet fields that affect
+// clusteradm join/upgrade but are not represented in the chart values document alone.
+func KlusterletReconcileHashInput(values *KlusterletChartConfig, k Klusterlet) any {
+	return struct {
+		Values                          *KlusterletChartConfig `json:"values,omitempty"`
+		AddonKubeClientRegistrationAuth string                 `json:"addonKubeClientRegistrationAuth,omitempty"`
+		AddonTokenExpirationSeconds     int64                  `json:"addonTokenExpirationSeconds,omitempty"`
+	}{
+		Values:                          values,
+		AddonKubeClientRegistrationAuth: k.AddonKubeClientRegistrationAuth,
+		AddonTokenExpirationSeconds:     k.AddonTokenExpirationSeconds,
+	}
 }
 
 func init() {

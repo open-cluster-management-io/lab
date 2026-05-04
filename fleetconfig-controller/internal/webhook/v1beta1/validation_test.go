@@ -409,6 +409,25 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "allowed - addon kubeClient registration auth change",
+			oldSpoke: &v1beta1.Spoke{
+				Spec: v1beta1.SpokeSpec{
+					Klusterlet: v1beta1.Klusterlet{
+						AddonKubeClientRegistrationAuth: "",
+					},
+				},
+			},
+			newSpoke: &v1beta1.Spoke{
+				Spec: v1beta1.SpokeSpec{
+					Klusterlet: v1beta1.Klusterlet{
+						AddonKubeClientRegistrationAuth: v1beta1.AddonKubeClientRegistrationAuthToken,
+						AddonTokenExpirationSeconds:     3600,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "disallowed - HubRef change",
 			oldSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{

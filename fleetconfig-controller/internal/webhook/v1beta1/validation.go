@@ -23,7 +23,7 @@ import (
 
 const (
 	warnHubNotFound       = "hub not found, cannot validate spoke addons"
-	errAllowedSpokeUpdate = "spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.values, spec.klusterlet.valuesFrom, spec.kubeconfig, spec.addOns, spec.purgeAgentNamespace, spec.cleanupConfig.purgeKubeconfigSecret, spec.timeout, and spec.logVerbosity are allowed when updating a spoke"
+	errAllowedSpokeUpdate = "spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.values, spec.klusterlet.valuesFrom, spec.klusterlet.addonKubeClientRegistrationAuth, spec.klusterlet.addonTokenExpirationSeconds, spec.kubeconfig, spec.addOns, spec.purgeAgentNamespace, spec.cleanupConfig.purgeKubeconfigSecret, spec.timeout, and spec.logVerbosity are allowed when updating a spoke"
 	errAllowedHubUpdate   = "only changes to spec.apiServer, spec.clusterManager.source.*, spec.hubAddOns, spec.addOnConfigs, spec.logVerbosity, spec.timeout, spec.registrationAuth, and spec.kubeconfig are allowed when updating the hub"
 )
 
@@ -115,6 +115,10 @@ func allowSpokeUpdate(oldSpoke, newSpoke *v1beta1.Spoke) error {
 		newSpokeCopy.Klusterlet.Values = nil
 		oldSpokeCopy.Klusterlet.ValuesFrom = nil
 		newSpokeCopy.Klusterlet.ValuesFrom = nil
+		oldSpokeCopy.Klusterlet.AddonKubeClientRegistrationAuth = ""
+		newSpokeCopy.Klusterlet.AddonKubeClientRegistrationAuth = ""
+		oldSpokeCopy.Klusterlet.AddonTokenExpirationSeconds = 0
+		newSpokeCopy.Klusterlet.AddonTokenExpirationSeconds = 0
 		oldSpokeCopy.Kubeconfig = v1beta1.Kubeconfig{}
 		newSpokeCopy.Kubeconfig = v1beta1.Kubeconfig{}
 		oldSpokeCopy.AddOns = []v1beta1.AddOn{}

@@ -409,6 +409,24 @@ func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub, hub
 		initArgs = append(initArgs, raArgs...)
 	}
 
+	if hub.Spec.RegistrationAuth.GRPCInitEnabled() {
+		ra := hub.Spec.RegistrationAuth
+		initArgs = append(initArgs, fmt.Sprintf("--registration-drivers=%s,%s", v1beta1.CSRRegistrationDriver, v1beta1.GRPCRegistrationDriver))
+		et := v1beta1.GRPCEndpointTypeHostname
+		if ra.GRPC != nil && ra.GRPC.Init != nil && ra.GRPC.Init.EndpointType != "" {
+			et = ra.GRPC.Init.EndpointType
+		}
+		initArgs = append(initArgs, fmt.Sprintf("--grpc-endpoint-type=%s", et))
+		if ra.GRPC != nil && ra.GRPC.Init != nil {
+			if ra.GRPC.Init.HubServer != "" {
+				initArgs = append(initArgs, "--grpc-server", ra.GRPC.Init.HubServer)
+			}
+			if len(ra.GRPC.Init.AutoApprovedIdentities) > 0 {
+				initArgs = append(initArgs, fmt.Sprintf("--auto-approved-grpc-identities=%s", strings.Join(ra.GRPC.Init.AutoApprovedIdentities, ",")))
+			}
+		}
+	}
+
 	if hub.Spec.SingletonControlPlane != nil {
 		initArgs = append(initArgs, "--singleton=true")
 		initArgs = append(initArgs, "--singleton-name", hub.Spec.SingletonControlPlane.Name)
