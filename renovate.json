@@ -14,18 +14,6 @@
       "gomodTidy",
       "gomodMassage"
     ],
-    "postUpgradeTasks": {
-        "commands": [
-            "go mod vendor"
-        ],
-        "fileFilters": [
-            "**/go.mod",
-            "**/go.sum",
-            "**/vendor/**"
-        ],
-        "executionMode": "update",
-        "workingDirTemplate": "{{{packageFileDir}}}"
-    },
     "packageRules": [
       {
         "matchUpdateTypes": [
