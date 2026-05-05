@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
 	operatorapi "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -306,55 +307,91 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub, hubKube
 		return err
 	}
 
-	var mergedClusterManagerValues *v1beta1.ClusterManagerChartConfig
-	var currClusterManagerHash string
-	if hub.Spec.ClusterManager != nil {
-		mergedClusterManagerValues, err = r.mergeClusterManagerValues(ctx, hub)
-		if err != nil {
-			return err
-		}
-		currClusterManagerHash, err = hash.ComputeHash(mergedClusterManagerValues)
-		if err != nil {
-			return fmt.Errorf("failed to compute hash of hub %s cluster-manager values: %w", hub.Name, err)
-		}
+	mergedClusterManagerValues, currClusterManagerHash, valuesHashChanged, err := r.clusterManagerChartState(ctx, hub)
+	if err != nil {
+		return err
 	}
-	valuesHashChanged := hub.Status.ClusterManagerHash != "" && hub.Status.ClusterManagerHash != currClusterManagerHash
 
-	// if a clustermanager already exists, we don't need to init the hub
-	if cm != nil && cm.Status.Conditions != nil {
-		msgs := make([]string, 0)
-		for _, c := range cm.Status.Conditions {
-			if c.Type == operatorv1.ConditionProgressing && c.Status == metav1.ConditionTrue {
-				msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
-			}
-			if c.Type == operatorv1.ConditionClusterManagerApplied && c.Status == metav1.ConditionFalse {
-				msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
-			}
-			if c.Type == operatorv1.ConditionHubRegistrationDegraded && c.Status == metav1.ConditionTrue {
-				msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
-			}
-			if c.Type == operatorv1.ConditionHubPlacementDegraded && c.Status == metav1.ConditionTrue {
-				msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
-			}
-		}
-		if len(msgs) > 0 {
-			msg := strings.TrimSuffix(strings.Join(msgs, "; "), "; ")
-			msg = fmt.Sprintf("hub pending/degraded: %s", msg)
-			hub.SetConditions(true, v1beta1.NewCondition(
-				msg, v1beta1.HubInitialized, metav1.ConditionFalse, metav1.ConditionTrue,
-			))
-			return errors.New(msg)
-		}
-	} else {
-		if err := r.initializeHub(ctx, hub, hubKubeconfig, mergedClusterManagerValues); err != nil {
-			return err
-		}
+	if err := r.ensureHubClusterManagerInitialized(ctx, hub, hubKubeconfig, cm, mergedClusterManagerValues); err != nil {
+		return err
 	}
 
 	hub.SetConditions(true, v1beta1.NewCondition(
 		v1beta1.HubInitialized, v1beta1.HubInitialized, metav1.ConditionTrue, metav1.ConditionTrue,
 	))
 
+	if err := r.reconcileHubAddonConditions(ctx, hub, addonC); err != nil {
+		return err
+	}
+
+	if err := r.maybeUpgradeHubClusterManager(ctx, hub, hubKubeconfig, operatorC, mergedClusterManagerValues, valuesHashChanged); err != nil {
+		return err
+	}
+
+	if hub.Spec.ClusterManager != nil {
+		hub.Status.ClusterManagerHash = currClusterManagerHash
+	}
+
+	return nil
+}
+
+func (r *HubReconciler) clusterManagerChartState(ctx context.Context, hub *v1beta1.Hub) (
+	merged *v1beta1.ClusterManagerChartConfig,
+	currHash string,
+	valuesHashChanged bool,
+	err error,
+) {
+	if hub.Spec.ClusterManager == nil {
+		return nil, "", false, nil
+	}
+	merged, err = r.mergeClusterManagerValues(ctx, hub)
+	if err != nil {
+		return nil, "", false, err
+	}
+	currHash, err = hash.ComputeHash(merged)
+	if err != nil {
+		return nil, "", false, fmt.Errorf("failed to compute hash of hub %s cluster-manager values: %w", hub.Name, err)
+	}
+	valuesHashChanged = hub.Status.ClusterManagerHash != "" && hub.Status.ClusterManagerHash != currHash
+	return merged, currHash, valuesHashChanged, nil
+}
+
+func clusterManagerStatusProblems(cm *operatorv1.ClusterManager) []string {
+	if cm == nil || cm.Status.Conditions == nil {
+		return nil
+	}
+	var msgs []string
+	for _, c := range cm.Status.Conditions {
+		switch {
+		case c.Type == operatorv1.ConditionProgressing && c.Status == metav1.ConditionTrue:
+			msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
+		case c.Type == operatorv1.ConditionClusterManagerApplied && c.Status == metav1.ConditionFalse:
+			msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
+		case c.Type == operatorv1.ConditionHubRegistrationDegraded && c.Status == metav1.ConditionTrue:
+			msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
+		case c.Type == operatorv1.ConditionHubPlacementDegraded && c.Status == metav1.ConditionTrue:
+			msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
+		}
+	}
+	return msgs
+}
+
+// ensureHubClusterManagerInitialized runs clusteradm init when no ClusterManager exists yet; otherwise checks for pending/degraded status.
+func (r *HubReconciler) ensureHubClusterManagerInitialized(ctx context.Context, hub *v1beta1.Hub, hubKubeconfig []byte, cm *operatorv1.ClusterManager, merged *v1beta1.ClusterManagerChartConfig) error {
+	if cm != nil && cm.Status.Conditions != nil {
+		if msgs := clusterManagerStatusProblems(cm); len(msgs) > 0 {
+			msg := fmt.Sprintf("hub pending/degraded: %s", strings.TrimSuffix(strings.Join(msgs, "; "), "; "))
+			hub.SetConditions(true, v1beta1.NewCondition(
+				msg, v1beta1.HubInitialized, metav1.ConditionFalse, metav1.ConditionTrue,
+			))
+			return errors.New(msg)
+		}
+		return nil
+	}
+	return r.initializeHub(ctx, hub, hubKubeconfig, merged)
+}
+
+func (r *HubReconciler) reconcileHubAddonConditions(ctx context.Context, hub *v1beta1.Hub, addonC *addonapi.Clientset) error {
 	addonConfigChanged, err := handleAddonConfig(ctx, r.Client, addonC, hub)
 	if err != nil && addonConfigChanged {
 		hub.SetConditions(true, v1beta1.NewCondition(
@@ -376,34 +413,38 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub, hubKube
 			v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
 		))
 	}
+	return nil
+}
 
-	// attempt an upgrade when the clustermanager bundle/image changes or merged chart values change (clusteradm upgrade clustermanager --cluster-manager-values-file)
-	if hub.Spec.ClusterManager != nil {
-		upgrade, err := r.hubNeedsUpgrade(ctx, hub, operatorC)
-		if err != nil {
+func (r *HubReconciler) maybeUpgradeHubClusterManager(
+	ctx context.Context,
+	hub *v1beta1.Hub,
+	hubKubeconfig []byte,
+	operatorC *operatorapi.Clientset,
+	merged *v1beta1.ClusterManagerChartConfig,
+	valuesHashChanged bool,
+) error {
+	if hub.Spec.ClusterManager == nil {
+		return nil
+	}
+	upgrade, err := r.hubNeedsUpgrade(ctx, hub, operatorC)
+	if err != nil {
+		hub.SetConditions(true, v1beta1.NewCondition(
+			err.Error(), v1beta1.HubUpgradeFailed, metav1.ConditionTrue, metav1.ConditionFalse,
+		))
+		return fmt.Errorf("failed to check if hub needs upgrade: %w", err)
+	}
+	if upgrade || valuesHashChanged {
+		if err := r.upgradeHub(ctx, hub, hubKubeconfig, merged); err != nil {
 			hub.SetConditions(true, v1beta1.NewCondition(
 				err.Error(), v1beta1.HubUpgradeFailed, metav1.ConditionTrue, metav1.ConditionFalse,
 			))
-			return fmt.Errorf("failed to check if hub needs upgrade: %w", err)
+			return fmt.Errorf("failed to upgrade hub: %w", err)
 		}
-		if upgrade || valuesHashChanged {
-			err = r.upgradeHub(ctx, hub, hubKubeconfig, mergedClusterManagerValues)
-			if err != nil {
-				hub.SetConditions(true, v1beta1.NewCondition(
-					err.Error(), v1beta1.HubUpgradeFailed, metav1.ConditionTrue, metav1.ConditionFalse,
-				))
-				return fmt.Errorf("failed to upgrade hub: %w", err)
-			}
-		}
-		hub.SetConditions(true, v1beta1.NewCondition(
-			v1beta1.HubUpgradeFailed, v1beta1.HubUpgradeFailed, metav1.ConditionFalse, metav1.ConditionFalse,
-		))
 	}
-
-	if hub.Spec.ClusterManager != nil {
-		hub.Status.ClusterManagerHash = currClusterManagerHash
-	}
-
+	hub.SetConditions(true, v1beta1.NewCondition(
+		v1beta1.HubUpgradeFailed, v1beta1.HubUpgradeFailed, metav1.ConditionFalse, metav1.ConditionFalse,
+	))
 	return nil
 }
 
