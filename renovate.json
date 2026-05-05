@@ -14,6 +14,18 @@
       "gomodTidy",
       "gomodMassage"
     ],
+    "postUpgradeTasks": {
+        "commands": [
+            "go mod vendor"
+        ],
+        "fileFilters": [
+            "**/go.mod",
+            "**/go.sum",
+            "**/vendor/**"
+        ],
+        "executionMode": "update",
+        "workingDirTemplate": "{{{packageFileDir}}}"
+    },
     "packageRules": [
       {
         "matchUpdateTypes": [
@@ -232,10 +244,7 @@
           "helmv3"
         ],
         "addLabels": [
-          "helm",
-          "test-regression",
-          "skip-ci",
-          "skip-unit-integration-tests"
+          "helm"
         ],
         "automerge": false,
         "groupName": "helm",
@@ -266,10 +275,7 @@
           "cert-manager/cert-manager"
         ],
         "addLabels": [
-          "helm",
-          "test-regression",
-          "skip-ci",
-          "skip-unit-integration-tests"
+          "helm"
         ],
         "automerge": false,
         "groupName": "helm",
