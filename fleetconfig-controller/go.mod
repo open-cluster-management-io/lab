@@ -141,6 +141,7 @@ require (
 )
 
 replace (
+	helm.sh/helm/v3 => helm.sh/helm/v3 v3.18.5
 	k8s.io/api => k8s.io/api v0.34.1
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.34.1
 	k8s.io/apimachinery => k8s.io/apimachinery v0.34.1
@@ -167,5 +168,3 @@ replace (
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.34.1
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.34.1
 )
-
-replace helm.sh/helm/v3 => helm.sh/helm/v3 v3.18.5
