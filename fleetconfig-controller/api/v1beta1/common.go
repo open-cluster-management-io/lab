@@ -135,48 +135,23 @@ func (c Condition) Equal(other Condition) bool {
 		c.Reason == other.Reason && c.Message == other.Message
 }
 
-// RegistrationAuthGRPCInit holds clusteradm init-only gRPC settings for the hub
+// RegistrationAuthGRPC holds clusteradm init gRPC settings for the hub
 // (--grpc-endpoint-type, --grpc-server, --auto-approved-grpc-identities).
 // See open-cluster-management-io/clusteradm init.
-type RegistrationAuthGRPCInit struct {
+type RegistrationAuthGRPC struct {
 	// EndpointType is the gRPC server endpoint type for clusteradm init (--grpc-endpoint-type).
 	// +kubebuilder:validation:Enum=hostname;loadBalancer
 	// +kubebuilder:default:=hostname
 	// +optional
 	EndpointType string `json:"endpointType,omitempty"`
 
-	// HubServer is the address for clusteradm init --grpc-server when configuring the hub.
+	// Server is the address for clusteradm init --grpc-server when configuring the hub.
 	// +optional
-	HubServer string `json:"hubServer,omitempty"`
+	Server string `json:"server,omitempty"`
 
 	// AutoApprovedIdentities are passed to clusteradm init --auto-approved-grpc-identities (comma-separated list).
 	// +optional
 	AutoApprovedIdentities []string `json:"autoApprovedIdentities,omitempty"`
-}
-
-// RegistrationAuthGRPCJoin holds clusteradm join-only gRPC material when registrationAuth.driver is grpc
-// (--grpc-server spoke-reachable address, --grpc-ca-file PEM). Validated as required when driver is grpc.
-// See open-cluster-management-io/clusteradm join.
-type RegistrationAuthGRPCJoin struct {
-	// JoinServer is the address passed to clusteradm join --grpc-server (reachable from the spoke).
-	// +required
-	JoinServer string `json:"joinServer"`
-
-	// CertificateAuthority is PEM content for clusteradm join --grpc-ca-file.
-	// +required
-	CertificateAuthority string `json:"certificateAuthority"`
-}
-
-// RegistrationAuthGRPC groups clusteradm init and join gRPC settings. Init and Join may be set independently:
-// Init is used for clusteradm init; Join is used for clusteradm join when driver is grpc.
-type RegistrationAuthGRPC struct {
-	// Init holds clusteradm init gRPC settings (registration-drivers csr,grpc and related flags).
-	// +optional
-	Init *RegistrationAuthGRPCInit `json:"init,omitempty"`
-
-	// Join configures gRPC for clusteradm join when driver is grpc.
-	// +optional
-	Join *RegistrationAuthGRPCJoin `json:"join,omitempty"`
 }
 
 // GRPCInitEnabled reports whether clusteradm init should enable the csr,grpc registration driver and related init flags.
@@ -187,11 +162,11 @@ func (r RegistrationAuth) GRPCInitEnabled() bool {
 	if r.Driver == GRPCRegistrationDriver {
 		return true
 	}
-	if r.GRPC == nil || r.GRPC.Init == nil {
+	h := r.GRPC
+	if h == nil {
 		return false
 	}
-	h := r.GRPC.Init
-	if h.HubServer != "" || len(h.AutoApprovedIdentities) > 0 {
+	if h.Server != "" || len(h.AutoApprovedIdentities) > 0 {
 		return true
 	}
 	return strings.EqualFold(h.EndpointType, GRPCEndpointTypeLoadBalancer)

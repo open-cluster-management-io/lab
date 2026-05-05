@@ -279,46 +279,24 @@ spec:
                     description: GRPC holds gRPC-specific settings for clusteradm
                       init and join.
                     properties:
-                      init:
-                        description: Init holds clusteradm init gRPC settings (registration-drivers
-                          csr,grpc and related flags).
-                        properties:
-                          autoApprovedIdentities:
-                            description: AutoApprovedIdentities are passed to clusteradm
-                              init --auto-approved-grpc-identities (comma-separated
-                              list).
-                            items:
-                              type: string
-                            type: array
-                          endpointType:
-                            default: hostname
-                            description: EndpointType is the gRPC server endpoint
-                              type for clusteradm init (--grpc-endpoint-type).
-                            enum:
-                            - hostname
-                            - loadBalancer
-                            type: string
-                          hubServer:
-                            description: HubServer is the address for clusteradm init
-                              --grpc-server when configuring the hub.
-                            type: string
-                        type: object
-                      join:
-                        description: Join configures gRPC for clusteradm join when
-                          driver is grpc.
-                        properties:
-                          certificateAuthority:
-                            description: CertificateAuthority is PEM content for clusteradm
-                              join --grpc-ca-file.
-                            type: string
-                          joinServer:
-                            description: JoinServer is the address passed to clusteradm
-                              join --grpc-server (reachable from the spoke).
-                            type: string
-                        required:
-                        - certificateAuthority
-                        - joinServer
-                        type: object
+                      autoApprovedIdentities:
+                        description: AutoApprovedIdentities are passed to clusteradm
+                          init --auto-approved-grpc-identities (comma-separated list).
+                        items:
+                          type: string
+                        type: array
+                      endpointType:
+                        default: hostname
+                        description: EndpointType is the gRPC server endpoint type
+                          for clusteradm init (--grpc-endpoint-type).
+                        enum:
+                        - hostname
+                        - loadBalancer
+                        type: string
+                      server:
+                        description: Server is the address for clusteradm init --grpc-server
+                          when configuring the hub.
+                        type: string
                     type: object
                   hubClusterARN:
                     description: The Hub cluster ARN for awsirsa registration authentication.
@@ -435,6 +413,17 @@ spec:
                   - wantStatus
                   type: object
                 type: array
+              grpcServer:
+                description: |-
+                  GRPCServer is the observed gRPC listen address (host:port) from the hub cluster's cluster-manager-grpc-server
+                  LoadBalancer ingress when registrationAuth.grpc.endpointType is loadBalancer. When endpoint type is hostname,
+                  spokes use spec.registrationAuth.grpc.server instead and this field may be empty.
+                type: string
+              grpcServerCA:
+                description: |-
+                  GRPCServerCA is the observed PEM CA bundle from the hub cluster's open-cluster-management-hub/ca-bundle-configmap
+                  (data key ca-bundle.crt).
+                type: string
               installedHubAddOns:
                 items:
                   description: InstalledHubAddOn tracks metadata for each hubAddon

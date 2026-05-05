@@ -24,27 +24,10 @@ func validateHubRegistrationAuth(h *v1beta1.Hub) field.ErrorList {
 		errs = append(errs, field.Invalid(base.Child("grpc"), ra.GRPC, "grpc must be unset when registrationAuth.driver is awsirsa"))
 	}
 
-	if ra.GRPC != nil && ra.GRPC.Join != nil && ra.Driver != v1beta1.GRPCRegistrationDriver {
-		errs = append(errs, field.Invalid(base.Child("grpc").Child("join"), ra.GRPC.Join, "grpc.join is only allowed when registrationAuth.driver is grpc"))
-	}
-
-	if ra.GRPC != nil && ra.GRPC.Init != nil {
-		et := ra.GRPC.Init.EndpointType
-		if et != "" && !strings.EqualFold(et, v1beta1.GRPCEndpointTypeHostname) && !strings.EqualFold(et, v1beta1.GRPCEndpointTypeLoadBalancer) {
-			errs = append(errs, field.NotSupported(base.Child("grpc").Child("init").Child("endpointType"), et, []string{v1beta1.GRPCEndpointTypeHostname, v1beta1.GRPCEndpointTypeLoadBalancer}))
-		}
-	}
-
-	if ra.Driver == v1beta1.GRPCRegistrationDriver {
-		if ra.GRPC == nil || ra.GRPC.Join == nil {
-			errs = append(errs, field.Required(base.Child("grpc").Child("join"), "grpc.join is required when registrationAuth.driver is grpc"))
-		} else {
-			if ra.GRPC.Join.JoinServer == "" {
-				errs = append(errs, field.Required(base.Child("grpc").Child("join").Child("joinServer"), "joinServer is required when registrationAuth.driver is grpc"))
-			}
-			if ra.GRPC.Join.CertificateAuthority == "" {
-				errs = append(errs, field.Required(base.Child("grpc").Child("join").Child("certificateAuthority"), "certificateAuthority is required when registrationAuth.driver is grpc"))
-			}
+	if ra.GRPC != nil && ra.GRPC.EndpointType != "" {
+		et := ra.GRPC.EndpointType
+		if !strings.EqualFold(et, v1beta1.GRPCEndpointTypeHostname) && !strings.EqualFold(et, v1beta1.GRPCEndpointTypeLoadBalancer) {
+			errs = append(errs, field.NotSupported(base.Child("grpc").Child("endpointType"), et, []string{v1beta1.GRPCEndpointTypeHostname, v1beta1.GRPCEndpointTypeLoadBalancer}))
 		}
 	}
 
@@ -93,7 +76,7 @@ func validateSpokeRegistrationWithHub(ctx context.Context, c client.Reader, spok
 
 	if merged != nil && merged.GRPCConfig != "" {
 		errs = append(errs, field.Invalid(field.NewPath("spec").Child("klusterlet"), spoke.Spec.Klusterlet,
-			"effective klusterlet chart values (spec.klusterlet.values merged over spec.klusterlet.valuesFrom) must not set grpcConfig when hub registrationAuth.driver is grpc; configure gRPC join via hub.spec.registrationAuth.grpc.join"))
+			"effective klusterlet chart values (spec.klusterlet.values merged over spec.klusterlet.valuesFrom) must not set grpcConfig when hub registrationAuth.driver is grpc; configure gRPC via hub.spec.registrationAuth.grpc (server when endpointType is not loadBalancer, or hub status when loadBalancer) and hub status grpcServerCA"))
 	}
 	return errs
 }

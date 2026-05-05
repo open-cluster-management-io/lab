@@ -48,45 +48,21 @@ func TestValidateHubRegistrationAuth(t *testing.T) {
 		wantLen int
 	}{
 		{
-			name: "grpc driver with full grpc",
+			name: "grpc driver with hostname grpc",
 			hub: &v1beta1.Hub{
 				ObjectMeta: metav1.ObjectMeta{Name: "h"},
 				Spec: v1beta1.HubSpec{
 					RegistrationAuth: v1beta1.RegistrationAuth{
 						Driver: v1beta1.GRPCRegistrationDriver,
 						GRPC: &v1beta1.RegistrationAuthGRPC{
-							Init: &v1beta1.RegistrationAuthGRPCInit{
-								EndpointType:           v1beta1.GRPCEndpointTypeHostname,
-								HubServer:              "hub-grpc:8090",
-								AutoApprovedIdentities: []string{"system:serviceaccount:open-cluster-management-hub:grpc"},
-							},
-							Join: &v1beta1.RegistrationAuthGRPCJoin{
-								JoinServer:           "grpc.example:8090",
-								CertificateAuthority: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----",
-							},
+							EndpointType:           v1beta1.GRPCEndpointTypeHostname,
+							Server:                 "hub-grpc:8090",
+							AutoApprovedIdentities: []string{"system:serviceaccount:open-cluster-management-hub:grpc"},
 						},
 					},
 				},
 			},
 			wantLen: 0,
-		},
-		{
-			name: "grpc driver missing join server",
-			hub: &v1beta1.Hub{
-				ObjectMeta: metav1.ObjectMeta{Name: "h"},
-				Spec: v1beta1.HubSpec{
-					RegistrationAuth: v1beta1.RegistrationAuth{
-						Driver: v1beta1.GRPCRegistrationDriver,
-						GRPC: &v1beta1.RegistrationAuthGRPC{
-							Join: &v1beta1.RegistrationAuthGRPCJoin{
-								JoinServer:           "",
-								CertificateAuthority: "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----",
-							},
-						},
-					},
-				},
-			},
-			wantLen: 1,
 		},
 		{
 			name: "awsirsa with grpc block",
@@ -95,7 +71,7 @@ func TestValidateHubRegistrationAuth(t *testing.T) {
 				Spec: v1beta1.HubSpec{
 					RegistrationAuth: v1beta1.RegistrationAuth{
 						Driver: v1beta1.AWSIRSARegistrationDriver,
-						GRPC:   &v1beta1.RegistrationAuthGRPC{Init: &v1beta1.RegistrationAuthGRPCInit{HubServer: "x"}},
+						GRPC:   &v1beta1.RegistrationAuthGRPC{Server: "x"},
 					},
 				},
 			},

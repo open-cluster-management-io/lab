@@ -986,6 +986,29 @@ type hubMeta struct {
 	kubeconfig []byte
 }
 
+// effectiveGRPCJoinServerAndCA resolves clusteradm join --grpc-server and CA PEM for gRPC registration.
+// When registrationAuth.grpc.endpointType is loadBalancer, --grpc-server comes from hub status grpcServer (observed from the hub cluster).
+// Otherwise the spoke uses registrationAuth.grpc.server. The CA PEM always comes from hub status grpcServerCA (ca-bundle ConfigMap on the hub).
+func effectiveGRPCJoinServerAndCA(hub *v1beta1.Hub) (server, ca string, err error) {
+	g := hub.Spec.RegistrationAuth.GRPC
+	if g == nil {
+		return "", "", fmt.Errorf("hub.spec.registrationAuth.grpc is required when registrationAuth.driver is grpc (hub %s/%s)", hub.Namespace, hub.Name)
+	}
+	if strings.EqualFold(g.EndpointType, v1beta1.GRPCEndpointTypeLoadBalancer) {
+		server = hub.Status.GRPCServer
+	} else {
+		server = g.Server
+	}
+	ca = hub.Status.GRPCServerCA
+	if server == "" || ca == "" {
+		return "", "", fmt.Errorf(
+			"gRPC join needs hub status grpcServerCA, and either hub status grpcServer (loadBalancer endpoint type) or spec.registrationAuth.grpc.server (hub %s/%s)",
+			hub.Namespace, hub.Name,
+		)
+	}
+	return server, ca, nil
+}
+
 // appendJoinSpokeTransportAndAuthArgs appends hub endpoint, hub TLS, registration drivers, hosted-mode kubeconfig,
 // proxy, and addon-kubeclient flags for clusteradm join.
 func (r *SpokeReconciler) appendJoinSpokeTransportAndAuthArgs(ctx context.Context, joinArgs []string, spoke *v1beta1.Spoke, hub *v1beta1.Hub, tokenMeta *tokenMeta) ([]string, error) {
@@ -1024,11 +1047,11 @@ func (r *SpokeReconciler) appendJoinSpokeTransportAndAuthArgs(ctx context.Contex
 	}
 
 	if hub.Spec.RegistrationAuth.Driver == v1beta1.GRPCRegistrationDriver {
-		g := hub.Spec.RegistrationAuth.GRPC
-		if g == nil || g.Join == nil || g.Join.JoinServer == "" || g.Join.CertificateAuthority == "" {
-			return nil, fmt.Errorf("hub registrationAuth.grpc.join.joinServer and certificateAuthority are required when registrationAuth.driver is grpc")
+		grpcServer, grpcCA, err := effectiveGRPCJoinServerAndCA(hub)
+		if err != nil {
+			return nil, err
 		}
-		grpcCAFile, grpcCACleanup, err := file.TmpFile([]byte(g.Join.CertificateAuthority), "grpc-ca")
+		grpcCAFile, grpcCACleanup, err := file.TmpFile([]byte(grpcCA), "grpc-ca")
 		if grpcCACleanup != nil {
 			defer grpcCACleanup()
 		}
@@ -1037,7 +1060,7 @@ func (r *SpokeReconciler) appendJoinSpokeTransportAndAuthArgs(ctx context.Contex
 		}
 		joinArgs = append(joinArgs,
 			fmt.Sprintf("--registration-auth=%s", v1beta1.GRPCRegistrationDriver),
-			"--grpc-server", g.Join.JoinServer,
+			"--grpc-server", grpcServer,
 			fmt.Sprintf("--grpc-ca-file=%s", grpcCAFile),
 		)
 	}

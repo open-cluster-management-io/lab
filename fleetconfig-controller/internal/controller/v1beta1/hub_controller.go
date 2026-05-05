@@ -381,6 +381,21 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub, hubKube
 		))
 	}
 
+	// reconcile hub gRPC status
+	hub.Status.GRPCServer = ""
+	hub.Status.GRPCServerCA = ""
+
+	if grpcHubObservationEnabled(hub) {
+		hubC, err := grpcHubKubernetesClient(ctx, hub, hubKubeconfig)
+		if err != nil {
+			return fmt.Errorf("failed to create gRPC hub client: %w", err)
+		}
+		r.observeHubGRPCCABundleStatus(ctx, hub, hubC)
+		if grpcHubLoadBalancerJoinAddressEnabled(hub) {
+			r.observeHubGRPCServerLoadBalancerStatus(ctx, hub, hubC)
+		}
+	}
+
 	return nil
 }
 
@@ -413,17 +428,15 @@ func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub, hub
 		ra := hub.Spec.RegistrationAuth
 		initArgs = append(initArgs, fmt.Sprintf("--registration-drivers=%s,%s", v1beta1.CSRRegistrationDriver, v1beta1.GRPCRegistrationDriver))
 		et := v1beta1.GRPCEndpointTypeHostname
-		if ra.GRPC != nil && ra.GRPC.Init != nil && ra.GRPC.Init.EndpointType != "" {
-			et = ra.GRPC.Init.EndpointType
+		if ra.GRPC != nil && ra.GRPC.EndpointType != "" {
+			et = ra.GRPC.EndpointType
 		}
 		initArgs = append(initArgs, fmt.Sprintf("--grpc-endpoint-type=%s", et))
-		if ra.GRPC != nil && ra.GRPC.Init != nil {
-			if ra.GRPC.Init.HubServer != "" {
-				initArgs = append(initArgs, "--grpc-server", ra.GRPC.Init.HubServer)
-			}
-			if len(ra.GRPC.Init.AutoApprovedIdentities) > 0 {
-				initArgs = append(initArgs, fmt.Sprintf("--auto-approved-grpc-identities=%s", strings.Join(ra.GRPC.Init.AutoApprovedIdentities, ",")))
-			}
+		if ra.GRPC != nil && ra.GRPC.Server != "" {
+			initArgs = append(initArgs, "--grpc-server", ra.GRPC.Server)
+		}
+		if ra.GRPC != nil && len(ra.GRPC.AutoApprovedIdentities) > 0 {
+			initArgs = append(initArgs, fmt.Sprintf("--auto-approved-grpc-identities=%s", strings.Join(ra.GRPC.AutoApprovedIdentities, ",")))
 		}
 	}
 

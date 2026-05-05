@@ -219,6 +219,17 @@ type HubStatus struct {
 	// Conditions are the current conditions of the Hub.
 	Conditions []Condition `json:"conditions,omitempty"`
 
+	// GRPCServer is the observed gRPC listen address (host:port) from the hub cluster's cluster-manager-grpc-server
+	// LoadBalancer ingress when registrationAuth.grpc.endpointType is loadBalancer. When endpoint type is hostname,
+	// spokes use spec.registrationAuth.grpc.server instead and this field may be empty.
+	// +optional
+	GRPCServer string `json:"grpcServer,omitempty"`
+
+	// GRPCServerCA is the observed PEM CA bundle from the hub cluster's open-cluster-management-hub/ca-bundle-configmap
+	// (data key ca-bundle.crt).
+	// +optional
+	GRPCServerCA string `json:"grpcServerCA,omitempty"`
+
 	InstalledHubAddOns []InstalledHubAddOn `json:"installedHubAddOns,omitempty"`
 }
 

@@ -1,3 +1,4 @@
+// Package klusterletvalues provides functions for merging klusterlet chart values.
 package klusterletvalues
 
 import (
