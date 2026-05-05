@@ -16,7 +16,7 @@
     ],
     "postUpgradeTasks": {
         "commands": [
-            "if [ -f go.mod ]; then go mod vendor; fi"
+            "go mod vendor"
         ],
         "fileFilters": [
             "**/go.mod",
