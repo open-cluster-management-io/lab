@@ -23,7 +23,7 @@ import (
 
 const (
 	warnHubNotFound       = "hub not found, cannot validate spoke addons"
-	errAllowedSpokeUpdate = "spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.values, spec.klusterlet.valuesFrom, spec.klusterlet.addonKubeClientRegistrationAuth, spec.klusterlet.addonTokenExpirationSeconds, spec.kubeconfig, spec.addOns, spec.purgeAgentNamespace, spec.cleanupConfig.purgeKubeconfigSecret, spec.timeout, and spec.logVerbosity are allowed when updating a spoke"
+	errAllowedSpokeUpdate = "spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.values, spec.klusterlet.valuesFrom, spec.klusterlet.addonKubeClientRegistrationAuth, spec.klusterlet.addonTokenExpirationSeconds, spec.kubeconfig, spec.addOns, spec.cleanupConfig (any field), spec.timeout, and spec.logVerbosity are allowed when updating a spoke"
 	errAllowedHubUpdate   = "only changes to spec.apiServer, spec.clusterManager.source.*, spec.hubAddOns, spec.addOnConfigs, spec.logVerbosity, spec.timeout, spec.registrationAuth, and spec.kubeconfig are allowed when updating the hub"
 )
 
@@ -96,15 +96,20 @@ func allowHubUpdate(oldHub, newHub *v1beta1.Hub) error {
 }
 
 // allowSpokeUpdate validates that only allowed fields are changed when updating a Spoke.
+// It deep-copies both specs, clears the allowed-mutable portions listed below, then requires
+// the remainder to be unchanged. Clearing uses zero values (e.g. the entire spec.cleanupConfig
+// struct is zeroed, so any field under cleanupConfig may differ without tripping this check).
 // Allowed changes include:
-// - spec.klusterlet.annotations
-// - spec.klusterlet.values
-// - spec.klusterlet.valuesFrom
-// - spec.kubeconfig
-// - spec.addOns
-// - spec.timeout
-// - spec.logVerbosity
-// - spec.cleanupConfig
+//   - spec.klusterlet.annotations
+//   - spec.klusterlet.values
+//   - spec.klusterlet.valuesFrom
+//   - spec.klusterlet.addonKubeClientRegistrationAuth
+//   - spec.klusterlet.addonTokenExpirationSeconds
+//   - spec.kubeconfig
+//   - spec.addOns
+//   - spec.timeout
+//   - spec.logVerbosity
+//   - spec.cleanupConfig (all fields)
 func allowSpokeUpdate(oldSpoke, newSpoke *v1beta1.Spoke) error {
 	if !reflect.DeepEqual(newSpoke.Spec, oldSpoke.Spec) {
 		oldSpokeCopy := oldSpoke.Spec.DeepCopy()

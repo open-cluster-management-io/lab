@@ -381,6 +381,24 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "allowed - cleanupConfig change (non-purgeKubeconfigSecret field)",
+			oldSpoke: &v1beta1.Spoke{
+				Spec: v1beta1.SpokeSpec{
+					CleanupConfig: v1beta1.CleanupConfig{
+						PurgeKlusterletOperator: true,
+					},
+				},
+			},
+			newSpoke: &v1beta1.Spoke{
+				Spec: v1beta1.SpokeSpec{
+					CleanupConfig: v1beta1.CleanupConfig{
+						PurgeKlusterletOperator: false,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "allowed - timeout change",
 			oldSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
