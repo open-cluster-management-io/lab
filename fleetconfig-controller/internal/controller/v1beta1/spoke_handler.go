@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"dario.cat/mergo"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +37,7 @@ import (
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/hash"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/klusterletvalues"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/version"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/pkg/common"
@@ -1436,61 +1436,9 @@ func (r *SpokeReconciler) mergeKlusterletValues(ctx context.Context, spoke *v1be
 		return nil, nil
 	}
 
-	var fromInterface = map[string]any{}
-	var specInterface = map[string]any{}
-
-	if spoke.Spec.Klusterlet.ValuesFrom != nil {
-		cm := &corev1.ConfigMap{}
-		nn := types.NamespacedName{Name: spoke.Spec.Klusterlet.ValuesFrom.Name, Namespace: spoke.Namespace}
-		err := r.Get(ctx, nn, cm)
-		if err != nil {
-			if kerrs.IsNotFound(err) {
-				// cm not found, return spec's values
-				logger.V(1).Info("warning: Klusterlet values ConfigMap not found", "spoke", spoke.Name, "configMap", nn)
-				return spoke.Spec.Klusterlet.Values, nil
-			}
-			return nil, fmt.Errorf("failed to retrieve Klusterlet values ConfigMap %s: %w", nn, err)
-		}
-		fromValues, ok := cm.Data[spoke.Spec.Klusterlet.ValuesFrom.Key]
-		if !ok {
-			logger.V(1).Info("warning: Klusterlet values key not found in ConfigMap", "spoke", spoke.Name, "configMap", nn, "key", spoke.Spec.Klusterlet.ValuesFrom.Key)
-			return spoke.Spec.Klusterlet.Values, nil
-		}
-		fromBytes := []byte(fromValues)
-		err = yaml.Unmarshal(fromBytes, &fromInterface)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal YAML values from ConfigMap %s key %s: %w", nn, spoke.Spec.Klusterlet.ValuesFrom.Key, err)
-		}
-	}
-
-	if spoke.Spec.Klusterlet.Values != nil {
-		specBytes, err := yaml.Marshal(spoke.Spec.Klusterlet.Values)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal Klusterlet values from spoke spec for spoke %s: %w", spoke.Name, err)
-		}
-		err = yaml.Unmarshal(specBytes, &specInterface)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal Klusterlet values from spoke spec for spoke %s: %w", spoke.Name, err)
-		}
-	}
-
-	mergedMap := map[string]any{}
-	maps.Copy(mergedMap, fromInterface)
-
-	// Merge spec on top but ignore zero-values from spec
-	if err := mergo.Map(&mergedMap, specInterface, mergo.WithOverride); err != nil {
-		return nil, fmt.Errorf("merge failed for spoke %s: %w", spoke.Name, err)
-	}
-
-	mergedBytes, err := yaml.Marshal(mergedMap)
+	merged, err := klusterletvalues.Merge(ctx, r.Client, spoke.Namespace, spoke.Spec.Klusterlet, klusterletvalues.MergeOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal merged Klusterlet values for spoke %s: %w", spoke.Name, err)
-	}
-
-	merged := &v1beta1.KlusterletChartConfig{}
-	err = yaml.Unmarshal(mergedBytes, merged)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal merged values into KlusterletChartConfig for spoke %s: %w", spoke.Name, err)
+		return nil, fmt.Errorf("merge klusterlet values for spoke %s: %w", spoke.Name, err)
 	}
 
 	return merged, nil

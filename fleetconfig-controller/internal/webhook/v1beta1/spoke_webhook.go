@@ -103,7 +103,7 @@ func (v *SpokeCustomValidator) ValidateCreate(ctx context.Context, obj runtime.O
 	hub := &v1beta1.Hub{}
 	err := v.client.Get(ctx, types.NamespacedName{Name: spoke.Spec.HubRef.Name, Namespace: spoke.Spec.HubRef.Namespace}, hub)
 	if err == nil {
-		allErrs = append(allErrs, validateSpokeRegistrationWithHub(spoke, hub)...)
+		allErrs = append(allErrs, validateSpokeRegistrationWithHub(ctx, v.client, spoke, hub)...)
 	}
 
 	warn, errs := v.validateAddons(ctx, v.client, spoke)
@@ -145,7 +145,7 @@ func (v *SpokeCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newOb
 
 	hub := &v1beta1.Hub{}
 	if err := v.client.Get(ctx, types.NamespacedName{Name: spoke.Spec.HubRef.Name, Namespace: spoke.Spec.HubRef.Namespace}, hub); err == nil {
-		allErrs = append(allErrs, validateSpokeRegistrationWithHub(spoke, hub)...)
+		allErrs = append(allErrs, validateSpokeRegistrationWithHub(ctx, v.client, spoke, hub)...)
 	}
 
 	warn, valErrs := v.validateAddons(ctx, v.client, spoke)
