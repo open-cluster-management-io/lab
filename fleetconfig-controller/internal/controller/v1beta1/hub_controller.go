@@ -388,7 +388,14 @@ func clusterManagerStatusProblems(cm *operatorv1.ClusterManager) []string {
 
 // ensureHubClusterManagerInitialized runs clusteradm init when no ClusterManager exists yet; otherwise checks for pending/degraded status.
 func (r *HubReconciler) ensureHubClusterManagerInitialized(ctx context.Context, hub *v1beta1.Hub, hubKubeconfig []byte, cm *operatorv1.ClusterManager, merged *v1beta1.ClusterManagerChartConfig) error {
-	if cm != nil && cm.Status.Conditions != nil {
+	if cm != nil {
+		if len(cm.Status.Conditions) == 0 {
+			msg := "waiting for ClusterManager status conditions"
+			hub.SetConditions(true, v1beta1.NewCondition(
+				msg, v1beta1.HubInitialized, metav1.ConditionFalse, metav1.ConditionTrue,
+			))
+			return errors.New(msg)
+		}
 		if msgs := clusterManagerStatusProblems(cm); len(msgs) > 0 {
 			msg := fmt.Sprintf("hub pending/degraded: %s", strings.TrimSuffix(strings.Join(msgs, "; "), "; "))
 			hub.SetConditions(true, v1beta1.NewCondition(
