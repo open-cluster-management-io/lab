@@ -668,6 +668,7 @@ func (r *HubReconciler) upgradeHub(ctx context.Context, hub *v1beta1.Hub, hubKub
 }
 
 // mergeClusterManagerValues merges chart values from a ConfigMap in the Hub namespace and from the Hub spec. Spec takes precedence.
+// If valuesFrom is set, the referenced ConfigMap and data key must exist or an error is returned.
 func (r *HubReconciler) mergeClusterManagerValues(ctx context.Context, hub *v1beta1.Hub) (*v1beta1.ClusterManagerChartConfig, error) {
 	logger := log.FromContext(ctx)
 	cmSpec := hub.Spec.ClusterManager
@@ -688,15 +689,19 @@ func (r *HubReconciler) mergeClusterManagerValues(ctx context.Context, hub *v1be
 		err := r.Get(ctx, nn, configMap)
 		if err != nil {
 			if kerrs.IsNotFound(err) {
-				logger.V(1).Info("warning: cluster-manager values ConfigMap not found", "hub", hub.Name, "configMap", nn)
-				return cmSpec.Values, nil
+				return nil, fmt.Errorf(
+					"cluster-manager valuesFrom references missing ConfigMap %s/%s for hub %s",
+					hub.Namespace, cmSpec.ValuesFrom.Name, hub.Name,
+				)
 			}
 			return nil, fmt.Errorf("failed to retrieve cluster-manager values ConfigMap %s: %w", nn, err)
 		}
 		fromValues, ok := configMap.Data[cmSpec.ValuesFrom.Key]
 		if !ok {
-			logger.V(1).Info("warning: cluster-manager values key not found in ConfigMap", "hub", hub.Name, "configMap", nn, "key", cmSpec.ValuesFrom.Key)
-			return cmSpec.Values, nil
+			return nil, fmt.Errorf(
+				"cluster-manager valuesFrom key %q not found in ConfigMap %s/%s for hub %s",
+				cmSpec.ValuesFrom.Key, hub.Namespace, cmSpec.ValuesFrom.Name, hub.Name,
+			)
 		}
 		if err := yaml.Unmarshal([]byte(fromValues), &fromInterface); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal YAML values from ConfigMap %s key %s: %w", nn, cmSpec.ValuesFrom.Key, err)
