@@ -307,7 +307,7 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub, hubKube
 		return err
 	}
 
-	mergedClusterManagerValues, currClusterManagerHash, valuesHashChanged, err := r.clusterManagerChartState(ctx, hub)
+	mergedClusterManagerValues, currClusterManagerHash, valuesHashChanged, err := r.clusterManagerChartState(ctx, hub, cm != nil)
 	if err != nil {
 		return err
 	}
@@ -335,7 +335,7 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub, hubKube
 	return nil
 }
 
-func (r *HubReconciler) clusterManagerChartState(ctx context.Context, hub *v1beta1.Hub) (
+func (r *HubReconciler) clusterManagerChartState(ctx context.Context, hub *v1beta1.Hub, clusterManagerExists bool) (
 	merged *v1beta1.ClusterManagerChartConfig,
 	currHash string,
 	valuesHashChanged bool,
@@ -352,8 +352,18 @@ func (r *HubReconciler) clusterManagerChartState(ctx context.Context, hub *v1bet
 	if err != nil {
 		return nil, "", false, fmt.Errorf("failed to compute hash of hub %s cluster-manager values: %w", hub.Name, err)
 	}
-	valuesHashChanged = hub.Status.ClusterManagerHash != "" && hub.Status.ClusterManagerHash != currHash
+	prevHash := hub.Status.ClusterManagerHash
+	valuesHashChanged = clusterManagerValuesUpgradeNeeded(prevHash, currHash, clusterManagerExists, merged)
 	return merged, currHash, valuesHashChanged, nil
+}
+
+// clusterManagerValuesUpgradeNeeded reports whether clusteradm upgrade clustermanager should run
+// to apply merged Helm values. When prevHash is empty, an upgrade is still required if the hub
+// already has a ClusterManager and non-empty merged values—otherwise the controller could persist
+// a new hash without ever passing --cluster-manager-values-file.
+func clusterManagerValuesUpgradeNeeded(prevHash, currHash string, clusterManagerExists bool, merged *v1beta1.ClusterManagerChartConfig) bool {
+	hasNonEmptyMergedValues := merged != nil && !merged.IsEmpty()
+	return currHash != prevHash && (prevHash != "" || (clusterManagerExists && hasNonEmptyMergedValues))
 }
 
 func clusterManagerStatusProblems(cm *operatorv1.ClusterManager) []string {
