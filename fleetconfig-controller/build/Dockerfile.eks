@@ -43,7 +43,7 @@ RUN curl -L https://raw.githubusercontent.com/open-cluster-management-io/cluster
 
 # Install aws-iam-authenticator (AWSIAMAUTH_VERSION from hack/.versions.env)
 ARG AWSIAMAUTH_VERSION
-RUN curl -Lo aws-iam-authenticator https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/download/v${AWSIAMAUTH_VERSION}/aws-iam-authenticator_${AWSIAMAUTH_VERSION}_${OS}_${ARCH} \
+RUN curl --fail -Lo aws-iam-authenticator https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/download/v${AWSIAMAUTH_VERSION}/aws-iam-authenticator_${AWSIAMAUTH_VERSION}_${OS}_${ARCH} \
     && chmod +x aws-iam-authenticator && \
     mv aws-iam-authenticator /usr/local/bin/aws-iam-authenticator
 

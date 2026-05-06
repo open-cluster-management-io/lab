@@ -69,7 +69,7 @@ RUN case ${ARCH} in \
         "arm64") GCLOUD_ARCH=arm ;; \
         *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
     esac \
-    && curl -Lo google-cloud-sdk.tar.gz https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-${OS}-${GCLOUD_ARCH}.tar.gz \
+    && curl --fail -Lo google-cloud-sdk.tar.gz https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-${OS}-${GCLOUD_ARCH}.tar.gz \
     && tar -xzf google-cloud-sdk.tar.gz \
     && rm google-cloud-sdk.tar.gz \
     && ./google-cloud-sdk/install.sh --quiet \
