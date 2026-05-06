@@ -27,6 +27,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ktypes "k8s.io/apimachinery/pkg/types"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -77,7 +78,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 
 	// Tests Hub and Spoke operations with ResourceCleanup feature gate enabled, verifying:
 	// 1. Cluster joining (spoke and hub-as-spoke) to the hub
-	// 2. Addon configuration on hub and installation on spoke
+	// 2. Addon configuration on hub and installation on spoke; ClusterManager.Values applied on the hub
 	// 3. ManifestWork creation in hub-as-spoke namespace and namespace creation validation
 	// 4. Prevention of feature gate modifications during active operation
 	// 5. Addon update and propagation
@@ -102,6 +103,73 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 
 		It("should verify addons configured on the hub and enabled on the spoke", func() {
 			ensureAddonCreated(tc, 0)
+		})
+
+		It("should reconcile innocuous ClusterManager chart values onto the hub", func() {
+			const ocmNamespace = "open-cluster-management"
+			clusterManagerOperatorNN := ktypes.NamespacedName{Name: "cluster-manager", Namespace: ocmNamespace}
+			wantCPU := resource.MustParse("3m")
+			wantMemory := resource.MustParse("20Mi")
+
+			By("setting Hub.spec.clusterManager.values (operator resources) and waiting for the cluster-manager deployment to match")
+			EventuallyWithOffset(1, func() error {
+				h := &v1beta1.Hub{}
+				if err := tc.kClient.Get(tc.ctx, v1beta1hubNN, h); err != nil {
+					return err
+				}
+				if h.Spec.ClusterManager == nil {
+					return fmt.Errorf("hub.spec.clusterManager is nil")
+				}
+				h.Spec.ClusterManager.Values = &v1beta1.ClusterManagerChartConfig{
+					ClusterManagerChartConfig: chart.ClusterManagerChartConfig{
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    wantCPU,
+								corev1.ResourceMemory: wantMemory,
+							},
+						},
+						// Hub CRD validates embedded operator types: ResourceRequirement.type must be
+						// Default | BestEffort | ResourceRequirement, never empty.
+						ClusterManager: chart.ClusterManagerConfig{
+							ResourceRequirement: operatorv1.ResourceRequirement{
+								Type: operatorv1.ResourceQosClassDefault,
+							},
+						},
+					},
+				}
+				if err := tc.kClient.Update(tc.ctx, h); err != nil {
+					return err
+				}
+				return nil
+			}, 2*time.Minute, 5*time.Second).Should(Succeed())
+
+			EventuallyWithOffset(1, func() error {
+				dep := &appsv1.Deployment{}
+				if err := tc.kClient.Get(tc.ctx, clusterManagerOperatorNN, dep); err != nil {
+					return err
+				}
+				for _, c := range dep.Spec.Template.Spec.Containers {
+					if c.Name != "registration-operator" {
+						continue
+					}
+					if c.Resources.Requests == nil {
+						return fmt.Errorf("registration-operator container has no resource requests")
+					}
+					gotCPU, ok := c.Resources.Requests[corev1.ResourceCPU]
+					if !ok || gotCPU.Cmp(wantCPU) != 0 {
+						return fmt.Errorf("registration-operator cpu request: want %s, got %v", wantCPU.String(), c.Resources.Requests[corev1.ResourceCPU])
+					}
+					gotMem, ok := c.Resources.Requests[corev1.ResourceMemory]
+					if !ok || gotMem.Cmp(wantMemory) != 0 {
+						return fmt.Errorf("registration-operator memory request: want %s, got %v", wantMemory.String(), c.Resources.Requests[corev1.ResourceMemory])
+					}
+					return nil
+				}
+				return fmt.Errorf("registration-operator container not found on cluster-manager deployment")
+			}, 5*time.Minute, 5*time.Second).Should(Succeed())
+
+			By("refreshing hubClone so a later Delete uses the current resourceVersion")
+			Expect(tc.kClient.Get(tc.ctx, v1beta1hubNN, hubClone)).To(Succeed())
 		})
 
 		It("should verify initial addon variables are correctly resolved", func() {

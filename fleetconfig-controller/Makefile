@@ -4,7 +4,13 @@
 include makelib/common.mk
 
 IMAGEBUILDER_VERSION ?= 1.2.16
-IMAGE_BUILD_EXTRA_FLAGS ?= --build-arg OS=linux --build-arg ARCH=$(GOARCH)
+
+# Tool versions for image builds
+VERSION_ENV_FILE ?= ./hack/.versions.env
+CLUSTERADM_VERSION ?= $(shell sed -n 's/^CLUSTERADM_VERSION=//p' $(VERSION_ENV_FILE) | head -1)
+AWSIAMAUTH_VERSION ?= $(shell sed -n 's/^AWSIAMAUTH_VERSION=//p' $(VERSION_ENV_FILE) | head -1)
+
+IMAGE_BUILD_EXTRA_FLAGS ?= --build-arg OS=linux --build-arg ARCH=$(GOARCH) --build-arg CLUSTERADM_VERSION=$(CLUSTERADM_VERSION) --build-arg AWSIAMAUTH_VERSION=$(AWSIAMAUTH_VERSION)
 
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	targets/openshift/images.mk \

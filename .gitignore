@@ -38,6 +38,7 @@ go.work.sum
 .devspace/
 .idea/
 .vscode/
+!.vscode/launch.json.example
 .nvim/
 venv/
 *__pycache__/
