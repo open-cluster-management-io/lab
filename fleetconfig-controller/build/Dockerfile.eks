@@ -37,13 +37,13 @@ ARG ARCH
 
 RUN apk update && apk add --no-cache bash curl
 
-# Install clusteradm
-ARG CLUSTERADM_VERSION=1.1.0
+# Install clusteradm (CLUSTERADM_VERSION from hack/.versions.env)
+ARG CLUSTERADM_VERSION
 RUN curl -L https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/install.sh | bash -s -- ${CLUSTERADM_VERSION}
 
-# Install aws-iam-authenticator
-ARG AWSIAMAUTH_VERSION=0.7.2
-RUN curl -Lo aws-iam-authenticator https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/download/v${AWSIAMAUTH_VERSION}/aws-iam-authenticator_${AWSIAMAUTH_VERSION}_${OS}_${ARCH} \
+# Install aws-iam-authenticator (AWSIAMAUTH_VERSION from hack/.versions.env)
+ARG AWSIAMAUTH_VERSION
+RUN curl --fail -Lo aws-iam-authenticator https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/download/v${AWSIAMAUTH_VERSION}/aws-iam-authenticator_${AWSIAMAUTH_VERSION}_${OS}_${ARCH} \
     && chmod +x aws-iam-authenticator && \
     mv aws-iam-authenticator /usr/local/bin/aws-iam-authenticator
 

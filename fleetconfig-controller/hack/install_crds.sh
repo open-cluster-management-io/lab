@@ -7,7 +7,7 @@ source "$script_dir/.versions.env"
 
 chart_dir=./charts/fleetconfig-controller/
 tmp_dir="$(mktemp -d)"
-ocm_asset_dir="api-$OCM_VERSION"
+ocm_asset_dir="api-$OCM_API_VERSION"
 ocm_tarball="$ocm_asset_dir.tar.tgz"
 
 cleanup() {
@@ -16,7 +16,7 @@ cleanup() {
 trap cleanup EXIT
 
 # ocm
-wget "https://github.com/open-cluster-management-io/api/archive/refs/tags/v$OCM_VERSION.tar.gz" -O "$tmp_dir/$ocm_tarball"
+wget "https://github.com/open-cluster-management-io/api/archive/refs/tags/v$OCM_API_VERSION.tar.gz" -O "$tmp_dir/$ocm_tarball"
 tar -xzf "$tmp_dir/$ocm_tarball" -C "$tmp_dir"
 
 cp "$tmp_dir/$ocm_asset_dir"/cluster/v1beta1/*.crd.yaml "$chart_dir/crds"

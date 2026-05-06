@@ -88,6 +88,8 @@ images:
       args:
       - --platform=linux/${GOARCH}
       - --build-arg=PROVIDER=${PROVIDER} # by default, build for "production" aka generic (no provider-specific binaries)
+      - --build-arg=CLUSTERADM_VERSION=${CLUSTERADM_VERSION}
+      - --build-arg=AWSIAMAUTH_VERSION=${AWSIAMAUTH_VERSION}
 
   fleetconfig-controller-local:
     image: ${IMAGE_REPOSITORY}-local
@@ -101,7 +103,8 @@ images:
       args:
       - --platform=linux/${GOARCH}
       - --target=${PROVIDER} # by default, build for "production" aka generic (no provider-specific binaries)
- 
+      - --build-arg=CLUSTERADM_VERSION=${CLUSTERADM_VERSION}
+
 deployments:
   fleetconfig-controller:
     helm:

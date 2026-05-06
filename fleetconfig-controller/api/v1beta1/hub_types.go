@@ -18,8 +18,12 @@ package v1beta1
 
 import (
 	"fmt"
+	"maps"
+	"reflect"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 )
 
 // HubSpec defines the desired state of Hub
@@ -152,6 +156,64 @@ type ClusterManager struct {
 	// If set, the bootstrap token will used instead of a service account token.
 	// +optional
 	UseBootstrapToken bool `json:"useBootstrapToken,omitempty"`
+
+	// ValuesFrom is an optional reference to a ConfigMap containing values for the cluster-manager Helm chart.
+	// +optional
+	ValuesFrom *ConfigMapRef `json:"valuesFrom,omitempty"`
+
+	// Values for the cluster-manager Helm chart. Values defined here override values which are defined in ValuesFrom.
+	// +optional
+	Values *ClusterManagerChartConfig `json:"values,omitempty"`
+}
+
+// ClusterManagerChartConfig is a wrapper around the external chart.ClusterManagerChartConfig
+// to provide the required DeepCopy methods for code generation.
+type ClusterManagerChartConfig struct {
+	chart.ClusterManagerChartConfig `json:",inline"`
+}
+
+// DeepCopy returns a deep copy of the ClusterManagerChartConfig.
+func (c *ClusterManagerChartConfig) DeepCopy() *ClusterManagerChartConfig {
+	if c == nil {
+		return nil
+	}
+	out := new(ClusterManagerChartConfig)
+	c.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto copies all properties of this object into another object of the
+// same type that is provided as a pointer.
+func (c *ClusterManagerChartConfig) DeepCopyInto(out *ClusterManagerChartConfig) {
+	*out = *c
+
+	out.ClusterManagerChartConfig = c.ClusterManagerChartConfig
+
+	if c.NodeSelector != nil {
+		c, out := &c.NodeSelector, &out.NodeSelector
+		*out = make(map[string]string, len(*c))
+		maps.Copy(*out, *c)
+	}
+	if c.Tolerations != nil {
+		c, out := &c.Tolerations, &out.Tolerations
+		*out = make([]corev1.Toleration, len(*c))
+		for i := range *c {
+			(*c)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+
+	c.Affinity.DeepCopyInto(&out.Affinity)
+	c.Resources.DeepCopyInto(&out.Resources)
+	c.PodSecurityContext.DeepCopyInto(&out.PodSecurityContext)
+	c.SecurityContext.DeepCopyInto(&out.SecurityContext)
+
+	out.Images = c.Images
+	out.ClusterManager = c.ClusterManager
+}
+
+// IsEmpty checks if the ClusterManagerChartConfig is empty/default/zero-valued
+func (c *ClusterManagerChartConfig) IsEmpty() bool {
+	return reflect.DeepEqual(*c, ClusterManagerChartConfig{})
 }
 
 // AddOnConfig is the configuration of a custom AddOn that can be installed on a cluster.
@@ -220,6 +282,11 @@ type HubStatus struct {
 	Conditions []Condition `json:"conditions,omitempty"`
 
 	InstalledHubAddOns []InstalledHubAddOn `json:"installedHubAddOns,omitempty"`
+
+	// ClusterManagerHash is a hash of the Hub's merged cluster-manager Helm chart values (.spec.clusterManager.values and valuesFrom).
+	// +kubebuilder:default:=""
+	// +optional
+	ClusterManagerHash string `json:"clusterManagerHash,omitempty"`
 }
 
 // InstalledHubAddOn tracks metadata for each hubAddon that is successfully installed on the hub.

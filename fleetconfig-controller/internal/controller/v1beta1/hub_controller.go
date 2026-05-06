@@ -21,15 +21,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os/exec"
 	"slices"
 	"strings"
 
+	"dario.cat/mergo"
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
 	operatorapi "open-cluster-management.io/api/client/operator/clientset/versioned"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -41,11 +45,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/yaml"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 	arg_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/args"
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/hash"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/version"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/pkg/common"
@@ -301,41 +307,108 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub, hubKube
 		return err
 	}
 
-	// if a clustermanager already exists, we don't need to init the hub
-	if cm != nil && cm.Status.Conditions != nil {
-		msgs := make([]string, 0)
-		for _, c := range cm.Status.Conditions {
-			if c.Type == operatorv1.ConditionProgressing && c.Status == metav1.ConditionTrue {
-				msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
-			}
-			if c.Type == operatorv1.ConditionClusterManagerApplied && c.Status == metav1.ConditionFalse {
-				msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
-			}
-			if c.Type == operatorv1.ConditionHubRegistrationDegraded && c.Status == metav1.ConditionTrue {
-				msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
-			}
-			if c.Type == operatorv1.ConditionHubPlacementDegraded && c.Status == metav1.ConditionTrue {
-				msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
-			}
-		}
-		if len(msgs) > 0 {
-			msg := strings.TrimSuffix(strings.Join(msgs, "; "), "; ")
-			msg = fmt.Sprintf("hub pending/degraded: %s", msg)
-			hub.SetConditions(true, v1beta1.NewCondition(
-				msg, v1beta1.HubInitialized, metav1.ConditionFalse, metav1.ConditionTrue,
-			))
-			return errors.New(msg)
-		}
-	} else {
-		if err := r.initializeHub(ctx, hub, hubKubeconfig); err != nil {
-			return err
-		}
+	mergedClusterManagerValues, currClusterManagerHash, valuesHashChanged, err := r.clusterManagerChartState(ctx, hub, cm != nil)
+	if err != nil {
+		return err
+	}
+
+	if err := r.ensureHubClusterManagerInitialized(ctx, hub, hubKubeconfig, cm, mergedClusterManagerValues); err != nil {
+		return err
 	}
 
 	hub.SetConditions(true, v1beta1.NewCondition(
 		v1beta1.HubInitialized, v1beta1.HubInitialized, metav1.ConditionTrue, metav1.ConditionTrue,
 	))
 
+	if err := r.reconcileHubAddonConditions(ctx, hub, addonC); err != nil {
+		return err
+	}
+
+	if err := r.maybeUpgradeHubClusterManager(ctx, hub, hubKubeconfig, operatorC, mergedClusterManagerValues, valuesHashChanged); err != nil {
+		return err
+	}
+
+	if hub.Spec.ClusterManager != nil {
+		hub.Status.ClusterManagerHash = currClusterManagerHash
+	}
+
+	return nil
+}
+
+func (r *HubReconciler) clusterManagerChartState(ctx context.Context, hub *v1beta1.Hub, clusterManagerExists bool) (
+	merged *v1beta1.ClusterManagerChartConfig,
+	currHash string,
+	valuesHashChanged bool,
+	err error,
+) {
+	if hub.Spec.ClusterManager == nil {
+		return nil, "", false, nil
+	}
+	merged, err = r.mergeClusterManagerValues(ctx, hub)
+	if err != nil {
+		return nil, "", false, err
+	}
+	currHash, err = hash.ComputeHash(merged)
+	if err != nil {
+		return nil, "", false, fmt.Errorf("failed to compute hash of hub %s cluster-manager values: %w", hub.Name, err)
+	}
+	prevHash := hub.Status.ClusterManagerHash
+	valuesHashChanged = clusterManagerValuesUpgradeNeeded(prevHash, currHash, clusterManagerExists, merged)
+	return merged, currHash, valuesHashChanged, nil
+}
+
+// clusterManagerValuesUpgradeNeeded reports whether clusteradm upgrade clustermanager should run
+// to apply merged Helm values. When prevHash is empty, an upgrade is still required if the hub
+// already has a ClusterManager and non-empty merged values—otherwise the controller could persist
+// a new hash without ever passing --cluster-manager-values-file.
+func clusterManagerValuesUpgradeNeeded(prevHash, currHash string, clusterManagerExists bool, merged *v1beta1.ClusterManagerChartConfig) bool {
+	hasNonEmptyMergedValues := merged != nil && !merged.IsEmpty()
+	return currHash != prevHash && (prevHash != "" || (clusterManagerExists && hasNonEmptyMergedValues))
+}
+
+func clusterManagerStatusProblems(cm *operatorv1.ClusterManager) []string {
+	if cm == nil || cm.Status.Conditions == nil {
+		return nil
+	}
+	var msgs []string
+	for _, c := range cm.Status.Conditions {
+		switch {
+		case c.Type == operatorv1.ConditionProgressing && c.Status == metav1.ConditionTrue:
+			msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
+		case c.Type == operatorv1.ConditionClusterManagerApplied && c.Status == metav1.ConditionFalse:
+			msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
+		case c.Type == operatorv1.ConditionHubRegistrationDegraded && c.Status == metav1.ConditionTrue:
+			msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
+		case c.Type == operatorv1.ConditionHubPlacementDegraded && c.Status == metav1.ConditionTrue:
+			msgs = append(msgs, fmt.Sprintf("%s: %s", c.Type, c.Message))
+		}
+	}
+	return msgs
+}
+
+// ensureHubClusterManagerInitialized runs clusteradm init when no ClusterManager exists yet; otherwise checks for pending/degraded status.
+func (r *HubReconciler) ensureHubClusterManagerInitialized(ctx context.Context, hub *v1beta1.Hub, hubKubeconfig []byte, cm *operatorv1.ClusterManager, merged *v1beta1.ClusterManagerChartConfig) error {
+	if cm != nil {
+		if len(cm.Status.Conditions) == 0 {
+			msg := "waiting for ClusterManager status conditions"
+			hub.SetConditions(true, v1beta1.NewCondition(
+				msg, v1beta1.HubInitialized, metav1.ConditionFalse, metav1.ConditionTrue,
+			))
+			return errors.New(msg)
+		}
+		if msgs := clusterManagerStatusProblems(cm); len(msgs) > 0 {
+			msg := fmt.Sprintf("hub pending/degraded: %s", strings.TrimSuffix(strings.Join(msgs, "; "), "; "))
+			hub.SetConditions(true, v1beta1.NewCondition(
+				msg, v1beta1.HubInitialized, metav1.ConditionFalse, metav1.ConditionTrue,
+			))
+			return errors.New(msg)
+		}
+		return nil
+	}
+	return r.initializeHub(ctx, hub, hubKubeconfig, merged)
+}
+
+func (r *HubReconciler) reconcileHubAddonConditions(ctx context.Context, hub *v1beta1.Hub, addonC *addonapi.Clientset) error {
 	addonConfigChanged, err := handleAddonConfig(ctx, r.Client, addonC, hub)
 	if err != nil && addonConfigChanged {
 		hub.SetConditions(true, v1beta1.NewCondition(
@@ -357,35 +430,43 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub, hubKube
 			v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
 		))
 	}
+	return nil
+}
 
-	// attempt an upgrade whenever the clustermanager's bundleVersion changes
-	if hub.Spec.ClusterManager != nil {
-		upgrade, err := r.hubNeedsUpgrade(ctx, hub, operatorC)
-		if err != nil {
+func (r *HubReconciler) maybeUpgradeHubClusterManager(
+	ctx context.Context,
+	hub *v1beta1.Hub,
+	hubKubeconfig []byte,
+	operatorC *operatorapi.Clientset,
+	merged *v1beta1.ClusterManagerChartConfig,
+	valuesHashChanged bool,
+) error {
+	if hub.Spec.ClusterManager == nil {
+		return nil
+	}
+	upgrade, err := r.hubNeedsUpgrade(ctx, hub, operatorC)
+	if err != nil {
+		hub.SetConditions(true, v1beta1.NewCondition(
+			err.Error(), v1beta1.HubUpgradeFailed, metav1.ConditionTrue, metav1.ConditionFalse,
+		))
+		return fmt.Errorf("failed to check if hub needs upgrade: %w", err)
+	}
+	if upgrade || valuesHashChanged {
+		if err := r.upgradeHub(ctx, hub, hubKubeconfig, merged); err != nil {
 			hub.SetConditions(true, v1beta1.NewCondition(
 				err.Error(), v1beta1.HubUpgradeFailed, metav1.ConditionTrue, metav1.ConditionFalse,
 			))
-			return fmt.Errorf("failed to check if hub needs upgrade: %w", err)
+			return fmt.Errorf("failed to upgrade hub: %w", err)
 		}
-		if upgrade {
-			err = r.upgradeHub(ctx, hub)
-			if err != nil {
-				hub.SetConditions(true, v1beta1.NewCondition(
-					err.Error(), v1beta1.HubUpgradeFailed, metav1.ConditionTrue, metav1.ConditionFalse,
-				))
-				return fmt.Errorf("failed to upgrade hub: %w", err)
-			}
-		}
-		hub.SetConditions(true, v1beta1.NewCondition(
-			v1beta1.HubUpgradeFailed, v1beta1.HubUpgradeFailed, metav1.ConditionFalse, metav1.ConditionFalse,
-		))
 	}
-
+	hub.SetConditions(true, v1beta1.NewCondition(
+		v1beta1.HubUpgradeFailed, v1beta1.HubUpgradeFailed, metav1.ConditionFalse, metav1.ConditionFalse,
+	))
 	return nil
 }
 
 // initializeHub initializes the Hub cluster via 'clusteradm init'
-func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub, hubKubeconfig []byte) error {
+func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub, hubKubeconfig []byte, clusterManagerValues *v1beta1.ClusterManagerChartConfig) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("initHub", "hub", hub.Name)
 
@@ -445,6 +526,14 @@ func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub, hub
 		initArgs = append(initArgs, "--image-registry", hub.Spec.ClusterManager.Source.Registry)
 		// resources args
 		initArgs = append(initArgs, arg_utils.PrepareResources(hub.Spec.ClusterManager.Resources)...)
+		valuesArgs, valuesCleanup, err := prepareClusterManagerChartValuesArgs(clusterManagerValues)
+		if valuesCleanup != nil {
+			defer valuesCleanup()
+		}
+		if err != nil {
+			return err
+		}
+		initArgs = append(initArgs, valuesArgs...)
 	} else {
 		// one of clusterManager or singletonControlPlane must be specified, per validating webhook, but handle the edge case anyway
 		return fmt.Errorf("unknown hub type, must specify either hub.clusterManager or hub.singletonControlPlane")
@@ -533,8 +622,8 @@ func (r *HubReconciler) hubNeedsUpgrade(ctx context.Context, hub *v1beta1.Hub, o
 	return versionChanged || sourceChanged, nil
 }
 
-// upgradeHub upgrades the Hub cluster's clustermanager to the specified version
-func (r *HubReconciler) upgradeHub(ctx context.Context, hub *v1beta1.Hub) error {
+// upgradeHub upgrades the Hub cluster's clustermanager (version/image and/or chart values via --cluster-manager-values-file).
+func (r *HubReconciler) upgradeHub(ctx context.Context, hub *v1beta1.Hub, hubKubeconfig []byte, clusterManagerValues *v1beta1.ClusterManagerChartConfig) error {
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("upgradeHub", "hub", hub.Name)
 
@@ -544,6 +633,23 @@ func (r *HubReconciler) upgradeHub(ctx context.Context, hub *v1beta1.Hub) error 
 		"--image-registry", hub.Spec.ClusterManager.Source.Registry,
 		"--wait=true",
 	}, hub.BaseArgs()...)
+
+	valuesArgs, valuesCleanup, err := prepareClusterManagerChartValuesArgs(clusterManagerValues)
+	if valuesCleanup != nil {
+		defer valuesCleanup()
+	}
+	if err != nil {
+		return err
+	}
+	upgradeArgs = append(upgradeArgs, valuesArgs...)
+
+	upgradeArgs, cleanupKcfg, err := arg_utils.PrepareKubeconfig(ctx, hubKubeconfig, hub.Spec.Kubeconfig.Context, upgradeArgs)
+	if cleanupKcfg != nil {
+		defer cleanupKcfg()
+	}
+	if err != nil {
+		return err
+	}
 
 	logger.V(1).Info("clusteradm upgrade clustermanager", "args", arg_utils.SanitizeArgs(upgradeArgs))
 
@@ -559,6 +665,97 @@ func (r *HubReconciler) upgradeHub(ctx context.Context, hub *v1beta1.Hub) error 
 	logger.V(1).Info("clustermanager upgraded", "output", string(stdout))
 
 	return nil
+}
+
+// mergeClusterManagerValues merges chart values from a ConfigMap in the Hub namespace and from the Hub spec. Spec takes precedence.
+// If valuesFrom is set, the referenced ConfigMap and data key must exist or an error is returned.
+func (r *HubReconciler) mergeClusterManagerValues(ctx context.Context, hub *v1beta1.Hub) (*v1beta1.ClusterManagerChartConfig, error) {
+	logger := log.FromContext(ctx)
+	cmSpec := hub.Spec.ClusterManager
+	if cmSpec == nil {
+		return nil, nil
+	}
+	if cmSpec.ValuesFrom == nil && cmSpec.Values == nil {
+		logger.V(3).Info("no cluster-manager values or valuesFrom provided", "hub", hub.Name)
+		return nil, nil
+	}
+
+	var fromInterface = map[string]any{}
+	var specInterface = map[string]any{}
+
+	if cmSpec.ValuesFrom != nil {
+		configMap := &corev1.ConfigMap{}
+		nn := types.NamespacedName{Name: cmSpec.ValuesFrom.Name, Namespace: hub.Namespace}
+		err := r.Get(ctx, nn, configMap)
+		if err != nil {
+			if kerrs.IsNotFound(err) {
+				return nil, fmt.Errorf(
+					"cluster-manager valuesFrom references missing ConfigMap %s/%s for hub %s",
+					hub.Namespace, cmSpec.ValuesFrom.Name, hub.Name,
+				)
+			}
+			return nil, fmt.Errorf("failed to retrieve cluster-manager values ConfigMap %s: %w", nn, err)
+		}
+		fromValues, ok := configMap.Data[cmSpec.ValuesFrom.Key]
+		if !ok {
+			return nil, fmt.Errorf(
+				"cluster-manager valuesFrom key %q not found in ConfigMap %s/%s for hub %s",
+				cmSpec.ValuesFrom.Key, hub.Namespace, cmSpec.ValuesFrom.Name, hub.Name,
+			)
+		}
+		if err := yaml.Unmarshal([]byte(fromValues), &fromInterface); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal YAML values from ConfigMap %s key %s: %w", nn, cmSpec.ValuesFrom.Key, err)
+		}
+	}
+
+	if cmSpec.Values != nil {
+		specBytes, err := yaml.Marshal(cmSpec.Values)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal cluster-manager values from hub spec for hub %s: %w", hub.Name, err)
+		}
+		if err := yaml.Unmarshal(specBytes, &specInterface); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal cluster-manager values from hub spec for hub %s: %w", hub.Name, err)
+		}
+	}
+
+	mergedMap := map[string]any{}
+	maps.Copy(mergedMap, fromInterface)
+
+	if err := mergo.Map(&mergedMap, specInterface, mergo.WithOverride); err != nil {
+		return nil, fmt.Errorf("merge cluster-manager values failed for hub %s: %w", hub.Name, err)
+	}
+
+	mergedBytes, err := yaml.Marshal(mergedMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal merged cluster-manager values for hub %s: %w", hub.Name, err)
+	}
+
+	merged := &v1beta1.ClusterManagerChartConfig{}
+	if err := yaml.Unmarshal(mergedBytes, merged); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal merged values into ClusterManagerChartConfig for hub %s: %w", hub.Name, err)
+	}
+
+	return merged, nil
+}
+
+// prepareClusterManagerChartValuesArgs writes chart values to a temp file and returns
+// --cluster-manager-values-file <path> for clusteradm init and clusteradm upgrade clustermanager.
+func prepareClusterManagerChartValuesArgs(values *v1beta1.ClusterManagerChartConfig) ([]string, func(), error) {
+	if values == nil {
+		return nil, nil, nil
+	}
+	if values.IsEmpty() {
+		return nil, nil, nil
+	}
+	valuesYAML, err := yaml.Marshal(values)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal cluster-manager values to YAML: %w", err)
+	}
+	valuesFile, valuesCleanup, err := file.TmpFile(valuesYAML, "clustermanager-values")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to write cluster-manager values to disk: %w", err)
+	}
+	return []string{"--cluster-manager-values-file", valuesFile}, valuesCleanup, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

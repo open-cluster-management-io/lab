@@ -36,8 +36,8 @@ ARG ARCH
 
 RUN apk update && apk add --no-cache bash curl
 
-# Install clusteradm
-ARG CLUSTERADM_VERSION=1.1.0
+# Install clusteradm (CLUSTERADM_VERSION from hack/.versions.env)
+ARG CLUSTERADM_VERSION
 RUN curl -L https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/install.sh | bash -s -- ${CLUSTERADM_VERSION}
 
 ## Stage 3: Compress binaries with upx to reduce image size
@@ -64,13 +64,12 @@ WORKDIR /
 RUN apk update && apk add --no-cache bash curl
 
 # Install gke-gcloud-auth-plugin (and gcloud which it depends on)
-ARG GCLOUD_VERSION=525.0.0
 RUN case ${ARCH} in \
         "amd64") GCLOUD_ARCH=x86_64 ;; \
         "arm64") GCLOUD_ARCH=arm ;; \
         *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
     esac \
-    && curl -Lo google-cloud-sdk.tar.gz https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-${OS}-${GCLOUD_ARCH}.tar.gz \
+    && curl --fail -Lo google-cloud-sdk.tar.gz https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-${OS}-${GCLOUD_ARCH}.tar.gz \
     && tar -xzf google-cloud-sdk.tar.gz \
     && rm google-cloud-sdk.tar.gz \
     && ./google-cloud-sdk/install.sh --quiet \

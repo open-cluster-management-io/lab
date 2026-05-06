@@ -154,6 +154,14 @@ jobs:
           cluster_name: ${{ steps.format-cluster-name.outputs.cluster_name }}
           node_image: kindest/node:v1.31.9
 
+      - name: Load version env for image build
+        if: steps.list-changed.outputs.changed == 'true'
+        id: versions
+        run: |
+          set -e
+          source "${{ inputs.repo }}/hack/.versions.env"
+          echo "clusteradm_version=${CLUSTERADM_VERSION}" >> "$GITHUB_OUTPUT"
+
       - name: Build Docker Image
         if: steps.list-changed.outputs.changed == 'true'
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
@@ -162,6 +170,10 @@ jobs:
           file: ./${{ inputs.repo }}/build/Dockerfile.base
           platforms: linux/amd64
           target: production
+          build-args: |
+            OS=linux
+            ARCH=amd64
+            CLUSTERADM_VERSION=${{ steps.versions.outputs.clusteradm_version }}
           tags: |
             ${{ env.IMAGE }}:${{ env.IMAGE_TAG }}
           builder: ${{ steps.buildx.outputs.name }}

@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "E2E: fleetconfig-controller",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/fleetconfig-controller",
+      "program": "${workspaceFolder}/fleetconfig-controller/test/e2e/suite_test.go",
+      "args": [
+        "-test.v",
+        "--ginkgo.label-filter=v1beta1",
+        "--ginkgo.timeout=20m",
+        "--ginkgo.vv"
+      ],
+      "env": {
+        "KUBECONFIG": "",
+        "KIND_CLUSTER": "",
+        "HUB_KUBECONFIG_DEST": "${env:HOME}/Downloads/hub.kubeconfig",
+        "SPOKE_KUBECONFIG_DEST": "${env:HOME}/Downloads/spoke.kubeconfig",
+        "SKIP_CLEANUP": "false",
+        "SKIP_CLEANUP_ON_FAILURE": "true"
+      }
+    }
+  ]
+}
