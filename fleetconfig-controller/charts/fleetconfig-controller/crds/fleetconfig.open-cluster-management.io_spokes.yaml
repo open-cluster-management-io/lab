@@ -377,6 +377,7 @@ spec:
                       AddonTokenExpirationSeconds is passed to clusteradm join --addon-token-expiration-seconds when addonKubeClientRegistrationAuth is token.
                       Use 0 for the system default.
                     format: int64
+                    minimum: 0
                     type: integer
                   annotations:
                     additionalProperties:

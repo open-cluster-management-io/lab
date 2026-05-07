@@ -203,6 +203,7 @@ type Klusterlet struct {
 
 	// AddonTokenExpirationSeconds is passed to clusteradm join --addon-token-expiration-seconds when addonKubeClientRegistrationAuth is token.
 	// Use 0 for the system default.
+	// +kubebuilder:validation:Minimum=0
 	// +optional
 	AddonTokenExpirationSeconds int64 `json:"addonTokenExpirationSeconds,omitempty"`
 

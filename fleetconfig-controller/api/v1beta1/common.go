@@ -178,13 +178,14 @@ type RegistrationAuth struct {
 	// Options are:
 	//  - csr: Use the default CSR-based registration authentication.
 	//  - awsirsa: Use AWS IAM Role for Service Accounts (IRSA) registration authentication.
-	//  - grpc: Use gRPC registration (requires grpc.join with joinServer and certificateAuthority).
+	//  - grpc: Use gRPC registration. Hub clusteradm init uses grpc (endpointType, server, autoApprovedIdentities).
+	//    Spokes resolve the effective join endpoint and TLS trust material from the Hub status.
 	// +kubebuilder:validation:Enum=csr;awsirsa;grpc
 	// +kubebuilder:default:="csr"
 	// +optional
 	Driver string `json:"driver,omitempty"`
 
-	// GRPC holds gRPC-specific settings for clusteradm init and join.
+	// GRPC holds hub-side gRPC settings for clusteradm init (endpoint type, server, auto-approved identities).
 	// +optional
 	GRPC *RegistrationAuthGRPC `json:"grpc,omitempty"`
 

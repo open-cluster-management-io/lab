@@ -102,8 +102,13 @@ func (v *SpokeCustomValidator) ValidateCreate(ctx context.Context, obj runtime.O
 
 	hub := &v1beta1.Hub{}
 	err := v.client.Get(ctx, types.NamespacedName{Name: spoke.Spec.HubRef.Name, Namespace: spoke.Spec.HubRef.Namespace}, hub)
-	if err == nil {
+	switch {
+	case err == nil:
 		allErrs = append(allErrs, validateSpokeRegistrationWithHub(ctx, v.client, spoke, hub)...)
+	case kerrs.IsNotFound(err):
+		// Hub-backed registration checks require the Hub object; optional skip until it exists.
+	default:
+		return nil, fmt.Errorf("get Hub %s/%s: %w", spoke.Spec.HubRef.Namespace, spoke.Spec.HubRef.Name, err)
 	}
 
 	warn, errs := v.validateAddons(ctx, v.client, spoke)
@@ -144,8 +149,13 @@ func (v *SpokeCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newOb
 	allErrs = append(allErrs, validateSpokeKlusterletAddon(spoke)...)
 
 	hub := &v1beta1.Hub{}
-	if err := v.client.Get(ctx, types.NamespacedName{Name: spoke.Spec.HubRef.Name, Namespace: spoke.Spec.HubRef.Namespace}, hub); err == nil {
+	hubGetErr := v.client.Get(ctx, types.NamespacedName{Name: spoke.Spec.HubRef.Name, Namespace: spoke.Spec.HubRef.Namespace}, hub)
+	switch {
+	case hubGetErr == nil:
 		allErrs = append(allErrs, validateSpokeRegistrationWithHub(ctx, v.client, spoke, hub)...)
+	case kerrs.IsNotFound(hubGetErr):
+	default:
+		return nil, fmt.Errorf("get Hub %s/%s: %w", spoke.Spec.HubRef.Namespace, spoke.Spec.HubRef.Name, hubGetErr)
 	}
 
 	warn, valErrs := v.validateAddons(ctx, v.client, spoke)
