@@ -3,6 +3,8 @@ package v1beta1
 import (
 	"testing"
 
+	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
+
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 )
 
@@ -134,6 +136,50 @@ func TestAllowHubUpdate(t *testing.T) {
 				Spec: v1beta1.HubSpec{
 					ClusterManager: &v1beta1.ClusterManager{
 						Source: v1beta1.OCMSource{Registry: "new-registry"},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "allowed - ClusterManager values change",
+			oldHub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					ClusterManager: &v1beta1.ClusterManager{
+						Values: &v1beta1.ClusterManagerChartConfig{
+							ClusterManagerChartConfig: chart.ClusterManagerChartConfig{
+								ReplicaCount: 1,
+							},
+						},
+					},
+				},
+			},
+			newHub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					ClusterManager: &v1beta1.ClusterManager{
+						Values: &v1beta1.ClusterManagerChartConfig{
+							ClusterManagerChartConfig: chart.ClusterManagerChartConfig{
+								ReplicaCount: 2,
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "allowed - ClusterManager valuesFrom change",
+			oldHub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					ClusterManager: &v1beta1.ClusterManager{
+						ValuesFrom: &v1beta1.ConfigMapRef{Name: "cm-a", Key: "values.yaml"},
+					},
+				},
+			},
+			newHub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					ClusterManager: &v1beta1.ClusterManager{
+						ValuesFrom: &v1beta1.ConfigMapRef{Name: "cm-b", Key: "values.yaml"},
 					},
 				},
 			},

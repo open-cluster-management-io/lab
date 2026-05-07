@@ -38,7 +38,7 @@ fleetConfig:
   ## Source bundle for the Cluster Manager and all Klusterlets.
   source:
     ## @param fleetConfig.source.bundleVersion Bundle version.
-    bundleVersion: v1.0.0
+    bundleVersion: v1.2.1
     ## @param fleetConfig.source.registry Image registry.
     registry: quay.io/open-cluster-management
   ## @descriptionStart

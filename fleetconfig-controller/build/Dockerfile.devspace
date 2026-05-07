@@ -15,14 +15,14 @@ RUN apk add --no-cache bash curl python3 py3-pip
 # Install Delve for debugging
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
-# Install clusteradm
-ARG CLUSTERADM_VERSION=1.1.0
+# Install clusteradm (CLUSTERADM_VERSION from hack/.versions.env)
+ARG CLUSTERADM_VERSION
 RUN curl -L https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/install.sh | bash -s -- ${CLUSTERADM_VERSION}
 
-# Install aws-iam-authenticator if building for EKS
-ARG AWSIAMAUTH_VERSION=0.7.2
+# Install aws-iam-authenticator if building for EKS (AWSIAMAUTH_VERSION from hack/.versions.env)
+ARG AWSIAMAUTH_VERSION
 RUN if [ "${PROVIDER}" = "eks" ]; then \
-        curl -Lo aws-iam-authenticator https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/download/v${AWSIAMAUTH_VERSION}/aws-iam-authenticator_${AWSIAMAUTH_VERSION}_${OS}_${ARCH} \
+        curl --fail -Lo aws-iam-authenticator https://github.com/kubernetes-sigs/aws-iam-authenticator/releases/download/v${AWSIAMAUTH_VERSION}/aws-iam-authenticator_${AWSIAMAUTH_VERSION}_${OS}_${ARCH} \
             && chmod +x aws-iam-authenticator \
             && mv aws-iam-authenticator /usr/local/bin/; \
     fi
@@ -34,7 +34,7 @@ RUN if [ "${PROVIDER}" = "gke" ]; then \
         "arm64") GCLOUD_ARCH=arm ;; \
         *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
     esac \
-    && curl -Lo google-cloud-sdk.tar.gz https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-${OS}-${GCLOUD_ARCH}.tar.gz \
+    && curl --fail -Lo google-cloud-sdk.tar.gz https://storage.googleapis.com/cloud-sdk-release/google-cloud-cli-${OS}-${GCLOUD_ARCH}.tar.gz \
     && tar -xzf google-cloud-sdk.tar.gz \
     && rm google-cloud-sdk.tar.gz \
     && ./google-cloud-sdk/install.sh --quiet \

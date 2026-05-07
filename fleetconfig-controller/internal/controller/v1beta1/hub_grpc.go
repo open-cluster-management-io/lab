@@ -38,6 +38,24 @@ func grpcHubKubernetesClient(ctx context.Context, hub *v1beta1.Hub, hubKubeconfi
 	return k8s, nil
 }
 
+// reconcileHubGRPCStatus observes gRPC registration material on the hub cluster into hub status.
+func (r *HubReconciler) reconcileHubGRPCStatus(ctx context.Context, hub *v1beta1.Hub, hubKubeconfig []byte) error {
+	hub.Status.GRPCServer = ""
+	hub.Status.GRPCServerCA = ""
+
+	if grpcHubObservationEnabled(hub) {
+		hubC, err := grpcHubKubernetesClient(ctx, hub, hubKubeconfig)
+		if err != nil {
+			return fmt.Errorf("failed to create gRPC hub client: %w", err)
+		}
+		r.observeHubGRPCCABundleStatus(ctx, hub, hubC)
+		if grpcHubLoadBalancerJoinAddressEnabled(hub) {
+			r.observeHubGRPCServerLoadBalancerStatus(ctx, hub, hubC)
+		}
+	}
+	return nil
+}
+
 // grpcHubObservationEnabled is true when the hub runs or exposes gRPC registration material worth observing.
 func grpcHubObservationEnabled(hub *v1beta1.Hub) bool {
 	return hub.Spec.RegistrationAuth.Driver == v1beta1.GRPCRegistrationDriver ||

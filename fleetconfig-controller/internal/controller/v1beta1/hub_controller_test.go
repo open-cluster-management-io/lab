@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"context"
 	"fmt"
+	"testing"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -27,6 +28,7 @@ import (
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
@@ -136,4 +138,76 @@ func assertHubConditions(conditions []v1beta1.Condition, expected map[string]met
 		}
 	}
 	return nil
+}
+
+func TestClusterManagerValuesUpgradeNeeded(t *testing.T) {
+	nonEmptyMerged := &v1beta1.ClusterManagerChartConfig{
+		ClusterManagerChartConfig: chart.ClusterManagerChartConfig{
+			ReplicaCount: 1,
+		},
+	}
+	cases := []struct {
+		name                 string
+		prevHash, currHash   string
+		clusterManagerExists bool
+		merged               *v1beta1.ClusterManagerChartConfig
+		want                 bool
+	}{
+		{
+			name:                 "steady state same hash",
+			prevHash:             "abc",
+			currHash:             "abc",
+			clusterManagerExists: true,
+			merged:               nonEmptyMerged,
+			want:                 false,
+		},
+		{
+			name:                 "hash changed after prior persist",
+			prevHash:             "abc",
+			currHash:             "def",
+			clusterManagerExists: true,
+			merged:               nonEmptyMerged,
+			want:                 true,
+		},
+		{
+			name:                 "first persist empty prev no cluster manager yet",
+			prevHash:             "",
+			currHash:             "def",
+			clusterManagerExists: false,
+			merged:               nonEmptyMerged,
+			want:                 false,
+		},
+		{
+			name:                 "empty prev cluster manager exists with merged values",
+			prevHash:             "",
+			currHash:             "def",
+			clusterManagerExists: true,
+			merged:               nonEmptyMerged,
+			want:                 true,
+		},
+		{
+			name:                 "empty prev cluster manager exists no merged values",
+			prevHash:             "",
+			currHash:             "def",
+			clusterManagerExists: true,
+			merged:               nil,
+			want:                 false,
+		},
+		{
+			name:                 "empty prev cluster manager exists merged empty struct",
+			prevHash:             "",
+			currHash:             "def",
+			clusterManagerExists: true,
+			merged:               &v1beta1.ClusterManagerChartConfig{},
+			want:                 false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := clusterManagerValuesUpgradeNeeded(tc.prevHash, tc.currHash, tc.clusterManagerExists, tc.merged)
+			if got != tc.want {
+				t.Fatalf("clusterManagerValuesUpgradeNeeded(...) = %v, want %v", got, tc.want)
+			}
+		})
+	}
 }
