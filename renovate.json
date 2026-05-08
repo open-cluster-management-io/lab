@@ -4,8 +4,7 @@
       "config:recommended",
       "helpers:pinGitHubActionDigests",
       ":gitSignOff",
-      ":semanticCommitTypeAll(deps)",
-      "group:allNonMajor"
+      ":semanticCommitTypeAll(deps)"
     ],
     "addLabels": [
       "dependencies"
@@ -33,6 +32,47 @@
         ],
         "matchCurrentVersion": "!/^0/",
         "automerge": true
+      },
+      {
+        "description": "Non-major catch-all",
+        "matchUpdateTypes": [
+          "minor",
+          "patch"
+        ],
+        "groupName": "Shared non-major dependencies"
+      },
+      {
+        "description": "Non-major grouping scoped to fleetconfig-controller",
+        "matchUpdateTypes": [
+          "minor",
+          "patch"
+        ],
+        "matchFileNames": [
+          "fleetconfig-controller/**"
+        ],
+        "groupName": "FleetConfig Controller non-major dependencies"
+      },
+      {
+        "description": "Non-major grouping scoped to dashboard",
+        "matchUpdateTypes": [
+          "minor",
+          "patch"
+        ],
+        "matchFileNames": [
+          "dashboard/**"
+        ],
+        "groupName": "Dashboard non-major dependencies"
+      },
+      {
+        "description": "Non-major grouping scoped to vscode-extension",
+        "matchUpdateTypes": [
+          "minor",
+          "patch"
+        ],
+        "matchFileNames": [
+          "vscode-extension/**"
+        ],
+        "groupName": "VS Code extension non-major dependencies"
       },
       {
         "description": "Ginkgo. See also: https://github.com/renovatebot/renovate/discussions/35963",
@@ -85,35 +125,91 @@
         ]
       },
       {
-        "description": "Open Cluster Management",
+        "description": "Open Cluster Management (fleetconfig-controller)",
         "matchManagers": [
           "gomod"
         ],
-        "additionalBranchPrefix": "ocm-",
-        "commitMessageSuffix": "(ocm)",
+        "matchFileNames": [
+          "fleetconfig-controller/go.mod"
+        ],
+        "additionalBranchPrefix": "fcc-ocm-",
+        "commitMessageSuffix": "(ocm fcc)",
         "addLabels": [
           "go-dependencies",
-          "ocm"
+          "ocm",
+          "fleetconfig-controller"
         ],
         "automerge": false,
-        "groupName": "Open Cluster Management",
+        "groupName": "FleetConfig Controller - Open Cluster Management",
+        "groupSlug": "fcc-ocm",
         "matchPackageNames": [
           "/^open-cluster-management\\.io/"
         ]
       },
       {
-        "description": "Kubernetes",
+        "description": "Open Cluster Management (dashboard)",
         "matchManagers": [
           "gomod"
         ],
-        "additionalBranchPrefix": "k8s-",
-        "commitMessageSuffix": "(kubernetes)",
+        "matchFileNames": [
+          "dashboard/**/go.mod"
+        ],
+        "additionalBranchPrefix": "dashboard-ocm-",
+        "commitMessageSuffix": "(ocm dashboard)",
         "addLabels": [
           "go-dependencies",
-          "kubernetes"
+          "ocm",
+          "dashboard"
+        ],
+        "automerge": false,
+        "groupName": "Dashboard - Open Cluster Management",
+        "groupSlug": "dashboard-ocm",
+        "matchPackageNames": [
+          "/^open-cluster-management\\.io/"
+        ]
+      },
+      {
+        "description": "Kubernetes (fleetconfig-controller)",
+        "matchManagers": [
+          "gomod"
+        ],
+        "matchFileNames": [
+          "fleetconfig-controller/go.mod"
+        ],
+        "additionalBranchPrefix": "fcc-k8s-",
+        "commitMessageSuffix": "(kubernetes fcc)",
+        "addLabels": [
+          "go-dependencies",
+          "kubernetes",
+          "fleetconfig-controller"
         ],
         "automerge": true,
-        "groupName": "Kubernetes packages",
+        "groupName": "FleetConfig Controller - Kubernetes packages",
+        "groupSlug": "fcc-kubernetes",
+        "versioning": "regex:^v?(?<major>0)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
+        "matchPackageNames": [
+          "/k8s/",
+          "/kubernetes/"
+        ]
+      },
+      {
+        "description": "Kubernetes (dashboard)",
+        "matchManagers": [
+          "gomod"
+        ],
+        "matchFileNames": [
+          "dashboard/**/go.mod"
+        ],
+        "additionalBranchPrefix": "dashboard-k8s-",
+        "commitMessageSuffix": "(kubernetes dashboard)",
+        "addLabels": [
+          "go-dependencies",
+          "kubernetes",
+          "dashboard"
+        ],
+        "automerge": true,
+        "groupName": "Dashboard - Kubernetes packages",
+        "groupSlug": "dashboard-kubernetes",
         "versioning": "regex:^v?(?<major>0)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$",
         "matchPackageNames": [
           "/k8s/",
