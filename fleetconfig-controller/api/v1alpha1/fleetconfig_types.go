@@ -792,10 +792,6 @@ type FleetConfigList struct {
 	Items           []FleetConfig `json:"items"`
 }
 
-func init() {
-	SchemeBuilder.Register(&FleetConfig{}, &FleetConfigList{})
-}
-
 func maxConditionNameLen(base string) int {
 	maxLen := 316 // a metav1.Condition.Type type can be at most 316 chars long
 	return maxLen - (len(base) - 2)
