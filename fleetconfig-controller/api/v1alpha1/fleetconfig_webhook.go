@@ -18,25 +18,21 @@ package v1alpha1
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-// log is for logging in this package.
 var log = logf.Log.WithName("fleetconfig-resource")
 
 // SetupFleetConfigWebhookWithManager registers the webhook for FleetConfig in the manager.
 func SetupFleetConfigWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&FleetConfig{}).
+	return ctrl.NewWebhookManagedBy(mgr, &FleetConfig{}).
 		WithDefaulter(&FleetConfigCustomDefaulter{}).
 		WithValidator(&FleetConfigCustomValidator{client: mgr.GetClient()}).
 		Complete()
@@ -46,49 +42,32 @@ func SetupFleetConfigWebhookWithManager(mgr ctrl.Manager) error {
 
 // FleetConfigCustomDefaulter struct is responsible for setting default values on the custom resource of the
 // Kind FleetConfig when those are created or updated.
-//
-// NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
-// as it is used only for temporary operations and does not need to be deeply copied.
 type FleetConfigCustomDefaulter struct {
 	// TODO(user): Add more fields as needed for defaulting
 }
 
-var _ webhook.CustomDefaulter = &FleetConfigCustomDefaulter{}
+var _ admission.Defaulter[*FleetConfig] = &FleetConfigCustomDefaulter{}
 
-// Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind FleetConfig.
-func (d *FleetConfigCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
-	fc, ok := obj.(*FleetConfig)
-
-	if !ok {
-		return fmt.Errorf("expected an FleetConfig object but got %T", obj)
-	}
+// Default implements admission.Defaulter so a webhook will be registered for the Kind FleetConfig.
+func (d *FleetConfigCustomDefaulter) Default(_ context.Context, fc *FleetConfig) error {
 	log.Info("Defaulting for FleetConfig", "name", fc.GetName())
 
 	return nil
 }
 
-// NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
-// Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
 // +kubebuilder:webhook:path=/validate-fleetconfig-open-cluster-management-io-v1alpha1-fleetconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=fleetconfig.open-cluster-management.io,resources=fleetconfigs,verbs=create;update;delete,versions=v1alpha1,name=vfleetconfig-v1alpha1.open-cluster-management.io,admissionReviewVersions=v1
 // +kubebuilder:object:generate=false
 
 // FleetConfigCustomValidator struct is responsible for validating the FleetConfig resource
 // when it is created, updated, or deleted.
-//
-// NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
-// as this struct is used only for temporary operations and does not need to be deeply copied.
 type FleetConfigCustomValidator struct {
 	client client.Client
 }
 
-var _ webhook.CustomValidator = &FleetConfigCustomValidator{}
+var _ admission.Validator[*FleetConfig] = &FleetConfigCustomValidator{}
 
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (v *FleetConfigCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	fc, ok := obj.(*FleetConfig)
-	if !ok {
-		return nil, fmt.Errorf("expected a FleetConfig object but got %T", obj)
-	}
+// ValidateCreate implements admission.Validator so a webhook will be registered for the type FleetConfig.
+func (v *FleetConfigCustomValidator) ValidateCreate(ctx context.Context, fc *FleetConfig) (admission.Warnings, error) {
 	log.Info("Validation for FleetConfig upon creation", "name", fc.GetName())
 
 	var (
@@ -150,16 +129,8 @@ func isKubeconfigValid(kubeconfig Kubeconfig) (bool, string) {
 	return true, ""
 }
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (v *FleetConfigCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	fc, ok := newObj.(*FleetConfig)
-	if !ok {
-		return nil, fmt.Errorf("expected a FleetConfig object for the newObj but got %T", newObj)
-	}
-	oldFc, ok := oldObj.(*FleetConfig)
-	if !ok {
-		return nil, fmt.Errorf("expected a FleetConfig object for the oldObj but got %T", oldObj)
-	}
+// ValidateUpdate implements admission.Validator so a webhook will be registered for the type FleetConfig.
+func (v *FleetConfigCustomValidator) ValidateUpdate(ctx context.Context, oldFc, fc *FleetConfig) (admission.Warnings, error) {
 	log.Info("starting validation for FleetConfig update", "name", fc.GetName())
 
 	err := allowFleetConfigUpdate(fc, oldFc)
@@ -178,12 +149,8 @@ func (v *FleetConfigCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 	return nil, nil
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (v *FleetConfigCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	fc, ok := obj.(*FleetConfig)
-	if !ok {
-		return nil, fmt.Errorf("expected a FleetConfig object but got %T", obj)
-	}
+// ValidateDelete implements admission.Validator so a webhook will be registered for the type FleetConfig.
+func (v *FleetConfigCustomValidator) ValidateDelete(_ context.Context, fc *FleetConfig) (admission.Warnings, error) {
 	log.Info("Validation for FleetConfig upon deletion", "name", fc.GetName())
 
 	// TODO(user): fill in your validation logic upon object deletion.

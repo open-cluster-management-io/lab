@@ -18,23 +18,18 @@ package v1beta1
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 )
 
-// nolint:unused
-// log is for logging in this package.
 var hublog = logf.Log.WithName("hub-resource")
 
 // SetupHubWebhookWithManager registers the webhook for Hub in the manager.
@@ -43,34 +38,24 @@ func SetupHubWebhookWithManager(mgr ctrl.Manager) error {
 	if err != nil {
 		return err
 	}
-	return ctrl.NewWebhookManagedBy(mgr).For(&v1beta1.Hub{}).
+	return ctrl.NewWebhookManagedBy(mgr, &v1beta1.Hub{}).
 		WithValidator(&HubCustomValidator{client: mgr.GetClient(), addonC: addonC}).
 		Complete()
 }
 
-// TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-// NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
-// Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
 // +kubebuilder:webhook:path=/validate-fleetconfig-open-cluster-management-io-v1beta1-hub,mutating=false,failurePolicy=fail,sideEffects=None,groups=fleetconfig.open-cluster-management.io,resources=hubs,verbs=create;update,versions=v1beta1,name=vhub-v1beta1.kb.io,admissionReviewVersions=v1
 
 // HubCustomValidator struct is responsible for validating the Hub resource
 // when it is created, updated, or deleted.
-//
-// NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
-// as this struct is used only for temporary operations and does not need to be deeply copied.
 type HubCustomValidator struct {
 	client client.Client
 	addonC *addonapi.Clientset
 }
 
-var _ webhook.CustomValidator = &HubCustomValidator{}
+var _ admission.Validator[*v1beta1.Hub] = &HubCustomValidator{}
 
-// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Hub.
-func (v *HubCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	hub, ok := obj.(*v1beta1.Hub)
-	if !ok {
-		return nil, fmt.Errorf("expected a Hub object but got %T", obj)
-	}
+// ValidateCreate implements admission.Validator so a webhook will be registered for the type Hub.
+func (v *HubCustomValidator) ValidateCreate(ctx context.Context, hub *v1beta1.Hub) (admission.Warnings, error) {
 	hublog.Info("Validation for Hub upon creation", "name", hub.GetName())
 
 	var allErrs field.ErrorList
@@ -100,16 +85,8 @@ func (v *HubCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Obj
 	return nil, nil
 }
 
-// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Hub.
-func (v *HubCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	hub, ok := newObj.(*v1beta1.Hub)
-	if !ok {
-		return nil, fmt.Errorf("expected a Hub object for the newObj but got %T", newObj)
-	}
-	oldHub, ok := oldObj.(*v1beta1.Hub)
-	if !ok {
-		return nil, fmt.Errorf("expected a Hub object for the oldObj but got %T", oldObj)
-	}
+// ValidateUpdate implements admission.Validator so a webhook will be registered for the type Hub.
+func (v *HubCustomValidator) ValidateUpdate(ctx context.Context, oldHub, hub *v1beta1.Hub) (admission.Warnings, error) {
 	hublog.Info("Validation for Hub upon update", "name", hub.GetName())
 
 	var allErrs field.ErrorList
@@ -133,12 +110,8 @@ func (v *HubCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj 
 	return nil, nil
 }
 
-// ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Hub.
-func (v *HubCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	hub, ok := obj.(*v1beta1.Hub)
-	if !ok {
-		return nil, fmt.Errorf("expected a Hub object but got %T", obj)
-	}
+// ValidateDelete implements admission.Validator so a webhook will be registered for the type Hub.
+func (v *HubCustomValidator) ValidateDelete(_ context.Context, hub *v1beta1.Hub) (admission.Warnings, error) {
 	hublog.Info("Validation for Hub upon deletion", "name", hub.GetName())
 
 	// TODO(user): fill in your validation logic upon object deletion.

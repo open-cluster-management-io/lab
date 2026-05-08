@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -29,14 +28,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 )
 
-// nolint:unused
-// log is for logging in this package.
 var spokelog = logf.Log.WithName("spoke-resource")
 
 // SetupSpokeWebhookWithManager registers the webhook for Spoke in the manager.
@@ -45,34 +41,25 @@ func SetupSpokeWebhookWithManager(mgr ctrl.Manager, instanceType string) error {
 	if err != nil {
 		return err
 	}
-	return ctrl.NewWebhookManagedBy(mgr).For(&v1beta1.Spoke{}).
+	return ctrl.NewWebhookManagedBy(mgr, &v1beta1.Spoke{}).
 		WithValidator(&SpokeCustomValidator{client: mgr.GetClient(), addonC: addonC, instanceType: instanceType}).
 		Complete()
 }
 
-// NOTE: The 'path' attribute must follow a specific pattern and should not be modified directly here.
-// Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
 // +kubebuilder:webhook:path=/validate-fleetconfig-open-cluster-management-io-v1beta1-spoke,mutating=false,failurePolicy=fail,sideEffects=None,groups=fleetconfig.open-cluster-management.io,resources=spokes,verbs=create;update,versions=v1beta1,name=vspoke-v1beta1.kb.io,admissionReviewVersions=v1
 
 // SpokeCustomValidator struct is responsible for validating the Spoke resource
 // when it is created, updated, or deleted.
-//
-// NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
-// as this struct is used only for temporary operations and does not need to be deeply copied.
 type SpokeCustomValidator struct {
 	client       client.Client
 	addonC       *addonapi.Clientset
 	instanceType string
 }
 
-var _ webhook.CustomValidator = &SpokeCustomValidator{}
+var _ admission.Validator[*v1beta1.Spoke] = &SpokeCustomValidator{}
 
-// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Spoke.
-func (v *SpokeCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	spoke, ok := obj.(*v1beta1.Spoke)
-	if !ok {
-		return nil, fmt.Errorf("expected a Spoke object but got %T", obj)
-	}
+// ValidateCreate implements admission.Validator so a webhook will be registered for the type Spoke.
+func (v *SpokeCustomValidator) ValidateCreate(ctx context.Context, spoke *v1beta1.Spoke) (admission.Warnings, error) {
 	spokelog.Info("Validation for Spoke upon creation", "name", spoke.GetName())
 
 	var allErrs field.ErrorList
@@ -120,16 +107,8 @@ func (v *SpokeCustomValidator) ValidateCreate(ctx context.Context, obj runtime.O
 	return warn, nil
 }
 
-// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Spoke.
-func (v *SpokeCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	spoke, ok := newObj.(*v1beta1.Spoke)
-	if !ok {
-		return nil, fmt.Errorf("expected a Spoke object for the newObj but got %T", newObj)
-	}
-	oldSpoke, ok := oldObj.(*v1beta1.Spoke)
-	if !ok {
-		return nil, fmt.Errorf("expected a Spoke object for the oldObj but got %T", oldObj)
-	}
+// ValidateUpdate implements admission.Validator so a webhook will be registered for the type Spoke.
+func (v *SpokeCustomValidator) ValidateUpdate(ctx context.Context, oldSpoke, spoke *v1beta1.Spoke) (admission.Warnings, error) {
 	spokelog.Info("Validation for Spoke upon update", "name", spoke.GetName())
 
 	err := allowSpokeUpdate(oldSpoke, spoke)
@@ -167,12 +146,8 @@ func (v *SpokeCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newOb
 	return warn, nil
 }
 
-// ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Spoke.
-func (v *SpokeCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	spoke, ok := obj.(*v1beta1.Spoke)
-	if !ok {
-		return nil, fmt.Errorf("expected a Spoke object but got %T", obj)
-	}
+// ValidateDelete implements admission.Validator so a webhook will be registered for the type Spoke.
+func (v *SpokeCustomValidator) ValidateDelete(_ context.Context, spoke *v1beta1.Spoke) (admission.Warnings, error) {
 	spokelog.Info("Validation for Spoke upon deletion", "name", spoke.GetName())
 
 	// TODO(user): fill in your validation logic upon object deletion.
