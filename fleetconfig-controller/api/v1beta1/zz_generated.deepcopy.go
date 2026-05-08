@@ -21,7 +21,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	"open-cluster-management.io/api/addon/v1alpha1"
 )
 
