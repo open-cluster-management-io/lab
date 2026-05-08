@@ -18,16 +18,13 @@ package v1beta1
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
@@ -43,7 +40,7 @@ func SetupHubWebhookWithManager(mgr ctrl.Manager) error {
 	if err != nil {
 		return err
 	}
-	return ctrl.NewWebhookManagedBy(mgr).For(&v1beta1.Hub{}).
+	return ctrl.NewWebhookManagedBy(mgr, &v1beta1.Hub{}).
 		WithValidator(&HubCustomValidator{client: mgr.GetClient(), addonC: addonC}).
 		Complete()
 }
@@ -63,14 +60,10 @@ type HubCustomValidator struct {
 	addonC *addonapi.Clientset
 }
 
-var _ webhook.CustomValidator = &HubCustomValidator{}
+var _ admission.Validator[*v1beta1.Hub] = &HubCustomValidator{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Hub.
-func (v *HubCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	hub, ok := obj.(*v1beta1.Hub)
-	if !ok {
-		return nil, fmt.Errorf("expected a Hub object but got %T", obj)
-	}
+func (v *HubCustomValidator) ValidateCreate(ctx context.Context, hub *v1beta1.Hub) (admission.Warnings, error) {
 	hublog.Info("Validation for Hub upon creation", "name", hub.GetName())
 
 	var allErrs field.ErrorList
@@ -101,44 +94,32 @@ func (v *HubCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Obj
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Hub.
-func (v *HubCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	hub, ok := newObj.(*v1beta1.Hub)
-	if !ok {
-		return nil, fmt.Errorf("expected a Hub object for the newObj but got %T", newObj)
-	}
-	oldHub, ok := oldObj.(*v1beta1.Hub)
-	if !ok {
-		return nil, fmt.Errorf("expected a Hub object for the oldObj but got %T", oldObj)
-	}
-	hublog.Info("Validation for Hub upon update", "name", hub.GetName())
+func (v *HubCustomValidator) ValidateUpdate(ctx context.Context, oldHub, newHub *v1beta1.Hub) (admission.Warnings, error) {
+	hublog.Info("Validation for Hub upon update", "name", newHub.GetName())
 
 	var allErrs field.ErrorList
 
-	err := allowHubUpdate(oldHub, hub)
+	err := allowHubUpdate(oldHub, newHub)
 	if err != nil {
 		return nil, err
 	}
 
-	if valid, msg := isKubeconfigValid(hub.Spec.Kubeconfig); !valid {
+	if valid, msg := isKubeconfigValid(newHub.Spec.Kubeconfig); !valid {
 		allErrs = append(allErrs, field.Invalid(
-			field.NewPath("hub"), hub.Spec.Kubeconfig, msg),
+			field.NewPath("hub"), newHub.Spec.Kubeconfig, msg),
 		)
 	}
-	allErrs = append(allErrs, validateHubRegistrationAuth(hub)...)
-	allErrs = append(allErrs, validateHubAddons(ctx, v.client, oldHub, hub, v.addonC)...)
+	allErrs = append(allErrs, validateHubRegistrationAuth(newHub)...)
+	allErrs = append(allErrs, validateHubAddons(ctx, v.client, oldHub, newHub, v.addonC)...)
 
 	if len(allErrs) > 0 {
-		return nil, errors.NewInvalid(v1beta1.HubGroupKind, hub.Name, allErrs)
+		return nil, errors.NewInvalid(v1beta1.HubGroupKind, newHub.Name, allErrs)
 	}
 	return nil, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Hub.
-func (v *HubCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	hub, ok := obj.(*v1beta1.Hub)
-	if !ok {
-		return nil, fmt.Errorf("expected a Hub object but got %T", obj)
-	}
+func (v *HubCustomValidator) ValidateDelete(_ context.Context, hub *v1beta1.Hub) (admission.Warnings, error) {
 	hublog.Info("Validation for Hub upon deletion", "name", hub.GetName())
 
 	// TODO(user): fill in your validation logic upon object deletion.

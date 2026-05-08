@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
@@ -29,7 +28,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
@@ -45,7 +43,7 @@ func SetupSpokeWebhookWithManager(mgr ctrl.Manager, instanceType string) error {
 	if err != nil {
 		return err
 	}
-	return ctrl.NewWebhookManagedBy(mgr).For(&v1beta1.Spoke{}).
+	return ctrl.NewWebhookManagedBy(mgr, &v1beta1.Spoke{}).
 		WithValidator(&SpokeCustomValidator{client: mgr.GetClient(), addonC: addonC, instanceType: instanceType}).
 		Complete()
 }
@@ -65,14 +63,10 @@ type SpokeCustomValidator struct {
 	instanceType string
 }
 
-var _ webhook.CustomValidator = &SpokeCustomValidator{}
+var _ admission.Validator[*v1beta1.Spoke] = &SpokeCustomValidator{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Spoke.
-func (v *SpokeCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	spoke, ok := obj.(*v1beta1.Spoke)
-	if !ok {
-		return nil, fmt.Errorf("expected a Spoke object but got %T", obj)
-	}
+func (v *SpokeCustomValidator) ValidateCreate(ctx context.Context, spoke *v1beta1.Spoke) (admission.Warnings, error) {
 	spokelog.Info("Validation for Spoke upon creation", "name", spoke.GetName())
 
 	var allErrs field.ErrorList
@@ -121,58 +115,46 @@ func (v *SpokeCustomValidator) ValidateCreate(ctx context.Context, obj runtime.O
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Spoke.
-func (v *SpokeCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	spoke, ok := newObj.(*v1beta1.Spoke)
-	if !ok {
-		return nil, fmt.Errorf("expected a Spoke object for the newObj but got %T", newObj)
-	}
-	oldSpoke, ok := oldObj.(*v1beta1.Spoke)
-	if !ok {
-		return nil, fmt.Errorf("expected a Spoke object for the oldObj but got %T", oldObj)
-	}
-	spokelog.Info("Validation for Spoke upon update", "name", spoke.GetName())
+func (v *SpokeCustomValidator) ValidateUpdate(ctx context.Context, oldSpoke, newSpoke *v1beta1.Spoke) (admission.Warnings, error) {
+	spokelog.Info("Validation for Spoke upon update", "name", newSpoke.GetName())
 
-	err := allowSpokeUpdate(oldSpoke, spoke)
+	err := allowSpokeUpdate(oldSpoke, newSpoke)
 	if err != nil {
 		return nil, err
 	}
 
 	var allErrs field.ErrorList
 
-	valid, msg := isKubeconfigValid(spoke.Spec.Kubeconfig)
+	valid, msg := isKubeconfigValid(newSpoke.Spec.Kubeconfig)
 	if !valid {
 		allErrs = append(allErrs, field.Invalid(
-			field.NewPath("spec").Child("kubeconfig"), spoke, msg),
+			field.NewPath("spec").Child("kubeconfig"), newSpoke, msg),
 		)
 	}
 
-	allErrs = append(allErrs, validateSpokeKlusterletAddon(spoke)...)
+	allErrs = append(allErrs, validateSpokeKlusterletAddon(newSpoke)...)
 
 	hub := &v1beta1.Hub{}
-	hubGetErr := v.client.Get(ctx, types.NamespacedName{Name: spoke.Spec.HubRef.Name, Namespace: spoke.Spec.HubRef.Namespace}, hub)
+	hubGetErr := v.client.Get(ctx, types.NamespacedName{Name: newSpoke.Spec.HubRef.Name, Namespace: newSpoke.Spec.HubRef.Namespace}, hub)
 	switch {
 	case hubGetErr == nil:
-		allErrs = append(allErrs, validateSpokeRegistrationWithHub(ctx, v.client, spoke, hub)...)
+		allErrs = append(allErrs, validateSpokeRegistrationWithHub(ctx, v.client, newSpoke, hub)...)
 	case kerrs.IsNotFound(hubGetErr):
 	default:
-		return nil, fmt.Errorf("get Hub %s/%s: %w", spoke.Spec.HubRef.Namespace, spoke.Spec.HubRef.Name, hubGetErr)
+		return nil, fmt.Errorf("get Hub %s/%s: %w", newSpoke.Spec.HubRef.Namespace, newSpoke.Spec.HubRef.Name, hubGetErr)
 	}
 
-	warn, valErrs := v.validateAddons(ctx, v.client, spoke)
+	warn, valErrs := v.validateAddons(ctx, v.client, newSpoke)
 	allErrs = append(allErrs, valErrs...)
 
 	if len(allErrs) > 0 {
-		return warn, kerrs.NewInvalid(v1beta1.SpokeGroupKind, spoke.Name, allErrs)
+		return warn, kerrs.NewInvalid(v1beta1.SpokeGroupKind, newSpoke.Name, allErrs)
 	}
 	return warn, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Spoke.
-func (v *SpokeCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	spoke, ok := obj.(*v1beta1.Spoke)
-	if !ok {
-		return nil, fmt.Errorf("expected a Spoke object but got %T", obj)
-	}
+func (v *SpokeCustomValidator) ValidateDelete(_ context.Context, spoke *v1beta1.Spoke) (admission.Warnings, error) {
 	spokelog.Info("Validation for Spoke upon deletion", "name", spoke.GetName())
 
 	// TODO(user): fill in your validation logic upon object deletion.

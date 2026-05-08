@@ -18,16 +18,13 @@ package v1alpha1
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -36,7 +33,7 @@ var log = logf.Log.WithName("fleetconfig-resource")
 
 // SetupFleetConfigWebhookWithManager registers the webhook for FleetConfig in the manager.
 func SetupFleetConfigWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).For(&FleetConfig{}).
+	return ctrl.NewWebhookManagedBy(mgr, &FleetConfig{}).
 		WithDefaulter(&FleetConfigCustomDefaulter{}).
 		WithValidator(&FleetConfigCustomValidator{client: mgr.GetClient()}).
 		Complete()
@@ -53,15 +50,10 @@ type FleetConfigCustomDefaulter struct {
 	// TODO(user): Add more fields as needed for defaulting
 }
 
-var _ webhook.CustomDefaulter = &FleetConfigCustomDefaulter{}
+var _ admission.Defaulter[*FleetConfig] = &FleetConfigCustomDefaulter{}
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind FleetConfig.
-func (d *FleetConfigCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
-	fc, ok := obj.(*FleetConfig)
-
-	if !ok {
-		return fmt.Errorf("expected an FleetConfig object but got %T", obj)
-	}
+func (d *FleetConfigCustomDefaulter) Default(_ context.Context, fc *FleetConfig) error {
 	log.Info("Defaulting for FleetConfig", "name", fc.GetName())
 
 	return nil
@@ -81,14 +73,10 @@ type FleetConfigCustomValidator struct {
 	client client.Client
 }
 
-var _ webhook.CustomValidator = &FleetConfigCustomValidator{}
+var _ admission.Validator[*FleetConfig] = &FleetConfigCustomValidator{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (v *FleetConfigCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
-	fc, ok := obj.(*FleetConfig)
-	if !ok {
-		return nil, fmt.Errorf("expected a FleetConfig object but got %T", obj)
-	}
+func (v *FleetConfigCustomValidator) ValidateCreate(ctx context.Context, fc *FleetConfig) (admission.Warnings, error) {
 	log.Info("Validation for FleetConfig upon creation", "name", fc.GetName())
 
 	var (
@@ -151,39 +139,27 @@ func isKubeconfigValid(kubeconfig Kubeconfig) (bool, string) {
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (v *FleetConfigCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
-	fc, ok := newObj.(*FleetConfig)
-	if !ok {
-		return nil, fmt.Errorf("expected a FleetConfig object for the newObj but got %T", newObj)
-	}
-	oldFc, ok := oldObj.(*FleetConfig)
-	if !ok {
-		return nil, fmt.Errorf("expected a FleetConfig object for the oldObj but got %T", oldObj)
-	}
-	log.Info("starting validation for FleetConfig update", "name", fc.GetName())
+func (v *FleetConfigCustomValidator) ValidateUpdate(ctx context.Context, oldFc, newFc *FleetConfig) (admission.Warnings, error) {
+	log.Info("starting validation for FleetConfig update", "name", newFc.GetName())
 
-	err := allowFleetConfigUpdate(fc, oldFc)
+	err := allowFleetConfigUpdate(newFc, oldFc)
 	if err != nil {
 		return nil, err
 	}
 
-	errs := validateAddonConfigs(ctx, v.client, oldFc, fc)
-	errs = append(errs, validateAddons(fc)...)
-	errs = append(errs, validateHubAddons(ctx, oldFc, fc)...)
+	errs := validateAddonConfigs(ctx, v.client, oldFc, newFc)
+	errs = append(errs, validateAddons(newFc)...)
+	errs = append(errs, validateHubAddons(ctx, oldFc, newFc)...)
 	if len(errs) > 0 {
-		return nil, errors.NewInvalid(GroupKind, fc.Name, errs)
+		return nil, errors.NewInvalid(GroupKind, newFc.Name, errs)
 	}
 
-	log.Info("validation for FleetConfig update allowed", "name", fc.GetName())
+	log.Info("validation for FleetConfig update allowed", "name", newFc.GetName())
 	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (v *FleetConfigCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
-	fc, ok := obj.(*FleetConfig)
-	if !ok {
-		return nil, fmt.Errorf("expected a FleetConfig object but got %T", obj)
-	}
+func (v *FleetConfigCustomValidator) ValidateDelete(_ context.Context, fc *FleetConfig) (admission.Warnings, error) {
 	log.Info("Validation for FleetConfig upon deletion", "name", fc.GetName())
 
 	// TODO(user): fill in your validation logic upon object deletion.
