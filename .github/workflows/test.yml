@@ -55,10 +55,33 @@ jobs:
         id: test
         run: cd ${{ inputs.repo }} && make test-unit
 
+  test-chart-precheck:
+    name: Detect Helm charts
+    runs-on: ubuntu-latest
+    outputs:
+      has_charts: ${{ steps.detect.outputs.has_charts }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+          submodules: 'recursive'
+      - id: detect
+        run: |
+          # hashFiles is not available in jobs.<job-id>.if conditions, hence the precheck job.
+          # see: https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability
+          if [[ -n "${{ hashFiles(format('{0}/charts/**', inputs.repo)) }}" ]]; then
+            echo "has_charts=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_charts=false" >> "$GITHUB_OUTPUT"
+          fi
+
   test-chart:
     name: Run Helm Chart Tests
+    needs: test-chart-precheck
+    if: needs.test-chart-precheck.outputs.has_charts == 'true'
     runs-on: ubuntu-latest
-    if: hashFiles('${{ inputs.repo }}/charts/**') != ''
     permissions:
       contents: read
       id-token: write
@@ -97,8 +120,8 @@ jobs:
         id: list-changed
         run: |
           set -e
-          changed=$(ct list-changed --chart-dirs ${{ inputs.repo }}/charts)
-          echo $changed
+          changed="$(ct list-changed --chart-dirs "${{ inputs.repo }}/charts")"
+          echo "$changed"
           if [[ -n "$changed" ]]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
