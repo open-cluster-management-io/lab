@@ -13,12 +13,12 @@ import (
 	"strings"
 	"unicode"
 
-	sRegexp "github.com/containers/storage/pkg/regexp"
-	"github.com/containers/storage/pkg/system"
 	buildkitparser "github.com/moby/buildkit/frontend/dockerfile/parser"
 	buildkitshell "github.com/moby/buildkit/frontend/dockerfile/shell"
 	"github.com/openshift/imagebuilder/dockerfile/command"
 	"github.com/openshift/imagebuilder/internal"
+	sRegexp "go.podman.io/storage/pkg/regexp"
+	"go.podman.io/storage/pkg/system"
 )
 
 // Node is a structure used to represent a parse tree.
@@ -291,7 +291,7 @@ func (r *Result) PrintWarnings(out io.Writer) {
 	if len(r.Warnings) == 0 {
 		return
 	}
-	fmt.Fprintf(out, strings.Join(r.Warnings, "\n")+"\n")
+	io.WriteString(out, strings.Join(r.Warnings, "\n")+"\n")
 }
 
 // Parse reads lines from a Reader, parses the lines into an AST and returns
