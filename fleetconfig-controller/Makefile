@@ -1,6 +1,8 @@
 # If you update this file, please follow:
 # https://www.thapaliya.com/en/writings/well-documented-makefiles/
 
+SHELL := /bin/bash
+
 include makelib/common.mk
 
 IMAGEBUILDER_VERSION ?= 1.2.16

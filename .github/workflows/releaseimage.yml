@@ -72,7 +72,7 @@ jobs:
           set -e
           cd ${{ matrix.repository }}
           IMAGE_TAG=${{ needs.env.outputs.RELEASE_VERSION }}-${{ matrix.arch }} \
-          IMAGE_BUILD_EXTRA_FLAGS="--build-arg OS=linux --build-arg ARCH=${{ matrix.arch }}" \
+          GOARCH=${{ matrix.arch }} \
             make images
 
       - name: push
