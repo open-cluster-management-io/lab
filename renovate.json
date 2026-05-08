@@ -39,8 +39,7 @@
           "minor",
           "patch"
         ],
-        "groupName": "Shared non-major dependencies",
-        "groupSlug": "shared-non-major"
+        "groupName": "Shared non-major dependencies"
       },
       {
         "description": "Non-major grouping scoped to fleetconfig-controller",
@@ -51,8 +50,7 @@
         "matchFileNames": [
           "fleetconfig-controller/**"
         ],
-        "groupName": "FleetConfig Controller non-major dependencies",
-        "groupSlug": "fcc-non-major"
+        "groupName": "FleetConfig Controller non-major dependencies"
       },
       {
         "description": "Non-major grouping scoped to dashboard",
@@ -63,8 +61,7 @@
         "matchFileNames": [
           "dashboard/**"
         ],
-        "groupName": "Dashboard non-major dependencies",
-        "groupSlug": "dashboard-non-major"
+        "groupName": "Dashboard non-major dependencies"
       },
       {
         "description": "Non-major grouping scoped to vscode-extension",
@@ -75,8 +72,7 @@
         "matchFileNames": [
           "vscode-extension/**"
         ],
-        "groupName": "VS Code extension non-major dependencies",
-        "groupSlug": "vscode-extension-non-major"
+        "groupName": "VS Code extension non-major dependencies"
       },
       {
         "description": "Ginkgo. See also: https://github.com/renovatebot/renovate/discussions/35963",
