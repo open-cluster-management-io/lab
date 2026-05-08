@@ -17,9 +17,17 @@ import (
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 )
 
-// RestConfigFromKubeconfig either creates a rest.Config from a v1alpha1.Kubeconfig or
-// returns an in-cluster config if the kubeconfig is nil.
+// RestConfigFromKubeconfig builds a rest.Config from raw kubeconfig file contents (standard kubeconfig YAML/JSON bytes).
+// It calls RestConfigFromKubeconfigWithContext with an empty context name so the file's current context is used.
+// If kubeconfig is nil, behavior matches RestConfigFromKubeconfigWithContext(nil, ""): in-cluster REST config.
 func RestConfigFromKubeconfig(kubeconfig []byte) (*rest.Config, error) {
+	return RestConfigFromKubeconfigWithContext(kubeconfig, "")
+}
+
+// RestConfigFromKubeconfigWithContext builds a rest.Config from raw kubeconfig bytes.
+// If kubeconfig is nil, it returns the default in-cluster REST config from controller-runtime GetConfig (typical pod service-account access).
+// If kubeconfig is non-nil, it is loaded with clientcmd; when contextName is non-empty, it overrides the loaded config's current context.
+func RestConfigFromKubeconfigWithContext(kubeconfig []byte, contextName string) (*rest.Config, error) {
 	if kubeconfig == nil {
 		return ctrl.GetConfig()
 	}
@@ -27,7 +35,11 @@ func RestConfigFromKubeconfig(kubeconfig []byte) (*rest.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load kubeconfig: %w", err)
 	}
-	clientConfig := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{})
+	overrides := &clientcmd.ConfigOverrides{}
+	if contextName != "" {
+		overrides.CurrentContext = contextName
+	}
+	clientConfig := clientcmd.NewDefaultClientConfig(*config, overrides)
 	return clientConfig.ClientConfig()
 }
 

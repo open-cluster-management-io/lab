@@ -22,6 +22,7 @@ import (
 
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
@@ -97,6 +98,19 @@ func (v *SpokeCustomValidator) ValidateCreate(ctx context.Context, obj runtime.O
 		)
 	}
 
+	allErrs = append(allErrs, validateSpokeKlusterletAddon(spoke)...)
+
+	hub := &v1beta1.Hub{}
+	err := v.client.Get(ctx, types.NamespacedName{Name: spoke.Spec.HubRef.Name, Namespace: spoke.Spec.HubRef.Namespace}, hub)
+	switch {
+	case err == nil:
+		allErrs = append(allErrs, validateSpokeRegistrationWithHub(ctx, v.client, spoke, hub)...)
+	case kerrs.IsNotFound(err):
+		// Hub-backed registration checks require the Hub object; optional skip until it exists.
+	default:
+		return nil, fmt.Errorf("get Hub %s/%s: %w", spoke.Spec.HubRef.Namespace, spoke.Spec.HubRef.Name, err)
+	}
+
 	warn, errs := v.validateAddons(ctx, v.client, spoke)
 	allErrs = append(allErrs, errs...)
 
@@ -130,6 +144,18 @@ func (v *SpokeCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newOb
 		allErrs = append(allErrs, field.Invalid(
 			field.NewPath("spec").Child("kubeconfig"), spoke, msg),
 		)
+	}
+
+	allErrs = append(allErrs, validateSpokeKlusterletAddon(spoke)...)
+
+	hub := &v1beta1.Hub{}
+	hubGetErr := v.client.Get(ctx, types.NamespacedName{Name: spoke.Spec.HubRef.Name, Namespace: spoke.Spec.HubRef.Namespace}, hub)
+	switch {
+	case hubGetErr == nil:
+		allErrs = append(allErrs, validateSpokeRegistrationWithHub(ctx, v.client, spoke, hub)...)
+	case kerrs.IsNotFound(hubGetErr):
+	default:
+		return nil, fmt.Errorf("get Hub %s/%s: %w", spoke.Spec.HubRef.Namespace, spoke.Spec.HubRef.Name, hubGetErr)
 	}
 
 	warn, valErrs := v.validateAddons(ctx, v.client, spoke)

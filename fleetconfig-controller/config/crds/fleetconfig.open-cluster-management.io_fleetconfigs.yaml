@@ -1475,6 +1475,11 @@ spec:
                                 ExternalManagedKubeConfig should be the kubeConfig file of the managed cluster via setting --set-file=<the kubeConfig file of managed cluster>
                                 only need to set in the hosted mode. optional
                               type: string
+                            grpcConfig:
+                              description: |-
+                                GRPCConfig includes the information needed to build connect to gRPC server in the bootstrap secret for
+                                cluster importing via setting --set-file=<the grpc config file> optional.
+                              type: string
                             images:
                               description: Images is the configurations for all images
                                 used in operator deployment and klusterlet CR.
@@ -1605,9 +1610,10 @@ spec:
                                           operator:
                                             description: |-
                                               Operator represents a key's relationship to the value.
-                                              Valid operators are Exists and Equal. Defaults to Equal.
+                                              Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                                               Exists is equivalent to wildcard for value, so that a pod can
                                               tolerate all taints of a particular category.
+                                              Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                                             type: string
                                           tolerationSeconds:
                                             description: |-
@@ -1629,6 +1635,36 @@ spec:
                                   description: RegistrationConfiguration contains
                                     the configuration of registration
                                   properties:
+                                    addOnKubeClientRegistrationDriver:
+                                      description: This provides driver details required
+                                        to register add-ons with hub for kubeClient
+                                        type
+                                      properties:
+                                        authType:
+                                          description: |-
+                                            AuthType is the authentication driver used for add-on registration.
+                                            Possible values are csr and token.
+                                            Currently, this field only affects kubeClient type add-on registration. The csr type add-on registration always uses csr driver.
+                                            In the future, this may be extended to customize authentication for csr type add-on registration as well.
+                                          enum:
+                                          - csr
+                                          - token
+                                          type: string
+                                        token:
+                                          description: Token contains the configuration
+                                            for token-based registration.
+                                          properties:
+                                            expirationSeconds:
+                                              description: |-
+                                                ExpirationSeconds represents the seconds of a token to expire.
+                                                If it is not set or 0, the default duration will be used, which is
+                                                the same as the certificate expiration set by the hub cluster's
+                                                kube-controller-manager (typically 1 year).
+                                                The minimum valid value for production use is 3600 (1 hour), though smaller values are allowed for testing.
+                                              format: int64
+                                              type: integer
+                                          type: object
+                                      type: object
                                     bootstrapKubeConfigs:
                                       description: |-
                                         BootstrapKubeConfigs defines the ordered list of bootstrap kubeconfigs. The order decides which bootstrap kubeconfig to use first when rebootstrap.
@@ -1720,6 +1756,13 @@ spec:
                                       required:
                                       - maxCustomClusterClaims
                                       type: object
+                                    clusterLabels:
+                                      additionalProperties:
+                                        type: string
+                                      description: ClusterLabels is labels set on
+                                        ManagedCluster when creating only, other actors
+                                        can update it afterwards.
+                                      type: object
                                     featureGates:
                                       description: "FeatureGates represents the list
                                         of feature gates for registration\nIf it is
@@ -1772,7 +1815,7 @@ spec:
                                       type: integer
                                     registrationDriver:
                                       description: This provides driver details required
-                                        to register with hub
+                                        to register klusterlet agent with hub
                                       properties:
                                         authType:
                                           default: csr
@@ -1783,6 +1826,7 @@ spec:
                                           enum:
                                           - csr
                                           - awsirsa
+                                          - grpc
                                           type: string
                                         awsIrsa:
                                           description: |-
@@ -2512,9 +2556,10 @@ spec:
                                   operator:
                                     description: |-
                                       Operator represents a key's relationship to the value.
-                                      Valid operators are Exists and Equal. Defaults to Equal.
+                                      Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                                       Exists is equivalent to wildcard for value, so that a pod can
                                       tolerate all taints of a particular category.
+                                      Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                                     type: string
                                   tolerationSeconds:
                                     description: |-

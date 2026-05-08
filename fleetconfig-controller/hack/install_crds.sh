@@ -3,6 +3,8 @@
 set -euo pipefail
 
 script_dir="$(dirname "${BASH_SOURCE[0]}")"
+
+# shellcheck source=/dev/null
 source "$script_dir/.versions.env"
 
 chart_dir=./charts/fleetconfig-controller/

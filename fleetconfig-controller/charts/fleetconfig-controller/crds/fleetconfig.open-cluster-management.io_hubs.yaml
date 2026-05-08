@@ -1195,6 +1195,18 @@ spec:
                                   - feature
                                   type: object
                                 type: array
+                              importerConfiguration:
+                                description: ImporterConfiguration represents the
+                                  configuration of the cluster importer
+                                properties:
+                                  renderers:
+                                    description: |-
+                                      renderers specifies which import renderers to use.
+                                      Valid values are: "render-auto", "render-from-config-secret"
+                                    items:
+                                      type: string
+                                    type: array
+                                type: object
                               registrationDrivers:
                                 description: |-
                                   RegistrationDrivers represent the list of hub registration drivers that contain information used by hub to initialize the hub cluster
@@ -1203,15 +1215,16 @@ spec:
                                   properties:
                                     authType:
                                       default: csr
-                                      description: Type of the authentication used
-                                        by hub to initialize the Hub cluster. Possible
-                                        values are csr and awsirsa.
+                                      description: |-
+                                        authType is the type of the authentication used by hub to initialize the Hub cluster.
+                                        Possible values are csr, awsirsa and grpc.
                                       enum:
                                       - csr
                                       - awsirsa
+                                      - grpc
                                       type: string
                                     awsirsa:
-                                      description: AwsIrsa represents the configuration
+                                      description: awsirsa represents the configuration
                                         for awsirsa driver.
                                       properties:
                                         autoApprovedIdentities:
@@ -1235,8 +1248,19 @@ spec:
                                           type: array
                                       type: object
                                     csr:
-                                      description: CSR represents the configuration
+                                      description: csr represents the configuration
                                         for csr driver.
+                                      properties:
+                                        autoApprovedIdentities:
+                                          description: AutoApprovedIdentities represent
+                                            a list of approved users
+                                          items:
+                                            type: string
+                                          type: array
+                                      type: object
+                                    grpc:
+                                      description: grpc represents the configuration
+                                        for gRPC driver.
                                       properties:
                                         autoApprovedIdentities:
                                           description: AutoApprovedIdentities represent
@@ -1325,6 +1349,179 @@ spec:
                                 - Default
                                 - BestEffort
                                 - ResourceRequirement
+                                type: string
+                            type: object
+                          serverConfiguration:
+                            description: ServerConfiguration contains the configuration
+                              of http/grpc server.
+                            properties:
+                              endpointsExposure:
+                                description: endpointsExposure represents the configuration
+                                  for endpoints exposure of the server.
+                                items:
+                                  properties:
+                                    grpc:
+                                      description: grpc represents the configuration
+                                        for grpc endpoint.
+                                      properties:
+                                        hostname:
+                                          description: hostname points to a fixed
+                                            hostname for serving agents' handshakes.
+                                          properties:
+                                            caBundle:
+                                              description: caBundle of the endpoint.
+                                              format: byte
+                                              type: string
+                                            host:
+                                              description: host is the host name of
+                                                the endpoint.
+                                              type: string
+                                          required:
+                                          - host
+                                          type: object
+                                        loadBalancer:
+                                          description: LoadBalancer points customized
+                                            configuration for loadBalancer type.
+                                          properties:
+                                            caBundle:
+                                              description: CABundle is a customized
+                                                caBundle of the endpoint.
+                                              format: byte
+                                              type: string
+                                            host:
+                                              description: Host is the customized
+                                                host name of the endpoint.
+                                              type: string
+                                          type: object
+                                        route:
+                                          description: Route points customized configuration
+                                            for route type.
+                                          properties:
+                                            caBundle:
+                                              description: CABundle is a customized
+                                                caBundle of the endpoint.
+                                              format: byte
+                                              type: string
+                                            host:
+                                              description: Host is the customized
+                                                host name of the endpoint.
+                                              type: string
+                                          type: object
+                                        type:
+                                          default: hostname
+                                          description: |-
+                                            type specifies how the endpoint is exposed.
+                                            You may need to apply an object to expose the endpoint, for example: a route.
+                                          enum:
+                                          - hostname
+                                          - loadBalancer
+                                          - route
+                                          type: string
+                                      required:
+                                      - type
+                                      type: object
+                                    https:
+                                      description: https represents the configuration
+                                        for https endpoint.
+                                      properties:
+                                        hostname:
+                                          description: hostname points to a fixed
+                                            hostname for serving agents' handshakes.
+                                          properties:
+                                            caBundle:
+                                              description: caBundle of the endpoint.
+                                              format: byte
+                                              type: string
+                                            host:
+                                              description: host is the host name of
+                                                the endpoint.
+                                              type: string
+                                          required:
+                                          - host
+                                          type: object
+                                        loadBalancer:
+                                          description: LoadBalancer points customized
+                                            configuration for loadBalancer type.
+                                          properties:
+                                            caBundle:
+                                              description: CABundle is a customized
+                                                caBundle of the endpoint.
+                                              format: byte
+                                              type: string
+                                            host:
+                                              description: Host is the customized
+                                                host name of the endpoint.
+                                              type: string
+                                          type: object
+                                        route:
+                                          description: Route points customized configuration
+                                            for route type.
+                                          properties:
+                                            caBundle:
+                                              description: CABundle is a customized
+                                                caBundle of the endpoint.
+                                              format: byte
+                                              type: string
+                                            host:
+                                              description: Host is the customized
+                                                host name of the endpoint.
+                                              type: string
+                                          type: object
+                                        type:
+                                          default: hostname
+                                          description: |-
+                                            type specifies how the endpoint is exposed.
+                                            You may need to apply an object to expose the endpoint, for example: a route.
+                                          enum:
+                                          - hostname
+                                          - loadBalancer
+                                          - route
+                                          type: string
+                                      required:
+                                      - type
+                                      type: object
+                                    protocol:
+                                      default: grpc
+                                      description: protocol is the protocol used for
+                                        the endpoint, could be https or grpc.
+                                      enum:
+                                      - grpc
+                                      - https
+                                      type: string
+                                    usage:
+                                      description: |-
+                                        usage defines the usage of the endpoint. It could be "agentToHub" indicating the endpoint is used
+                                        for communication between agent and hub, or "consumer" indicating the endpoint is used for external consumer.
+                                      type: string
+                                  required:
+                                  - protocol
+                                  type: object
+                                type: array
+                              featureGates:
+                                description: featureGates represents the features
+                                  enabled for the server
+                                items:
+                                  properties:
+                                    feature:
+                                      description: Feature is the key of feature gate.
+                                        e.g. featuregate/Foo.
+                                      type: string
+                                    mode:
+                                      default: Disable
+                                      description: |-
+                                        Mode is either Enable, Disable, "" where "" is Disable by default.
+                                        In Enable mode, a valid feature gate `featuregate/Foo` will be set to "--featuregate/Foo=true".
+                                        In Disable mode, a valid feature gate `featuregate/Foo` will be set to "--featuregate/Foo=false".
+                                      enum:
+                                      - Enable
+                                      - Disable
+                                      type: string
+                                  required:
+                                  - feature
+                                  type: object
+                                type: array
+                              imagePullSpec:
+                                description: imagePullSpec is the image for the server
                                 type: string
                             type: object
                           workConfiguration:
@@ -1972,9 +2169,10 @@ spec:
                             operator:
                               description: |-
                                 Operator represents a key's relationship to the value.
-                                Valid operators are Exists and Equal. Defaults to Equal.
+                                Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                                 Exists is equivalent to wildcard for value, so that a pod can
                                 tolerate all taints of a particular category.
+                                Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                               type: string
                             tolerationSeconds:
                               description: |-
@@ -2106,11 +2304,36 @@ spec:
                       Options are:
                        - csr: Use the default CSR-based registration authentication.
                        - awsirsa: Use AWS IAM Role for Service Accounts (IRSA) registration authentication.
-                      The set of valid options is open for extension.
+                       - grpc: Use gRPC registration. Hub clusteradm init uses grpc (endpointType, server, autoApprovedIdentities).
+                         Spokes resolve the effective join endpoint and TLS trust material from the Hub status.
                     enum:
                     - csr
                     - awsirsa
+                    - grpc
                     type: string
+                  grpc:
+                    description: GRPC holds hub-side gRPC settings for clusteradm
+                      init (endpoint type, server, auto-approved identities).
+                    properties:
+                      autoApprovedIdentities:
+                        description: AutoApprovedIdentities are passed to clusteradm
+                          init --auto-approved-grpc-identities (comma-separated list).
+                        items:
+                          type: string
+                        type: array
+                      endpointType:
+                        default: hostname
+                        description: EndpointType is the gRPC server endpoint type
+                          for clusteradm init (--grpc-endpoint-type).
+                        enum:
+                        - hostname
+                        - loadBalancer
+                        type: string
+                      server:
+                        description: Server is the address for clusteradm init --grpc-server
+                          when configuring the hub.
+                        type: string
+                    type: object
                   hubClusterARN:
                     description: The Hub cluster ARN for awsirsa registration authentication.
                       Required when Type is awsirsa, otherwise ignored.
@@ -2231,6 +2454,17 @@ spec:
                   - wantStatus
                   type: object
                 type: array
+              grpcServer:
+                description: |-
+                  GRPCServer is the observed gRPC listen address (host:port) from the hub cluster's cluster-manager-grpc-server
+                  LoadBalancer ingress when registrationAuth.grpc.endpointType is loadBalancer. When endpoint type is hostname,
+                  spokes use spec.registrationAuth.grpc.server instead and this field may be empty.
+                type: string
+              grpcServerCA:
+                description: |-
+                  GRPCServerCA is the observed PEM CA bundle from the hub cluster's open-cluster-management-hub/ca-bundle-configmap
+                  (data key ca-bundle.crt).
+                type: string
               installedHubAddOns:
                 items:
                   description: InstalledHubAddOn tracks metadata for each hubAddon

@@ -2,6 +2,7 @@ package v1beta1
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -134,17 +135,59 @@ func (c Condition) Equal(other Condition) bool {
 		c.Reason == other.Reason && c.Message == other.Message
 }
 
+// RegistrationAuthGRPC holds clusteradm init gRPC settings for the hub
+// (--grpc-endpoint-type, --grpc-server, --auto-approved-grpc-identities).
+// See open-cluster-management-io/clusteradm init.
+type RegistrationAuthGRPC struct {
+	// EndpointType is the gRPC server endpoint type for clusteradm init (--grpc-endpoint-type).
+	// +kubebuilder:validation:Enum=hostname;loadBalancer
+	// +kubebuilder:default:=hostname
+	// +optional
+	EndpointType string `json:"endpointType,omitempty"`
+
+	// Server is the address for clusteradm init --grpc-server when configuring the hub.
+	// +optional
+	Server string `json:"server,omitempty"`
+
+	// AutoApprovedIdentities are passed to clusteradm init --auto-approved-grpc-identities (comma-separated list).
+	// +optional
+	AutoApprovedIdentities []string `json:"autoApprovedIdentities,omitempty"`
+}
+
+// GRPCInitEnabled reports whether clusteradm init should enable the csr,grpc registration driver and related init flags.
+func (r RegistrationAuth) GRPCInitEnabled() bool {
+	if r.Driver == AWSIRSARegistrationDriver {
+		return false
+	}
+	if r.Driver == GRPCRegistrationDriver {
+		return true
+	}
+	h := r.GRPC
+	if h == nil {
+		return false
+	}
+	if h.Server != "" || len(h.AutoApprovedIdentities) > 0 {
+		return true
+	}
+	return strings.EqualFold(h.EndpointType, GRPCEndpointTypeLoadBalancer)
+}
+
 // RegistrationAuth provides specifications for registration authentication.
 type RegistrationAuth struct {
 	// The registration authentication driver to use.
 	// Options are:
 	//  - csr: Use the default CSR-based registration authentication.
 	//  - awsirsa: Use AWS IAM Role for Service Accounts (IRSA) registration authentication.
-	// The set of valid options is open for extension.
-	// +kubebuilder:validation:Enum=csr;awsirsa
+	//  - grpc: Use gRPC registration. Hub clusteradm init uses grpc (endpointType, server, autoApprovedIdentities).
+	//    Spokes resolve the effective join endpoint and TLS trust material from the Hub status.
+	// +kubebuilder:validation:Enum=csr;awsirsa;grpc
 	// +kubebuilder:default:="csr"
 	// +optional
 	Driver string `json:"driver,omitempty"`
+
+	// GRPC holds hub-side gRPC settings for clusteradm init (endpoint type, server, auto-approved identities).
+	// +optional
+	GRPC *RegistrationAuthGRPC `json:"grpc,omitempty"`
 
 	// The Hub cluster ARN for awsirsa registration authentication. Required when Type is awsirsa, otherwise ignored.
 	// +optional

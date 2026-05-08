@@ -17,10 +17,10 @@ require (
 	k8s.io/client-go v0.35.1
 	k8s.io/kubectl v0.35.1
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
-	open-cluster-management.io/api v1.0.0
-	open-cluster-management.io/ocm v1.0.0
+	open-cluster-management.io/api v1.2.0
+	open-cluster-management.io/ocm v1.2.1
 	sigs.k8s.io/cluster-api v1.10.1
-	sigs.k8s.io/controller-runtime v0.21.0
+	sigs.k8s.io/controller-runtime v0.22.4
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -116,7 +116,7 @@ require (
 	golang.org/x/crypto v0.50.0 // indirect
 	golang.org/x/mod v0.35.0 // indirect
 	golang.org/x/net v0.53.0 // indirect
-	golang.org/x/oauth2 v0.30.0 // indirect
+	golang.org/x/oauth2 v0.32.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/term v0.42.0 // indirect
@@ -127,7 +127,7 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	helm.sh/helm/v3 v3.17.3 // indirect
+	helm.sh/helm/v3 v3.20.2 // indirect
 	k8s.io/apiextensions-apiserver v0.35.1 // indirect
 	k8s.io/cluster-bootstrap v0.33.0 // indirect
 	k8s.io/klog v1.0.0 // indirect
@@ -136,33 +136,4 @@ require (
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
-)
-
-replace (
-	helm.sh/helm/v3 => helm.sh/helm/v3 v3.20.2
-	k8s.io/api => k8s.io/api v0.34.1
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.34.1
-	k8s.io/apimachinery => k8s.io/apimachinery v0.34.1
-	k8s.io/apiserver => k8s.io/apiserver v0.34.1
-	k8s.io/client-go => k8s.io/client-go v0.34.1
-	k8s.io/client-go/rest => k8s.io/client-go/rest v0.34.1
-	k8s.io/cloud-provider => k8s.io/cloud-provider v0.34.1
-	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.34.1
-	k8s.io/component-base => k8s.io/component-base v0.34.1
-	k8s.io/controller-manager => k8s.io/controller-manager v0.34.1
-	k8s.io/cri-api => k8s.io/cri-api v0.34.1
-	k8s.io/cri-client => k8s.io/cri-client v0.34.1
-	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.34.1
-	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.34.1
-	k8s.io/endpointslice => k8s.io/endpointslice v0.34.1
-	k8s.io/externaljwt => k8s.io/externaljwt v0.34.1
-	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.34.1
-	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.34.1
-	k8s.io/kube-proxy => k8s.io/kube-proxy v0.34.1
-	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.34.1
-	k8s.io/kubectl => k8s.io/kubectl v0.34.1
-	k8s.io/kubelet => k8s.io/kubelet v0.34.1
-	k8s.io/mount-utils => k8s.io/mount-utils v0.34.1
-	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.34.1
-	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.34.1
 )

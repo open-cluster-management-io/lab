@@ -427,6 +427,24 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "allowed - cleanupConfig change (non-purgeKubeconfigSecret field)",
+			oldSpoke: &v1beta1.Spoke{
+				Spec: v1beta1.SpokeSpec{
+					CleanupConfig: v1beta1.CleanupConfig{
+						PurgeKlusterletOperator: true,
+					},
+				},
+			},
+			newSpoke: &v1beta1.Spoke{
+				Spec: v1beta1.SpokeSpec{
+					CleanupConfig: v1beta1.CleanupConfig{
+						PurgeKlusterletOperator: false,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "allowed - timeout change",
 			oldSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
@@ -450,6 +468,25 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			newSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
 					LogVerbosity: 5,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "allowed - addon kubeClient registration auth change",
+			oldSpoke: &v1beta1.Spoke{
+				Spec: v1beta1.SpokeSpec{
+					Klusterlet: v1beta1.Klusterlet{
+						AddonKubeClientRegistrationAuth: "",
+					},
+				},
+			},
+			newSpoke: &v1beta1.Spoke{
+				Spec: v1beta1.SpokeSpec{
+					Klusterlet: v1beta1.Klusterlet{
+						AddonKubeClientRegistrationAuth: v1beta1.AddonKubeClientRegistrationAuthToken,
+						AddonTokenExpirationSeconds:     3600,
+					},
 				},
 			},
 			wantErr: false,

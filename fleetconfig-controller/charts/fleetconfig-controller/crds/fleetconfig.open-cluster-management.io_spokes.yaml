@@ -67,14 +67,16 @@ spec:
                       properties:
                         agentInstallNamespace:
                           default: open-cluster-management-agent-addon
-                          description: AgentInstallNamespace is the namespace where
-                            the add-on agent should be installed on the managed cluster.
+                          description: |-
+                            AgentInstallNamespace is the namespace where the add-on agent should be installed on the managed cluster.
+                            For template-type addons: set to empty string "" to use the namespace defined in the addonTemplate.
+                            For non-template addons: defaults to "open-cluster-management-agent-addon" if not specified.
                           maxLength: 63
-                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                          pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$
                           type: string
                         customizedVariables:
                           description: |-
-                            CustomizedVariables is a list of name-value variables for the current add-on deployment.
+                            customizedVariables is a list of name-value variables for the current add-on deployment.
                             The add-on implementation can use these variables to render its add-on deployment.
                             The default is an empty list.
                           items:
@@ -99,7 +101,7 @@ spec:
                           x-kubernetes-list-type: map
                         nodePlacement:
                           description: |-
-                            NodePlacement enables explicit control over the scheduling of the add-on agents on the
+                            nodePlacement enables explicit control over the scheduling of the add-on agents on the
                             managed cluster.
                             All add-on agent pods are expected to comply with this node placement.
                             If the placement is nil, the placement is not specified, it will be omitted.
@@ -137,9 +139,10 @@ spec:
                                   operator:
                                     description: |-
                                       Operator represents a key's relationship to the value.
-                                      Valid operators are Exists and Equal. Defaults to Equal.
+                                      Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                                       Exists is equivalent to wildcard for value, so that a pod can
                                       tolerate all taints of a particular category.
+                                      Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                                     type: string
                                   tolerationSeconds:
                                     description: |-
@@ -184,7 +187,7 @@ spec:
                           type: object
                         registries:
                           description: |-
-                            Registries describes how to override images used by the addon agent on the managed cluster.
+                            registries describes how to override images used by the addon agent on the managed cluster.
                             the following example will override image "quay.io/open-cluster-management/addon-agent" to
                             "quay.io/ocm/addon-agent" when deploying the addon agent
 
@@ -363,6 +366,20 @@ spec:
                 default: {}
                 description: Klusterlet configuration.
                 properties:
+                  addonKubeClientRegistrationAuth:
+                    description: AddonKubeClientRegistrationAuth is passed to clusteradm
+                      join --addon-kubeclient-registration-auth (csr or token).
+                    enum:
+                    - csr
+                    - token
+                    type: string
+                  addonTokenExpirationSeconds:
+                    description: |-
+                      AddonTokenExpirationSeconds is passed to clusteradm join --addon-token-expiration-seconds when addonKubeClientRegistrationAuth is token.
+                      Use 0 for the system default.
+                    format: int64
+                    minimum: 0
+                    type: integer
                   annotations:
                     additionalProperties:
                       type: string
@@ -1422,6 +1439,11 @@ spec:
                           ExternalManagedKubeConfig should be the kubeConfig file of the managed cluster via setting --set-file=<the kubeConfig file of managed cluster>
                           only need to set in the hosted mode. optional
                         type: string
+                      grpcConfig:
+                        description: |-
+                          GRPCConfig includes the information needed to build connect to gRPC server in the bootstrap secret for
+                          cluster importing via setting --set-file=<the grpc config file> optional.
+                        type: string
                       images:
                         description: Images is the configurations for all images used
                           in operator deployment and klusterlet CR.
@@ -1550,9 +1572,10 @@ spec:
                                     operator:
                                       description: |-
                                         Operator represents a key's relationship to the value.
-                                        Valid operators are Exists and Equal. Defaults to Equal.
+                                        Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                                         Exists is equivalent to wildcard for value, so that a pod can
                                         tolerate all taints of a particular category.
+                                        Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                                       type: string
                                     tolerationSeconds:
                                       description: |-
@@ -1574,6 +1597,35 @@ spec:
                             description: RegistrationConfiguration contains the configuration
                               of registration
                             properties:
+                              addOnKubeClientRegistrationDriver:
+                                description: This provides driver details required
+                                  to register add-ons with hub for kubeClient type
+                                properties:
+                                  authType:
+                                    description: |-
+                                      AuthType is the authentication driver used for add-on registration.
+                                      Possible values are csr and token.
+                                      Currently, this field only affects kubeClient type add-on registration. The csr type add-on registration always uses csr driver.
+                                      In the future, this may be extended to customize authentication for csr type add-on registration as well.
+                                    enum:
+                                    - csr
+                                    - token
+                                    type: string
+                                  token:
+                                    description: Token contains the configuration
+                                      for token-based registration.
+                                    properties:
+                                      expirationSeconds:
+                                        description: |-
+                                          ExpirationSeconds represents the seconds of a token to expire.
+                                          If it is not set or 0, the default duration will be used, which is
+                                          the same as the certificate expiration set by the hub cluster's
+                                          kube-controller-manager (typically 1 year).
+                                          The minimum valid value for production use is 3600 (1 hour), though smaller values are allowed for testing.
+                                        format: int64
+                                        type: integer
+                                    type: object
+                                type: object
                               bootstrapKubeConfigs:
                                 description: |-
                                   BootstrapKubeConfigs defines the ordered list of bootstrap kubeconfigs. The order decides which bootstrap kubeconfig to use first when rebootstrap.
@@ -1663,6 +1715,12 @@ spec:
                                 required:
                                 - maxCustomClusterClaims
                                 type: object
+                              clusterLabels:
+                                additionalProperties:
+                                  type: string
+                                description: ClusterLabels is labels set on ManagedCluster
+                                  when creating only, other actors can update it afterwards.
+                                type: object
                               featureGates:
                                 description: "FeatureGates represents the list of
                                   feature gates for registration\nIf it is set empty,
@@ -1712,7 +1770,7 @@ spec:
                                 type: integer
                               registrationDriver:
                                 description: This provides driver details required
-                                  to register with hub
+                                  to register klusterlet agent with hub
                                 properties:
                                   authType:
                                     default: csr
@@ -1722,6 +1780,7 @@ spec:
                                     enum:
                                     - csr
                                     - awsirsa
+                                    - grpc
                                     type: string
                                   awsIrsa:
                                     description: |-
@@ -2446,9 +2505,10 @@ spec:
                             operator:
                               description: |-
                                 Operator represents a key's relationship to the value.
-                                Valid operators are Exists and Equal. Defaults to Equal.
+                                Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal.
                                 Exists is equivalent to wildcard for value, so that a pod can
                                 tolerate all taints of a particular category.
+                                Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).
                               type: string
                             tolerationSeconds:
                               description: |-
@@ -2625,7 +2685,9 @@ spec:
                 type: array
               klusterletHash:
                 default: ""
-                description: KlusterletHash is a hash of the Spoke's .spec.klusterlet.values.
+                description: |-
+                  KlusterletHash is a hash of merged klusterlet chart values plus join-relevant klusterlet fields
+                  (e.g. addon kubeClient registration auth) used to detect upgrade/reconcile needs.
                 type: string
               phase:
                 description: Phase is the current phase of the Spoke reconcile.

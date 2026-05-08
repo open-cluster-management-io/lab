@@ -91,6 +91,7 @@ func (v *HubCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Obj
 			field.NewPath("hub"), hub.Spec, "only one of hub.clusterManager or hub.singletonControlPlane may be specified"),
 		)
 	}
+	allErrs = append(allErrs, validateHubRegistrationAuth(hub)...)
 	allErrs = append(allErrs, validateHubAddons(ctx, v.client, nil, hub, v.addonC)...)
 
 	if len(allErrs) > 0 {
@@ -123,6 +124,7 @@ func (v *HubCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj 
 			field.NewPath("hub"), hub.Spec.Kubeconfig, msg),
 		)
 	}
+	allErrs = append(allErrs, validateHubRegistrationAuth(hub)...)
 	allErrs = append(allErrs, validateHubAddons(ctx, v.client, oldHub, hub, v.addonC)...)
 
 	if len(allErrs) > 0 {

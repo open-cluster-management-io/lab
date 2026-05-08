@@ -332,6 +332,10 @@ func (r *HubReconciler) handleHub(ctx context.Context, hub *v1beta1.Hub, hubKube
 		hub.Status.ClusterManagerHash = currClusterManagerHash
 	}
 
+	if err := r.reconcileHubGRPCStatus(ctx, hub, hubKubeconfig); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -459,9 +463,11 @@ func (r *HubReconciler) maybeUpgradeHubClusterManager(
 			return fmt.Errorf("failed to upgrade hub: %w", err)
 		}
 	}
+
 	hub.SetConditions(true, v1beta1.NewCondition(
 		v1beta1.HubUpgradeFailed, v1beta1.HubUpgradeFailed, metav1.ConditionFalse, metav1.ConditionFalse,
 	))
+
 	return nil
 }
 
@@ -488,6 +494,22 @@ func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub, hub
 			raArgs = append(raArgs, fmt.Sprintf("--auto-approved-arn-patterns=%s", strings.Join(hub.Spec.RegistrationAuth.AutoApprovedARNPatterns, ",")))
 		}
 		initArgs = append(initArgs, raArgs...)
+	}
+
+	if hub.Spec.RegistrationAuth.GRPCInitEnabled() {
+		ra := hub.Spec.RegistrationAuth
+		initArgs = append(initArgs, fmt.Sprintf("--registration-drivers=%s,%s", v1beta1.CSRRegistrationDriver, v1beta1.GRPCRegistrationDriver))
+		et := v1beta1.GRPCEndpointTypeHostname
+		if ra.GRPC != nil && ra.GRPC.EndpointType != "" {
+			et = ra.GRPC.EndpointType
+		}
+		initArgs = append(initArgs, fmt.Sprintf("--grpc-endpoint-type=%s", et))
+		if ra.GRPC != nil && ra.GRPC.Server != "" {
+			initArgs = append(initArgs, "--grpc-server", ra.GRPC.Server)
+		}
+		if ra.GRPC != nil && len(ra.GRPC.AutoApprovedIdentities) > 0 {
+			initArgs = append(initArgs, fmt.Sprintf("--auto-approved-grpc-identities=%s", strings.Join(ra.GRPC.AutoApprovedIdentities, ",")))
+		}
 	}
 
 	if hub.Spec.SingletonControlPlane != nil {

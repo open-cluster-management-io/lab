@@ -15,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"dario.cat/mergo"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +37,7 @@ import (
 	exec_utils "github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/exec"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/file"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/hash"
+	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/klusterletvalues"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/version"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/pkg/common"
@@ -525,7 +525,7 @@ func (r *SpokeReconciler) doSpokeWork(ctx context.Context, spoke *v1beta1.Spoke,
 	}
 
 	// attempt an upgrade whenever the klusterlet's bundleVersion or values change
-	currKlusterletHash, err := hash.ComputeHash(klusterletValues)
+	currKlusterletHash, err := hash.ComputeHash(v1beta1.KlusterletReconcileHashInput(klusterletValues, spoke.Spec.Klusterlet))
 	if err != nil {
 		return fmt.Errorf("failed to compute hash of spoke %s klusterlet values: %w", spoke.Name, err)
 	}
@@ -986,6 +986,128 @@ type hubMeta struct {
 	kubeconfig []byte
 }
 
+// effectiveGRPCJoinServerAndCA resolves clusteradm join --grpc-server and CA PEM for gRPC registration.
+// When registrationAuth.grpc.endpointType is loadBalancer, --grpc-server comes from hub status grpcServer (observed from the hub cluster).
+// Otherwise the spoke uses registrationAuth.grpc.server. The CA PEM always comes from hub status grpcServerCA (ca-bundle ConfigMap on the hub).
+func effectiveGRPCJoinServerAndCA(hub *v1beta1.Hub) (server, ca string, err error) {
+	g := hub.Spec.RegistrationAuth.GRPC
+	if g == nil {
+		return "", "", fmt.Errorf("hub.spec.registrationAuth.grpc is required when registrationAuth.driver is grpc (hub %s/%s)", hub.Namespace, hub.Name)
+	}
+	if strings.EqualFold(g.EndpointType, v1beta1.GRPCEndpointTypeLoadBalancer) {
+		server = hub.Status.GRPCServer
+	} else {
+		server = g.Server
+	}
+	ca = hub.Status.GRPCServerCA
+	if server == "" || ca == "" {
+		return "", "", fmt.Errorf(
+			"gRPC join needs hub status grpcServerCA, and either hub status grpcServer (loadBalancer endpoint type) or spec.registrationAuth.grpc.server (hub %s/%s)",
+			hub.Namespace, hub.Name,
+		)
+	}
+	return server, ca, nil
+}
+
+// appendJoinSpokeTransportAndAuthArgs appends hub endpoint, hub TLS, registration drivers, hosted-mode kubeconfig,
+// proxy, and addon-kubeclient flags for clusteradm join.
+func (r *SpokeReconciler) appendJoinSpokeTransportAndAuthArgs(ctx context.Context, joinArgs []string, spoke *v1beta1.Spoke, hub *v1beta1.Hub, tokenMeta *tokenMeta) ([]string, error) {
+	// Use hub API server from spec if provided and not forced to use internal endpoint,
+	// otherwise fall back to the hub API server from the tokenMeta
+	if hub.Spec.APIServer != "" && !spoke.Spec.Klusterlet.ForceInternalEndpointLookup {
+		joinArgs = append(joinArgs, "--hub-apiserver", hub.Spec.APIServer)
+	} else if tokenMeta != nil && tokenMeta.HubAPIServer != "" {
+		joinArgs = append(joinArgs, "--hub-apiserver", tokenMeta.HubAPIServer)
+	}
+
+	if hub.Spec.Ca != "" {
+		caFile, caCleanup, err := file.TmpFile([]byte(hub.Spec.Ca), "ca")
+		if caCleanup != nil {
+			defer caCleanup()
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to write hub CA to disk: %w", err)
+		}
+		joinArgs = append([]string{fmt.Sprintf("--ca-file=%s", caFile)}, joinArgs...)
+	}
+
+	ra := hub.Spec.RegistrationAuth
+	if ra.Driver == v1alpha1.AWSIRSARegistrationDriver {
+		raArgs := []string{
+			fmt.Sprintf("--registration-auth=%s", ra.Driver),
+		}
+		if ra.HubClusterARN != "" {
+			raArgs = append(raArgs, fmt.Sprintf("--hub-cluster-arn=%s", ra.HubClusterARN))
+		}
+		if spoke.Spec.ClusterARN != "" {
+			raArgs = append(raArgs, fmt.Sprintf("--managed-cluster-arn=%s", spoke.Spec.ClusterARN))
+		}
+
+		joinArgs = append(joinArgs, raArgs...)
+	}
+
+	if hub.Spec.RegistrationAuth.Driver == v1beta1.GRPCRegistrationDriver {
+		grpcServer, grpcCA, err := effectiveGRPCJoinServerAndCA(hub)
+		if err != nil {
+			return nil, err
+		}
+		grpcCAFile, grpcCACleanup, err := file.TmpFile([]byte(grpcCA), "grpc-ca")
+		if grpcCACleanup != nil {
+			defer grpcCACleanup()
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to write gRPC CA to disk: %w", err)
+		}
+		joinArgs = append(joinArgs,
+			fmt.Sprintf("--registration-auth=%s", v1beta1.GRPCRegistrationDriver),
+			"--grpc-server", grpcServer,
+			fmt.Sprintf("--grpc-ca-file=%s", grpcCAFile),
+		)
+	}
+
+	if spoke.Spec.Klusterlet.Mode == string(operatorv1.InstallModeHosted) {
+		joinArgs = append(joinArgs,
+			fmt.Sprintf("--force-internal-endpoint-lookup-managed=%t", spoke.Spec.Klusterlet.ForceInternalEndpointLookupManaged),
+		)
+		raw, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, spoke.Spec.Klusterlet.ManagedClusterKubeconfig, spoke.Namespace)
+		if err != nil {
+			return nil, err
+		}
+		mgdKcfg, mgdKcfgCleanup, err := file.TmpFile(raw, "kubeconfig")
+		if mgdKcfgCleanup != nil {
+			defer mgdKcfgCleanup()
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to write managedClusterKubeconfig to disk: %w", err)
+		}
+		joinArgs = append(joinArgs, "--managed-cluster-kubeconfig", mgdKcfg)
+	}
+
+	if spoke.Spec.ProxyCa != "" {
+		proxyCaFile, proxyCaCleanup, err := file.TmpFile([]byte(spoke.Spec.ProxyCa), "proxy-ca")
+		if proxyCaCleanup != nil {
+			defer proxyCaCleanup()
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to write proxy CA to disk: %w", err)
+		}
+		joinArgs = append(joinArgs, fmt.Sprintf("--proxy-ca-file=%s", proxyCaFile))
+	}
+	if spoke.Spec.ProxyURL != "" {
+		joinArgs = append(joinArgs, fmt.Sprintf("--proxy-url=%s", spoke.Spec.ProxyURL))
+	}
+
+	auth := spoke.Spec.Klusterlet.AddonKubeClientRegistrationAuth
+	if auth != "" {
+		joinArgs = append(joinArgs, fmt.Sprintf("--addon-kubeclient-registration-auth=%s", auth))
+		if strings.EqualFold(auth, v1beta1.AddonKubeClientRegistrationAuthToken) {
+			joinArgs = append(joinArgs, fmt.Sprintf("--addon-token-expiration-seconds=%d", spoke.Spec.Klusterlet.AddonTokenExpirationSeconds))
+		}
+	}
+
+	return joinArgs, nil
+}
+
 // joinSpoke joins a Spoke cluster to the Hub cluster
 func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, hubMeta hubMeta, klusterletValues *v1beta1.KlusterletChartConfig, spokeKubeconfig []byte) error {
 	logger := log.FromContext(ctx)
@@ -1033,70 +1155,9 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 	// resources args
 	joinArgs = append(joinArgs, arg_utils.PrepareResources(spoke.Spec.Klusterlet.Resources)...)
 
-	// Use hub API server from spec if provided and not forced to use internal endpoint,
-	// otherwise fall back to the hub API server from the tokenMeta
-	if hub.Spec.APIServer != "" && !spoke.Spec.Klusterlet.ForceInternalEndpointLookup {
-		joinArgs = append(joinArgs, "--hub-apiserver", hub.Spec.APIServer)
-	} else if tokenMeta.HubAPIServer != "" {
-		joinArgs = append(joinArgs, "--hub-apiserver", tokenMeta.HubAPIServer)
-	}
-
-	if hub.Spec.Ca != "" {
-		caFile, caCleanup, err := file.TmpFile([]byte(hub.Spec.Ca), "ca")
-		if caCleanup != nil {
-			defer caCleanup()
-		}
-		if err != nil {
-			return fmt.Errorf("failed to write hub CA to disk: %w", err)
-		}
-		joinArgs = append([]string{fmt.Sprintf("--ca-file=%s", caFile)}, joinArgs...)
-	}
-
-	ra := hub.Spec.RegistrationAuth
-	if ra.Driver == v1alpha1.AWSIRSARegistrationDriver {
-		raArgs := []string{
-			fmt.Sprintf("--registration-auth=%s", ra.Driver),
-		}
-		if ra.HubClusterARN != "" {
-			raArgs = append(raArgs, fmt.Sprintf("--hub-cluster-arn=%s", ra.HubClusterARN))
-		}
-		if spoke.Spec.ClusterARN != "" {
-			raArgs = append(raArgs, fmt.Sprintf("--managed-cluster-arn=%s", spoke.Spec.ClusterARN))
-		}
-
-		joinArgs = append(joinArgs, raArgs...)
-	}
-
-	if spoke.Spec.Klusterlet.Mode == string(operatorv1.InstallModeHosted) {
-		joinArgs = append(joinArgs,
-			fmt.Sprintf("--force-internal-endpoint-lookup-managed=%t", spoke.Spec.Klusterlet.ForceInternalEndpointLookupManaged),
-		)
-		raw, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, spoke.Spec.Klusterlet.ManagedClusterKubeconfig, spoke.Namespace)
-		if err != nil {
-			return err
-		}
-		mgdKcfg, mgdKcfgCleanup, err := file.TmpFile(raw, "kubeconfig")
-		if mgdKcfgCleanup != nil {
-			defer mgdKcfgCleanup()
-		}
-		if err != nil {
-			return fmt.Errorf("failed to write managedClusterKubeconfig to disk: %w", err)
-		}
-		joinArgs = append(joinArgs, "--managed-cluster-kubeconfig", mgdKcfg)
-	}
-
-	if spoke.Spec.ProxyCa != "" {
-		proxyCaFile, proxyCaCleanup, err := file.TmpFile([]byte(spoke.Spec.ProxyCa), "proxy-ca")
-		if proxyCaCleanup != nil {
-			defer proxyCaCleanup()
-		}
-		if err != nil {
-			return fmt.Errorf("failed to write proxy CA to disk: %w", err)
-		}
-		joinArgs = append(joinArgs, fmt.Sprintf("--proxy-ca-file=%s", proxyCaFile))
-	}
-	if spoke.Spec.ProxyURL != "" {
-		joinArgs = append(joinArgs, fmt.Sprintf("--proxy-url=%s", spoke.Spec.ProxyURL))
+	joinArgs, err = r.appendJoinSpokeTransportAndAuthArgs(ctx, joinArgs, spoke, hub, tokenMeta)
+	if err != nil {
+		return err
 	}
 
 	valuesArgs, valuesCleanup, err := prepareKlusterletValuesFile(klusterletValues)
@@ -1398,61 +1459,9 @@ func (r *SpokeReconciler) mergeKlusterletValues(ctx context.Context, spoke *v1be
 		return nil, nil
 	}
 
-	var fromInterface = map[string]any{}
-	var specInterface = map[string]any{}
-
-	if spoke.Spec.Klusterlet.ValuesFrom != nil {
-		cm := &corev1.ConfigMap{}
-		nn := types.NamespacedName{Name: spoke.Spec.Klusterlet.ValuesFrom.Name, Namespace: spoke.Namespace}
-		err := r.Get(ctx, nn, cm)
-		if err != nil {
-			if kerrs.IsNotFound(err) {
-				// cm not found, return spec's values
-				logger.V(1).Info("warning: Klusterlet values ConfigMap not found", "spoke", spoke.Name, "configMap", nn)
-				return spoke.Spec.Klusterlet.Values, nil
-			}
-			return nil, fmt.Errorf("failed to retrieve Klusterlet values ConfigMap %s: %w", nn, err)
-		}
-		fromValues, ok := cm.Data[spoke.Spec.Klusterlet.ValuesFrom.Key]
-		if !ok {
-			logger.V(1).Info("warning: Klusterlet values key not found in ConfigMap", "spoke", spoke.Name, "configMap", nn, "key", spoke.Spec.Klusterlet.ValuesFrom.Key)
-			return spoke.Spec.Klusterlet.Values, nil
-		}
-		fromBytes := []byte(fromValues)
-		err = yaml.Unmarshal(fromBytes, &fromInterface)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal YAML values from ConfigMap %s key %s: %w", nn, spoke.Spec.Klusterlet.ValuesFrom.Key, err)
-		}
-	}
-
-	if spoke.Spec.Klusterlet.Values != nil {
-		specBytes, err := yaml.Marshal(spoke.Spec.Klusterlet.Values)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal Klusterlet values from spoke spec for spoke %s: %w", spoke.Name, err)
-		}
-		err = yaml.Unmarshal(specBytes, &specInterface)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal Klusterlet values from spoke spec for spoke %s: %w", spoke.Name, err)
-		}
-	}
-
-	mergedMap := map[string]any{}
-	maps.Copy(mergedMap, fromInterface)
-
-	// Merge spec on top but ignore zero-values from spec
-	if err := mergo.Map(&mergedMap, specInterface, mergo.WithOverride); err != nil {
-		return nil, fmt.Errorf("merge failed for spoke %s: %w", spoke.Name, err)
-	}
-
-	mergedBytes, err := yaml.Marshal(mergedMap)
+	merged, err := klusterletvalues.Merge(ctx, r.Client, spoke.Namespace, spoke.Spec.Klusterlet, klusterletvalues.MergeOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal merged Klusterlet values for spoke %s: %w", spoke.Name, err)
-	}
-
-	merged := &v1beta1.KlusterletChartConfig{}
-	err = yaml.Unmarshal(mergedBytes, merged)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal merged values into KlusterletChartConfig for spoke %s: %w", spoke.Name, err)
+		return nil, fmt.Errorf("merge klusterlet values for spoke %s: %w", spoke.Name, err)
 	}
 
 	return merged, nil

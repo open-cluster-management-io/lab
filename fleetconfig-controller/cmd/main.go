@@ -48,12 +48,14 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(apiv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(apiv1beta1.AddToScheme(scheme))
-	utilruntime.Must(clusterv1beta1.AddToScheme(scheme))
-	utilruntime.Must(clusterv1beta2.AddToScheme(scheme))
-	// +kubebuilder:scaffold:scheme
+	if err := clusterv1beta1.Install(scheme); err != nil {
+		panic(err)
+	}
+	if err := clusterv1beta2.Install(scheme); err != nil {
+		panic(err)
+	}
 }
 
 func main() {
