@@ -396,7 +396,3 @@ func (h *Hub) GetCondition(cType string) *Condition {
 func (h *Hub) SetConditions(cover bool, c ...Condition) {
 	h.Status.SetConditions(cover, c...)
 }
-
-func init() {
-	SchemeBuilder.Register(&Hub{}, &HubList{})
-}

@@ -420,7 +420,3 @@ func KlusterletReconcileHashInput(values *KlusterletChartConfig, k Klusterlet) a
 		AddonTokenExpirationSeconds:     k.AddonTokenExpirationSeconds,
 	}
 }
-
-func init() {
-	SchemeBuilder.Register(&Spoke{}, &SpokeList{})
-}
