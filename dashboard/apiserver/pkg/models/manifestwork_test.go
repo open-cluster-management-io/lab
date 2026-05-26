@@ -309,3 +309,105 @@ func TestManifestWorkListModel(t *testing.T) {
 	assert.Equal(t, "manifestwork-1", list.Items[0].Name)
 	assert.Equal(t, "work2", list.Items[1].ID)
 }
+
+func TestStatusFeedbackResultModel(t *testing.T) {
+	intVal := int64(2)
+	strVal := "10.96.0.1"
+	boolVal := true
+
+	result := StatusFeedbackResult{
+		Values: []FeedbackValue{
+			{
+				Name: "ReadyReplicas",
+				Value: FieldValue{
+					Type:    "Integer",
+					Integer: &intVal,
+				},
+			},
+			{
+				Name: "clusterIP",
+				Value: FieldValue{
+					Type:   "String",
+					String: &strVal,
+				},
+			},
+			{
+				Name: "healthy",
+				Value: FieldValue{
+					Type:    "Boolean",
+					Boolean: &boolVal,
+				},
+			},
+		},
+	}
+
+	assert.Len(t, result.Values, 3)
+
+	assert.Equal(t, "ReadyReplicas", result.Values[0].Name)
+	assert.Equal(t, "Integer", result.Values[0].Value.Type)
+	assert.Equal(t, int64(2), *result.Values[0].Value.Integer)
+	assert.Nil(t, result.Values[0].Value.String)
+
+	assert.Equal(t, "clusterIP", result.Values[1].Name)
+	assert.Equal(t, "String", result.Values[1].Value.Type)
+	assert.Equal(t, "10.96.0.1", *result.Values[1].Value.String)
+	assert.Nil(t, result.Values[1].Value.Integer)
+
+	assert.Equal(t, "healthy", result.Values[2].Name)
+	assert.Equal(t, "Boolean", result.Values[2].Value.Type)
+	assert.True(t, *result.Values[2].Value.Boolean)
+}
+
+func TestStatusFeedbackResultEmpty(t *testing.T) {
+	result := StatusFeedbackResult{}
+	assert.Nil(t, result.Values)
+
+	result2 := StatusFeedbackResult{Values: []FeedbackValue{}}
+	assert.Empty(t, result2.Values)
+}
+
+func TestManifestConditionWithStatusFeedback(t *testing.T) {
+	intVal := int64(1)
+
+	mc := ManifestCondition{
+		ResourceMeta: ManifestResourceMeta{
+			Ordinal: 0,
+			Kind:    "Deployment",
+			Name:    "nginx",
+		},
+		Conditions: []Condition{
+			{Type: "Applied", Status: "True"},
+		},
+		StatusFeedback: &StatusFeedbackResult{
+			Values: []FeedbackValue{
+				{
+					Name: "ReadyReplicas",
+					Value: FieldValue{
+						Type:    "Integer",
+						Integer: &intVal,
+					},
+				},
+			},
+		},
+	}
+
+	assert.NotNil(t, mc.StatusFeedback)
+	assert.Len(t, mc.StatusFeedback.Values, 1)
+	assert.Equal(t, "ReadyReplicas", mc.StatusFeedback.Values[0].Name)
+	assert.Equal(t, int64(1), *mc.StatusFeedback.Values[0].Value.Integer)
+}
+
+func TestManifestConditionWithoutStatusFeedback(t *testing.T) {
+	mc := ManifestCondition{
+		ResourceMeta: ManifestResourceMeta{
+			Ordinal: 0,
+			Kind:    "ConfigMap",
+			Name:    "settings",
+		},
+		Conditions: []Condition{
+			{Type: "Applied", Status: "True"},
+		},
+	}
+
+	assert.Nil(t, mc.StatusFeedback)
+}

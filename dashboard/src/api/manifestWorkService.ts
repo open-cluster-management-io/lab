@@ -30,6 +30,24 @@ export interface ManifestResourceStatus {
 export interface ManifestCondition {
   resourceMeta: ManifestResourceMeta;
   conditions: Condition[];
+  statusFeedback?: StatusFeedbackResult;
+}
+
+export interface StatusFeedbackResult {
+  values?: FeedbackValue[];
+}
+
+export interface FeedbackValue {
+  name: string;
+  fieldValue: FieldValue;
+}
+
+export interface FieldValue {
+  type: 'Integer' | 'String' | 'Boolean' | 'JsonRaw';
+  integer?: number;
+  string?: string;
+  boolean?: boolean;
+  jsonRaw?: string;
 }
 
 export interface ManifestResourceMeta {
@@ -48,6 +66,63 @@ export type { ManifestWork as ManifestWorkType };
 // Backend API base URL - configurable for production
 // In production, use relative path so requests go through the same host/ingress
 const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.PROD ? '' : 'http://localhost:8080');
+
+// Fetch all manifest works across all namespaces
+export const fetchAllManifestWorks = async (): Promise<ManifestWork[]> => {
+  if (import.meta.env.DEV && !import.meta.env.VITE_USE_REAL_API) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve([
+          {
+            id: "mw-1",
+            name: "deploy-nginx",
+            namespace: "ocm-spoke1",
+            labels: { "work.open-cluster-management.io/manifestworkreplicaset": "default.deploy-nginx" },
+            creationTimestamp: "2025-05-14T09:35:54Z",
+            conditions: [
+              { type: "Applied", status: "True", reason: "WorkApplied", message: "All resources applied", lastTransitionTime: "2025-05-14T09:37:25Z" },
+              { type: "Available", status: "True", reason: "ResourcesAvailable", message: "All resources available", lastTransitionTime: "2025-05-14T09:37:25Z" },
+            ],
+            resourceStatus: {
+              manifests: [
+                { resourceMeta: { ordinal: 0, group: "apps", version: "v1", kind: "Deployment", resource: "deployments", name: "nginx", namespace: "default" }, conditions: [{ type: "Applied", status: "True", reason: "AppliedManifestComplete", message: "Resource applied", lastTransitionTime: "2025-05-14T09:37:25Z" }], statusFeedback: { values: [{ name: "readyReplicas", fieldValue: { type: "Integer", integer: 2 } }, { name: "replicas", fieldValue: { type: "Integer", integer: 2 } }] } },
+              ],
+            },
+          },
+          {
+            id: "mw-2",
+            name: "deploy-nginx",
+            namespace: "ocm-spoke2",
+            labels: { "work.open-cluster-management.io/manifestworkreplicaset": "default.deploy-nginx" },
+            creationTimestamp: "2025-05-14T09:35:54Z",
+            conditions: [
+              { type: "Applied", status: "True", reason: "WorkApplied", message: "All resources applied", lastTransitionTime: "2025-05-14T09:37:25Z" },
+              { type: "Available", status: "True", reason: "ResourcesAvailable", message: "All resources available", lastTransitionTime: "2025-05-14T09:37:25Z" },
+            ],
+            resourceStatus: {
+              manifests: [
+                { resourceMeta: { ordinal: 0, group: "apps", version: "v1", kind: "Deployment", resource: "deployments", name: "nginx", namespace: "default" }, conditions: [{ type: "Applied", status: "True", reason: "AppliedManifestComplete", message: "Resource applied", lastTransitionTime: "2025-05-14T09:37:25Z" }] },
+              ],
+            },
+          },
+        ]);
+      }, 800);
+    });
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/api/manifestworks`, {
+      headers: createHeaders()
+    });
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching all ManifestWorks:', error);
+    return [];
+  }
+};
 
 // Fetch all manifest works for a namespace
 export const fetchManifestWorks = async (namespace: string): Promise<ManifestWork[]> => {

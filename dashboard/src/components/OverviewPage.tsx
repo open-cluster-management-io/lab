@@ -1,21 +1,31 @@
-import { Box, Typography, Paper, Grid, alpha, useTheme } from "@mui/material"
-import { Storage as StorageIcon, Layers as LayersIcon, DeviceHub as DeviceHubIcon } from "@mui/icons-material"
-import { useEffect, useState } from "react"
+import { Box, Typography, Paper, Grid, alpha, useTheme, Chip } from "@mui/material"
+import { Storage as StorageIcon, Layers as LayersIcon, DeviceHub as DeviceHubIcon, DynamicFeed as DynamicFeedIcon } from "@mui/icons-material"
+import { useEffect, useMemo, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { fetchClusters } from "../api/clusterService"
 import { fetchClusterSets } from "../api/clusterSetService"
 import { fetchPlacements } from "../api/placementService"
+import { fetchManifestWorkReplicaSets } from "../api/manifestWorkReplicaSetService"
+import { fetchAllManifestWorks } from "../api/manifestWorkService"
 import type { Cluster } from "../api/clusterService"
 import type { ClusterSet } from "../api/clusterSetService"
 import type { Placement } from "../api/placementService"
+import type { ManifestWorkReplicaSet } from "../api/manifestWorkReplicaSetService"
+import type { ManifestWork } from "../api/manifestWorkService"
+import { deriveMWRSStatus, buildMWRSChildMap } from "../utils/statusHelpers"
 
 export default function OverviewPage() {
   const theme = useTheme()
+  const navigate = useNavigate()
   const [clusters, setClusters] = useState<Cluster[]>([])
   const [clusterSets, setClusterSets] = useState<ClusterSet[]>([])
   const [placements, setPlacements] = useState<Placement[]>([])
+  const [mwrsList, setMwrsList] = useState<ManifestWorkReplicaSet[]>([])
+  const [allMWs, setAllMWs] = useState<ManifestWork[]>([])
   const [loading, setLoading] = useState(true)
   const [clusterSetsLoading, setClusterSetsLoading] = useState(true)
   const [placementsLoading, setPlacementsLoading] = useState(true)
+  const [mwrsLoading, setMwrsLoading] = useState(true)
   const [clusterSetCounts, setClusterSetCounts] = useState<Record<string, number>>({})
 
   useEffect(() => {
@@ -55,6 +65,23 @@ export default function OverviewPage() {
       }
     }
     loadPlacements()
+  }, [])
+
+  useEffect(() => {
+    const loadMwrs = async () => {
+      setMwrsLoading(true)
+      try {
+        const [mwrsData, mwData] = await Promise.all([
+          fetchManifestWorkReplicaSets(),
+          fetchAllManifestWorks(),
+        ])
+        setMwrsList(mwrsData)
+        setAllMWs(mwData)
+      } finally {
+        setMwrsLoading(false)
+      }
+    }
+    loadMwrs()
   }, [])
 
   // Calculate cluster counts for each cluster set
@@ -120,6 +147,22 @@ export default function OverviewPage() {
   const totalPlacements = placements.length
   const successfulPlacements = placements.filter(p => p.succeeded).length
 
+  const mwrsChildMap = useMemo(() => buildMWRSChildMap(allMWs), [allMWs])
+
+  const totalMwrs = mwrsList.length
+  const appliedMwrs = mwrsList.filter(m => {
+    const childMWs = mwrsChildMap.get(`${m.namespace}/${m.name}`)
+    return deriveMWRSStatus(m, childMWs) === 'Applied'
+  }).length
+  const degradedMwrs = mwrsList.filter(m => {
+    const childMWs = mwrsChildMap.get(`${m.namespace}/${m.name}`)
+    return deriveMWRSStatus(m, childMWs) === 'Degraded'
+  })
+  const failedMwrs = mwrsList.filter(m => {
+    const childMWs = mwrsChildMap.get(`${m.namespace}/${m.name}`)
+    return deriveMWRSStatus(m, childMWs) === 'Failed'
+  })
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h5" sx={{ mb: 3, fontWeight: "bold" }}>
@@ -129,7 +172,7 @@ export default function OverviewPage() {
       {/* Simplified KPI cards */}
       <Grid container spacing={3} sx={{ width: '100%' }}>
         {/* Combined Clusters card */}
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Paper
             sx={{
               p: 3,
@@ -215,7 +258,7 @@ export default function OverviewPage() {
         </Grid>
 
         {/* ManagedClusterSets card */}
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Paper
             sx={{
               p: 3,
@@ -293,7 +336,7 @@ export default function OverviewPage() {
         </Grid>
 
         {/* Placements card */}
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Paper
             sx={{
               p: 3,
@@ -374,6 +417,152 @@ export default function OverviewPage() {
               <Typography variant="body2" color="text.secondary">
                 {placementsLoading ? '-' : totalPlacements - successfulPlacements} placements currently pending or failed
               </Typography>
+            </Box>
+          </Paper>
+        </Grid>
+        {/* WorkReplicaSets card */}
+        <Grid size={{ xs: 12, md: 6 }}>
+          <Paper
+            sx={{
+              p: 3,
+              height: "100%",
+              borderRadius: 2,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 48,
+                  height: 48,
+                  borderRadius: 2,
+                  bgcolor: alpha(theme.palette.warning.main, 0.1),
+                  mr: 2,
+                }}
+              >
+                <DynamicFeedIcon sx={{ color: "warning.main", fontSize: 24 }} />
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "flex-end" }}>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    WorkReplicaSets
+                  </Typography>
+                  <Typography variant="h3" sx={{ fontWeight: "medium" }}>
+                    {mwrsLoading ? "-" : totalMwrs}
+                  </Typography>
+                </Box>
+                <Box sx={{ ml: 4 }}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Applied
+                  </Typography>
+                  <Typography variant="h3" sx={{ fontWeight: "medium", color: "success.main" }}>
+                    {mwrsLoading ? "-" : appliedMwrs}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Applied Rate
+            </Typography>
+
+            <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+              <Box
+                sx={{
+                  height: 8,
+                  width: "100%",
+                  bgcolor: alpha(theme.palette.success.main, 0.1),
+                  borderRadius: 4,
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                <Box
+                  sx={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    height: "100%",
+                    width: totalMwrs > 0 ? `${(appliedMwrs / totalMwrs) * 100}%` : 0,
+                    bgcolor: "success.main",
+                    borderRadius: 4,
+                  }}
+                />
+              </Box>
+              <Typography variant="body2" fontWeight="medium" sx={{ ml: 2, minWidth: 40 }}>
+                {mwrsLoading || totalMwrs === 0 ? '-' : Math.round((appliedMwrs / totalMwrs) * 100)}%
+              </Typography>
+            </Box>
+
+            <Box sx={{ mt: "auto" }}>
+              {!mwrsLoading && (degradedMwrs.length > 0 || failedMwrs.length > 0) ? (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                  {degradedMwrs.length > 0 && (
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, alignItems: "center" }}>
+                      <Typography variant="body2" color="warning.main" sx={{ mr: 0.5 }}>
+                        {degradedMwrs.length} degraded:
+                      </Typography>
+                      {degradedMwrs.slice(0, 3).map(m => (
+                        <Chip
+                          key={m.id}
+                          label={`${m.namespace}/${m.name}`}
+                          size="small"
+                          color="warning"
+                          variant="outlined"
+                          clickable
+                          onClick={() => navigate(`/manifestworkreplicasets/${m.namespace}/${m.name}`)}
+                        />
+                      ))}
+                      {degradedMwrs.length > 3 && (
+                        <Chip
+                          label={`+${degradedMwrs.length - 3} more`}
+                          size="small"
+                          variant="outlined"
+                          clickable
+                          onClick={() => navigate('/manifestworkreplicasets')}
+                        />
+                      )}
+                    </Box>
+                  )}
+                  {failedMwrs.length > 0 && (
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, alignItems: "center" }}>
+                      <Typography variant="body2" color="error.main" sx={{ mr: 0.5 }}>
+                        {failedMwrs.length} failed:
+                      </Typography>
+                      {failedMwrs.slice(0, 3).map(m => (
+                        <Chip
+                          key={m.id}
+                          label={`${m.namespace}/${m.name}`}
+                          size="small"
+                          color="error"
+                          variant="outlined"
+                          clickable
+                          onClick={() => navigate(`/manifestworkreplicasets/${m.namespace}/${m.name}`)}
+                        />
+                      ))}
+                      {failedMwrs.length > 3 && (
+                        <Chip
+                          label={`+${failedMwrs.length - 3} more`}
+                          size="small"
+                          variant="outlined"
+                          clickable
+                          onClick={() => navigate('/manifestworkreplicasets')}
+                        />
+                      )}
+                    </Box>
+                  )}
+                </Box>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  {mwrsLoading ? '-' : totalMwrs - appliedMwrs > 0
+                    ? `${totalMwrs - appliedMwrs} WorkReplicaSets not yet applied`
+                    : 'All WorkReplicaSets applied successfully'}
+                </Typography>
+              )}
             </Box>
           </Paper>
         </Grid>

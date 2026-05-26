@@ -18,6 +18,7 @@ rules:
   - apiGroups: ["work.open-cluster-management.io"]
     resources:
       - "manifestworks"
+      - "manifestworkreplicasets"
     verbs: ["get", "list", "watch"]
   - apiGroups: ["addon.open-cluster-management.io"]
     resources:
