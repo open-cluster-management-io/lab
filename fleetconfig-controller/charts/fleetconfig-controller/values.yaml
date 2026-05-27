@@ -92,6 +92,8 @@ fleetConfig:
       ## - **NilExecutorValidating** (ALPHA - default=false) - Enables nil executor validation
       ## - **ResourceCleanup** (BETA - default=true) - Enables automatic resource cleanup
       ## - **V1beta1CSRAPICompatibility** (ALPHA - default=false) - Enables v1beta1 CSR API compatibility
+      ## - **CleanUpCompletedManifestWork** (ALPHA - default=false) - Enables automatic garbage collection of completed manifest works
+      ## - **PlacementDebugServer** (ALPHA - default=false) - Enables the placement debug server
       ## @descriptionEnd
       ## @param fleetConfig.hub.clusterManager.enabled Whether to enable the cluster manager. Set to false if using Singleton Control Plane.
       enabled: true
@@ -102,6 +104,8 @@ fleetConfig:
         ManifestWorkReplicaSet: true
         ## @param fleetConfig.hub.clusterManager.featureGates.ResourceCleanup ResourceCleanup feature gate.
         ResourceCleanup: true
+        ## @param fleetConfig.hub.clusterManager.featureGates.CleanUpCompletedManifestWork CleanUpCompletedManifestWork feature gate.
+        CleanUpCompletedManifestWork: true
       ## @param fleetConfig.hub.clusterManager.purgeOperator If set, the cluster manager operator will be purged and the open-cluster-management namespace deleted when the FleetConfig CR is deleted.
       purgeOperator: true
       ## @descriptionStart
@@ -294,7 +298,7 @@ imageRegistry: ""
 ## @param image.pullPolicy Image pull policy
 image:
   repository: quay.io/open-cluster-management/fleetconfig-controller
-  tag: v0.3.1
+  tag: v0.3.2
   pullPolicy: IfNotPresent
 
 

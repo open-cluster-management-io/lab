@@ -47,3 +47,6 @@ requirements.txt
 
 # Temp files
 tmp/
+
+# Generated OCM API diffs
+fleetconfig-controller/hack/ocm-api-diff-v*/
