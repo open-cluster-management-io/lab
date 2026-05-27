@@ -12,6 +12,7 @@ Compare upstream OCM API releases and write unified diffs under:
   hack/ocm-api-diff-v<old>-to-v<new>/
 
 Versions may be passed with or without a leading "v" (e.g. 1.0.0 or v1.3.0).
+Each version must be semver-like: MAJOR.MINOR.PATCH with an optional pre-release suffix.
 
 Example:
   $(basename "$0") 1.0.0 1.3.0
@@ -20,6 +21,33 @@ EOF
 
 normalize_ver() {
   echo "${1#v}"
+}
+
+# Release tags are semver-like (e.g. 1.0.0, 0.16.2). Reject path metacharacters.
+validate_ver() {
+  local ver="$1"
+  local label="$2"
+  if [[ -z "$ver" ]]; then
+    echo "error: ${label} version must not be empty" >&2
+    exit 1
+  fi
+  if [[ ! "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+    echo "error: invalid ${label} version '${ver}' (expected semver, e.g. 1.0.0)" >&2
+    exit 1
+  fi
+}
+
+assert_output_dir_safe() {
+  local dir="$1"
+  if [[ "$dir" != "$script_dir/"* ]]; then
+    echo "error: output directory escapes script directory: '${dir}'" >&2
+    exit 1
+  fi
+  local rel="${dir#"$script_dir/"}"
+  if [[ ! "$rel" =~ ^ocm-api-diff-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?-to-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+    echo "error: unsafe output directory: '${dir}'" >&2
+    exit 1
+  fi
 }
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
@@ -34,11 +62,14 @@ fi
 
 old_ver="$(normalize_ver "$1")"
 new_ver="$(normalize_ver "$2")"
+validate_ver "$old_ver" "old"
+validate_ver "$new_ver" "new"
 
 cache_dir="${TMPDIR:-/tmp}/ocm-api-compare"
 old_dir="$cache_dir/api-${old_ver}"
 new_dir="$cache_dir/api-${new_ver}"
 out_dir="$script_dir/ocm-api-diff-v${old_ver}-to-v${new_ver}"
+assert_output_dir_safe "$out_dir"
 
 fetch() {
   local ver="$1"
@@ -72,6 +103,8 @@ Upstream: https://github.com/open-cluster-management-io/api
 
 - \`new-api-version/\` — API version packages present only in v${new_ver}
 - \`changed-types/*.patch\` — per-file unified diffs for API Go sources (types, funcs, etc.)
+- \`changed-types/NEW__*.patch\` — files added in v${new_ver}
+- \`changed-types/REMOVED__*.patch\` — files removed in v${new_ver}
 - \`feature-gates/feature.go.patch\` — feature gate diff
 - \`all-changed-types.patch\` — concatenated type diffs
 
@@ -103,13 +136,16 @@ for group in addon cluster work operator; do
   done
 done
 
-# Changed API Go sources
+# Changed and removed API Go sources
 while IFS= read -r -d '' oldf; do
   rel="${oldf#"$old_dir"/}"
   newf="$new_dir/$rel"
-  [[ -f "$newf" ]] || continue
+  safe="${rel//\//__}"
+  if [[ ! -f "$newf" ]]; then
+    diff -u "$oldf" /dev/null >"$out_dir/changed-types/REMOVED__${safe}.patch" || true
+    continue
+  fi
   if ! diff -q "$oldf" "$newf" >/dev/null 2>&1; then
-    safe="${rel//\//__}"
     diff -u "$oldf" "$newf" >"$out_dir/changed-types/${safe}.patch" || true
   fi
 done < <(find_api_go_files "$old_dir")
