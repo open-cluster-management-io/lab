@@ -448,6 +448,10 @@ func (r *SpokeReconciler) configureFCCAddOn(spoke *v1beta1.Spoke) {
 			Value: spoke.Spec.HubRef.Namespace,
 		},
 		{
+			Name:  v1beta1.SpokeNameEnvVar,
+			Value: spoke.Name,
+		},
+		{
 			Name:  v1beta1.SpokeNamespaceEnvVar,
 			Value: spoke.Namespace,
 		},
