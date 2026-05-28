@@ -174,7 +174,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 
 		It("should verify initial addon variables are correctly resolved", func() {
 			By("verifying that the initial FOO and CLUSTER_NAME variables are resolved in deployed resources")
-			ensureAddonVariablesResolved(tc, 0, spokeName, "initial-foo-value")
+			ensureAddonVariablesResolved(tc, 0, spoke.Status.ManagedClusterName, "initial-foo-value")
 		})
 
 		It("should verify spoke cluster annotations", func() {
@@ -344,7 +344,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 			}, 1*time.Minute, 5*time.Second).Should(Succeed())
 
 			By("verifying that the updated FOO variable is correctly resolved in deployed resources")
-			ensureAddonVariablesResolved(tc, 0, spokeName, "updated-foo-value")
+			ensureAddonVariablesResolved(tc, 0, spoke.Status.ManagedClusterName, "updated-foo-value")
 		})
 
 		It("should update addon template version and verify new resources are deployed", func() {
@@ -352,7 +352,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 			ensureAddonCreated(tc, 1, spoke.Status.ManagedClusterName)
 
 			By("verifying that the new addon template (v2.0.0) has variables correctly resolved")
-			ensureAddonVariablesResolved(tc, 1, spokeName, "updated-foo-value")
+			ensureAddonVariablesResolved(tc, 1, spoke.Status.ManagedClusterName, "updated-foo-value")
 		})
 
 		It("should delete a Spoke", func() {
