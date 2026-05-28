@@ -230,8 +230,18 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 		return fmt.Errorf("failed to create addon client: %w", err)
 	}
 
-	// check if the spoke has already been joined to the hub
-	managedCluster, err := common.GetManagedCluster(ctx, clusterClient, spoke.Name)
+	ownerLabels := map[string]string{
+		v1beta1.LabelSpokeName:      spoke.Name,
+		v1beta1.LabelSpokeNamespace: spoke.Namespace,
+	}
+
+	// Find the ManagedCluster: prefer label match, fall back to derived name (canonical post-fix
+	// name, also covers a crash between clusteradm join and label patch) and spoke.Name (legacy).
+	managedCluster, err := common.GetManagedCluster(
+		ctx, clusterClient,
+		[]string{spoke.DerivedManagedClusterName(), spoke.Name},
+		ownerLabels,
+	)
 	if err != nil {
 		logger.Error(err, "failed to get managedCluster", "spoke", spoke.Name)
 		return err
@@ -247,7 +257,8 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 			))
 			return loadErr
 		}
-		if err := r.joinSpoke(ctx, spoke, hubMeta, klusterletValues, spokeKubeconfig); err != nil {
+		mcName := spoke.DerivedManagedClusterName()
+		if err := r.joinSpoke(ctx, spoke, mcName, hubMeta, klusterletValues, spokeKubeconfig); err != nil {
 			spoke.SetConditions(true, v1beta1.NewCondition(
 				err.Error(), v1beta1.SpokeJoined, metav1.ConditionFalse, metav1.ConditionTrue,
 			))
@@ -255,14 +266,14 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 		}
 
 		// Accept the cluster join request
-		if err := acceptCluster(ctx, spoke, false); err != nil {
+		if err := acceptCluster(ctx, spoke, mcName, false); err != nil {
 			spoke.SetConditions(true, v1beta1.NewCondition(
 				err.Error(), v1beta1.SpokeJoined, metav1.ConditionFalse, metav1.ConditionTrue,
 			))
 			return err
 		}
 
-		managedCluster, err = common.GetManagedCluster(ctx, clusterClient, spoke.Name)
+		managedCluster, err = common.GetManagedCluster(ctx, clusterClient, []string{mcName}, ownerLabels)
 		if err != nil {
 			logger.Error(err, "failed to get managedCluster after join", "spoke", spoke.Name)
 			return err
@@ -312,7 +323,7 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 			msg, v1beta1.SpokeJoined, metav1.ConditionFalse, metav1.ConditionTrue,
 		))
 		// Re-accept all join requests for the spoke cluster
-		if err := acceptCluster(ctx, spoke, true); err != nil {
+		if err := acceptCluster(ctx, spoke, managedCluster.Name, true); err != nil {
 			logger.Error(err, "failed to accept spoke cluster join request(s)", "spoke", spoke.Name)
 		}
 		return nil
@@ -1109,9 +1120,9 @@ func (r *SpokeReconciler) appendJoinSpokeTransportAndAuthArgs(ctx context.Contex
 }
 
 // joinSpoke joins a Spoke cluster to the Hub cluster
-func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, hubMeta hubMeta, klusterletValues *v1beta1.KlusterletChartConfig, spokeKubeconfig []byte) error {
+func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, mcName string, hubMeta hubMeta, klusterletValues *v1beta1.KlusterletChartConfig, spokeKubeconfig []byte) error {
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("joinSpoke", "spoke", spoke.Name)
+	logger.V(0).Info("joinSpoke", "spoke", spoke.Name, "managedCluster", mcName)
 
 	hub := hubMeta.hub
 
@@ -1131,7 +1142,7 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 
 	joinArgs := append([]string{
 		"join",
-		"--cluster-name", spoke.Name,
+		"--cluster-name", mcName,
 		fmt.Sprintf("--create-namespace=%t", spoke.Spec.CreateNamespace),
 		fmt.Sprintf("--enable-sync-labels=%t", spoke.Spec.SyncLabels),
 		"--hub-token", tokenMeta.Token,
@@ -1191,12 +1202,12 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 }
 
 // acceptCluster accepts a Spoke cluster's join request
-func acceptCluster(ctx context.Context, spoke *v1beta1.Spoke, skipApproveCheck bool) error {
+func acceptCluster(ctx context.Context, spoke *v1beta1.Spoke, mcName string, skipApproveCheck bool) error {
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("acceptCluster", "spoke", spoke.Name)
+	logger.V(0).Info("acceptCluster", "spoke", spoke.Name, "managedCluster", mcName)
 
 	acceptArgs := append([]string{
-		"accept", "--cluster", spoke.Name,
+		"accept", "--cluster", mcName,
 	}, spoke.BaseArgs()...)
 
 	logger.V(1).Info("clusteradm accept", "args", arg_utils.SanitizeArgs(acceptArgs))
