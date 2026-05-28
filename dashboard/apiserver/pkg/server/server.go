@@ -163,13 +163,43 @@ func SetupServer(ocmClient *client.OCMClient, ctx context.Context, debugMode boo
 			handlers.GetClusterSetBinding(c, ocmClient, ctx)
 		})
 
+		// Register manifestworkreplicaset routes
+		api.GET("/manifestworkreplicasets", authMiddleware, func(c *gin.Context) {
+			handlers.GetAllManifestWorkReplicaSets(c, ocmClient, ctx)
+		})
+
+		api.GET("/namespaces/:namespace/manifestworkreplicasets", authMiddleware, func(c *gin.Context) {
+			handlers.GetManifestWorkReplicaSets(c, ocmClient, ctx)
+		})
+
+		api.GET("/namespaces/:namespace/manifestworkreplicasets/:name", authMiddleware, func(c *gin.Context) {
+			handlers.GetManifestWorkReplicaSet(c, ocmClient, ctx)
+		})
+
+		api.GET("/namespaces/:namespace/manifestworkreplicasets/:name/manifestworks", authMiddleware, func(c *gin.Context) {
+			handlers.GetManifestWorksByReplicaSet(c, ocmClient, ctx)
+		})
+
 		// Register manifestwork routes
+		api.GET("/manifestworks", authMiddleware, func(c *gin.Context) {
+			handlers.GetAllManifestWorks(c, ocmClient, ctx)
+		})
+
 		api.GET("/namespaces/:namespace/manifestworks", authMiddleware, func(c *gin.Context) {
 			handlers.GetManifestWorks(c, ocmClient, ctx)
 		})
 
 		api.GET("/namespaces/:namespace/manifestworks/:name", authMiddleware, func(c *gin.Context) {
 			handlers.GetManifestWork(c, ocmClient, ctx)
+		})
+
+		// Register resource routes
+		api.GET("/resources", authMiddleware, func(c *gin.Context) {
+			handlers.GetManagedResources(c, ocmClient, ctx)
+		})
+
+		api.GET("/resources/:cluster/:manifestwork/:ordinal", authMiddleware, func(c *gin.Context) {
+			handlers.GetManagedResource(c, ocmClient, ctx)
 		})
 
 		// Register placement routes

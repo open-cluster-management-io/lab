@@ -17,6 +17,9 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import StorageIcon from '@mui/icons-material/Storage';
 import DeviceHubIcon from '@mui/icons-material/DeviceHub';
 import LayersIcon from '@mui/icons-material/Layers';
+import DynamicFeedIcon from '@mui/icons-material/DynamicFeed';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import WidgetsIcon from '@mui/icons-material/Widgets';
 
 interface DrawerProps {
   open: boolean;
@@ -59,6 +62,9 @@ const navItems = [
   { text: 'Clusters', icon: <StorageIcon />, path: '/clusters' },
   { text: 'Clustersets', icon: <LayersIcon />, path: '/clustersets' },
   { text: 'Placements', icon: <DeviceHubIcon />, path: '/placements' },
+  { text: 'WorkReplicaSets', icon: <DynamicFeedIcon />, path: '/manifestworkreplicasets' },
+  { text: 'ManifestWorks', icon: <ContentCopyIcon />, path: '/manifestworks' },
+  { text: 'Resources', icon: <WidgetsIcon />, path: '/resources' },
 ];
 
 export default function Drawer({ open, drawerWidth, onDrawerToggle }: DrawerProps) {

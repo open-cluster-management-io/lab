@@ -1,0 +1,305 @@
+---
+# ManagedClusterSetBinding - binds the "default" ManagedClusterSet to the "default" namespace
+# Required so ManifestWorkReplicaSets in this namespace can target clusters in the set
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: default
+  namespace: default
+spec:
+  clusterSet: default
+---
+# Ensure the monitoring namespace exists
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+---
+# ManagedClusterSetBinding for the "monitoring" namespace
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: default
+  namespace: monitoring
+spec:
+  clusterSet: default
+---
+# Placement: select all clusters for the "default" namespace
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: all-clusters
+  namespace: default
+spec:
+  clusterSets:
+    - default
+---
+# Placement: select all clusters for the "monitoring" namespace
+apiVersion: cluster.open-cluster-management.io/v1beta1
+kind: Placement
+metadata:
+  name: all-clusters
+  namespace: monitoring
+spec:
+  clusterSets:
+    - default
+---
+# ManifestWorkReplicaSet 1: Deploy nginx to all clusters (default namespace)
+apiVersion: work.open-cluster-management.io/v1alpha1
+kind: ManifestWorkReplicaSet
+metadata:
+  name: deploy-nginx
+  namespace: default
+spec:
+  placementRefs:
+    - name: all-clusters
+      rolloutStrategy:
+        type: All
+  manifestWorkTemplate:
+    manifestConfigs:
+      - resourceIdentifier:
+          group: apps
+          resource: deployments
+          namespace: default
+          name: nginx
+        feedbackRules:
+          - type: JSONPaths
+            jsonPaths:
+              - name: Available
+                path: ".status.conditions[?(@.type=='Available')].status"
+              - name: AvailableMessage
+                path: ".status.conditions[?(@.type=='Available')].message"
+              - name: Progressing
+                path: ".status.conditions[?(@.type=='Progressing')].status"
+              - name: ProgressingReason
+                path: ".status.conditions[?(@.type=='Progressing')].reason"
+              - name: ProgressingMessage
+                path: ".status.conditions[?(@.type=='Progressing')].message"
+              - name: ReadyReplicas
+                path: '.status.readyReplicas'
+              - name: UnavailableReplicas
+                path: '.status.unavailableReplicas'
+              - name: Replicas
+                path: '.status.replicas'
+              - name: SpecReplicas
+                path: '.spec.replicas'
+        # ConditionRules gate MWRS progressive rollout on actual workload health.
+        # Without these, OCM considers a ManifestWork "succeeded" as soon as the
+        # manifests are applied, even if the Deployment is stuck (e.g., bad image pull).
+        conditionRules:
+          - condition: Progressing
+            type: CEL
+            celExpressions:
+              - >-
+                !hasConditions(object.status)
+                || !object.status.conditions.exists(c,
+                c.type == 'Available' && c.status == 'True')
+            messageExpression: >-
+              hasConditions(object.status)
+              && object.status.conditions.exists(c, c.type == 'Available')
+              ? object.status.conditions.filter(c, c.type == 'Available')[0].message
+              : 'Waiting for availability'
+          - condition: Degraded
+            type: CEL
+            celExpressions:
+              - >-
+                hasConditions(object.status)
+                && object.status.conditions.exists(c,
+                c.type == 'Progressing' && c.status == 'False')
+            messageExpression: >-
+              hasConditions(object.status)
+              && object.status.conditions.exists(c, c.type == 'Progressing')
+              ? object.status.conditions.filter(c, c.type == 'Progressing')[0].message
+              : 'Deployment is not progressing'
+      - resourceIdentifier:
+          group: ""
+          resource: services
+          namespace: default
+          name: nginx-svc
+        feedbackRules:
+          - type: JSONPaths
+            jsonPaths:
+              - name: clusterIP
+                path: '.spec.clusterIP'
+    workload:
+      manifests:
+        - apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: nginx
+            namespace: default
+          spec:
+            replicas: 2
+            selector:
+              matchLabels:
+                app: nginx
+            template:
+              metadata:
+                labels:
+                  app: nginx
+              spec:
+                containers:
+                  - name: nginx
+                    image: nginx:1.25
+                    ports:
+                      - containerPort: 80
+        - apiVersion: v1
+          kind: Service
+          metadata:
+            name: nginx-svc
+            namespace: default
+          spec:
+            selector:
+              app: nginx
+            ports:
+              - port: 80
+                targetPort: 80
+---
+# ManifestWorkReplicaSet 2: Deploy monitoring config to all clusters (monitoring namespace)
+apiVersion: work.open-cluster-management.io/v1alpha1
+kind: ManifestWorkReplicaSet
+metadata:
+  name: monitoring-config
+  namespace: monitoring
+spec:
+  placementRefs:
+    - name: all-clusters
+      rolloutStrategy:
+        type: All
+  manifestWorkTemplate:
+    manifestConfigs:
+      - resourceIdentifier:
+          group: apps
+          resource: deployments
+          namespace: monitoring
+          name: monitoring-agent
+        feedbackRules:
+          - type: WellKnownStatus
+        conditionRules:
+          - condition: Progressing
+            type: CEL
+            celExpressions:
+              - >-
+                !hasConditions(object.status)
+                || !object.status.conditions.exists(c,
+                c.type == 'Available' && c.status == 'True')
+            messageExpression: >-
+              hasConditions(object.status)
+              && object.status.conditions.exists(c, c.type == 'Available')
+              ? object.status.conditions.filter(c, c.type == 'Available')[0].message
+              : 'Waiting for availability'
+          - condition: Degraded
+            type: CEL
+            celExpressions:
+              - >-
+                hasConditions(object.status)
+                && object.status.conditions.exists(c,
+                c.type == 'Progressing' && c.status == 'False')
+            messageExpression: >-
+              hasConditions(object.status)
+              && object.status.conditions.exists(c, c.type == 'Progressing')
+              ? object.status.conditions.filter(c, c.type == 'Progressing')[0].message
+              : 'Deployment is not progressing'
+    workload:
+      manifests:
+        - apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: monitoring
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: monitoring-agent-config
+            namespace: monitoring
+          data:
+            config.yaml: |
+              scrape_interval: 30s
+              evaluation_interval: 30s
+        - apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: monitoring-agent
+            namespace: monitoring
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: monitoring-agent
+            template:
+              metadata:
+                labels:
+                  app: monitoring-agent
+              spec:
+                containers:
+                  - name: agent
+                    image: busybox:1.36
+                    command: ["sh", "-c", "echo 'monitoring agent running' && sleep infinity"]
+---
+# ManifestWorkReplicaSet 3: Deploy app config (default namespace, separate MWRS)
+apiVersion: work.open-cluster-management.io/v1alpha1
+kind: ManifestWorkReplicaSet
+metadata:
+  name: app-configmaps
+  namespace: default
+spec:
+  placementRefs:
+    - name: all-clusters
+      rolloutStrategy:
+        type: All
+  manifestWorkTemplate:
+    workload:
+      manifests:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: app-settings
+            namespace: default
+          data:
+            LOG_LEVEL: info
+            FEATURE_FLAGS: "true"
+---
+# ManifestWorkReplicaSet 4: Run a one-shot data migration Job on all clusters
+# Demonstrates WellKnownConditions for ConditionRules (vs. the CEL rules above).
+# OCM has built-in WellKnownConditions for Jobs (Complete) and Pods (Complete).
+apiVersion: work.open-cluster-management.io/v1alpha1
+kind: ManifestWorkReplicaSet
+metadata:
+  name: data-migration
+  namespace: default
+spec:
+  placementRefs:
+    - name: all-clusters
+      rolloutStrategy:
+        type: All
+  manifestWorkTemplate:
+    manifestConfigs:
+      - resourceIdentifier:
+          group: batch
+          resource: jobs
+          namespace: default
+          name: data-migration
+        feedbackRules:
+          - type: WellKnownStatus
+        # WellKnownConditions: OCM knows how to evaluate Job completion natively.
+        # For Jobs, "Complete" is true when the Job has a Complete or Failed condition.
+        # This is the ConditionRules equivalent of WellKnownStatus for FeedbackRules —
+        # no CEL expressions needed for standard resource types.
+        conditionRules:
+          - condition: Complete
+            type: WellKnownConditions
+    workload:
+      manifests:
+        - apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: data-migration
+            namespace: default
+          spec:
+            backoffLimit: 3
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: migrate
+                    image: busybox:1.36
+                    command: ["sh", "-c", "echo 'Running data migration...' && sleep 5 && echo 'Done'"]

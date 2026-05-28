@@ -13,11 +13,16 @@ import {
   Chip,
   CircularProgress,
   Alert,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import type { ManifestWork } from '../api/manifestWorkService';
 import { useState } from 'react';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import StatusFeedbackDisplay from './StatusFeedbackDisplay';
 
 interface ManifestWorkRowProps {
   manifestWork: ManifestWork;
@@ -100,6 +105,7 @@ function ManifestWorkRow({ manifestWork }: ManifestWorkRowProps) {
                       <TableCell>Name</TableCell>
                       <TableCell>Namespace</TableCell>
                       <TableCell>Status</TableCell>
+                      <TableCell>Status Feedback</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -120,12 +126,42 @@ function ManifestWorkRow({ manifestWork }: ManifestWorkRowProps) {
                               size="small"
                             />
                           </TableCell>
+                          <TableCell>
+                            <StatusFeedbackDisplay feedback={manifest.statusFeedback} variant="inline" maxItems={3} />
+                          </TableCell>
                         </TableRow>
                       );
                     })}
                   </TableBody>
                 </Table>
               </TableContainer>
+
+              {/* Status Feedback details (collapsible per resource) */}
+              {manifestWork.resourceStatus?.manifests?.some(m => m.statusFeedback?.values?.length) && (
+                <>
+                  <Typography variant="subtitle2" gutterBottom component="div" sx={{ fontWeight: 'bold', mt: 2 }}>
+                    Status Feedback
+                  </Typography>
+                  {manifestWork.resourceStatus.manifests
+                    .filter(m => m.statusFeedback?.values?.length)
+                    .map((manifest, idx) => (
+                      <Accordion key={idx} variant="outlined" disableGutters sx={{ mb: 1, '&:before': { display: 'none' } }}>
+                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Chip label={manifest.resourceMeta.kind || 'Resource'} size="small" variant="outlined" />
+                            <Typography variant="body2">{manifest.resourceMeta.name || '-'}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              ({manifest.statusFeedback!.values!.length} values)
+                            </Typography>
+                          </Box>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                          <StatusFeedbackDisplay feedback={manifest.statusFeedback} variant="table" />
+                        </AccordionDetails>
+                      </Accordion>
+                    ))}
+                </>
+              )}
 
               <Typography variant="subtitle2" gutterBottom component="div" sx={{ fontWeight: 'bold', mt: 2 }}>
                 Conditions

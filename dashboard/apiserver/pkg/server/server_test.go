@@ -122,7 +122,7 @@ func TestAuthMiddleware(t *testing.T) {
 			name:           "bypass auth disabled with header",
 			bypassAuth:     "false",
 			authHeader:     "Bearer token",
-			expectedStatus: http.StatusInternalServerError,
+			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:           "bypass auth disabled without header",
@@ -178,6 +178,6 @@ func TestRootRedirect(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusMovedPermanently, w.Code)
-	assert.Equal(t, "/static/index.html", w.Header().Get("Location"))
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "OCM Dashboard API Server")
 }

@@ -8,6 +8,12 @@ import OverviewPage from './components/OverviewPage';
 import ClusterListPage from './components/ClusterListPage';
 import ClustersetList from './components/ClustersetList';
 import PlacementListPage from './components/PlacementListPage';
+import ManifestWorkReplicaSetListPage from './components/ManifestWorkReplicaSetListPage';
+import ManifestWorkReplicaSetDetailPage from './components/ManifestWorkReplicaSetDetailPage';
+import ManifestWorkListPage from './components/ManifestWorkListPage';
+import ManifestWorkDetailPage from './components/ManifestWorkDetailPage';
+import ResourceListPage from './components/ResourceListPage';
+import ResourceDetailPage from './components/ResourceDetailPage';
 import { MuiThemeProvider } from './theme/ThemeProvider';
 
 // Protected route component that redirects to login if not authenticated
@@ -47,6 +53,12 @@ function AppContent() {
           <Route path="clusters/:name" element={<ClusterDetailPage />} />
           <Route path="placements" element={<PlacementListPage />} />
           <Route path="clustersets" element={<ClustersetList />} />
+          <Route path="manifestworkreplicasets" element={<ManifestWorkReplicaSetListPage />} />
+          <Route path="manifestworkreplicasets/:namespace/:name" element={<ManifestWorkReplicaSetDetailPage />} />
+          <Route path="manifestworks" element={<ManifestWorkListPage />} />
+          <Route path="manifestworks/:namespace/:name" element={<ManifestWorkDetailPage />} />
+          <Route path="resources" element={<ResourceListPage />} />
+          <Route path="resources/:cluster/:manifestwork/:ordinal" element={<ResourceDetailPage />} />
           <Route index element={<Navigate to="/overview" />} />
           <Route path="*" element={<Navigate to="/overview" />} />
         </Route>
