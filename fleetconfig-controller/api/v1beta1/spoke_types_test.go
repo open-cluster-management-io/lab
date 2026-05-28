@@ -42,25 +42,28 @@ func TestDerivedManagedClusterName(t *testing.T) {
 			},
 		},
 		{
-			name: "hub-as-spoke sentinel returns sentinel unchanged",
+			name: "hub-as-spoke gets a hashed name (no sentinel carve-out)",
 			spoke: &Spoke{
-				ObjectMeta: metav1.ObjectMeta{Name: ManagedClusterTypeHubAsSpoke, Namespace: "ns"},
+				ObjectMeta: metav1.ObjectMeta{Name: ManagedClusterTypeHubAsSpoke, Namespace: "ns1"},
 			},
 			check: func(t *testing.T, got string) {
-				if got != ManagedClusterTypeHubAsSpoke {
-					t.Errorf("want %q, got %q", ManagedClusterTypeHubAsSpoke, got)
+				if !strings.HasPrefix(got, ManagedClusterTypeHubAsSpoke+"-") {
+					t.Errorf("want prefix %q-, got %q", ManagedClusterTypeHubAsSpoke, got)
+				}
+				if got == ManagedClusterTypeHubAsSpoke {
+					t.Errorf("expected hashed name, got bare sentinel %q", got)
 				}
 			},
 		},
 		{
-			name: "InCluster kubeconfig (hub-as-spoke variant) returns sentinel",
+			name: "two hub-as-spoke Spokes in different namespaces produce different names",
 			spoke: &Spoke{
-				ObjectMeta: metav1.ObjectMeta{Name: "anything", Namespace: "ns"},
-				Spec:       SpokeSpec{Kubeconfig: Kubeconfig{InCluster: true}},
+				ObjectMeta: metav1.ObjectMeta{Name: ManagedClusterTypeHubAsSpoke, Namespace: "ns2"},
 			},
 			check: func(t *testing.T, got string) {
-				if got != ManagedClusterTypeHubAsSpoke {
-					t.Errorf("want %q, got %q", ManagedClusterTypeHubAsSpoke, got)
+				other := (&Spoke{ObjectMeta: metav1.ObjectMeta{Name: ManagedClusterTypeHubAsSpoke, Namespace: "ns1"}}).DerivedManagedClusterName()
+				if got == other {
+					t.Errorf("expected different derived names across namespaces, both got %q", got)
 				}
 			},
 		},

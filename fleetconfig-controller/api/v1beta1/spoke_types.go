@@ -140,12 +140,8 @@ func (s *Spoke) IsHubAsSpoke() bool {
 
 // DerivedManagedClusterName returns the ManagedCluster name to assign when joining a brand-new Spoke.
 // Format: <truncated spoke.Name>-<8 hex chars of sha256(namespace/name)>
-// Hub-as-spoke returns its sentinel name unchanged.
 // Legacy Spokes that were joined before this scheme existed keep their original name and never invoke this function.
 func (s *Spoke) DerivedManagedClusterName() string {
-	if s.IsHubAsSpoke() {
-		return ManagedClusterTypeHubAsSpoke
-	}
 	h := sha256.Sum256([]byte(s.Namespace + "/" + s.Name))
 	suffix := hex.EncodeToString(h[:])[:8]
 	base := s.Name
