@@ -241,13 +241,11 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 		return fmt.Errorf("failed to create addon client: %w", err)
 	}
 
+	// check if the spoke has already been joined to the hub
 	ownerLabels := map[string]string{
 		v1beta1.LabelSpokeName:      spoke.Name,
 		v1beta1.LabelSpokeNamespace: spoke.Namespace,
 	}
-
-	// Find the ManagedCluster: prefer label match, fall back to derived name (canonical post-fix
-	// name, also covers a crash between clusteradm join and label patch) and spoke.Name (legacy).
 	managedCluster, err := common.GetManagedCluster(
 		ctx, clusterClient,
 		[]string{spoke.DerivedManagedClusterName(), spoke.Name},
