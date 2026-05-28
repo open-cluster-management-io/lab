@@ -43,6 +43,7 @@ Taskfile.yaml
 .idea/
 .vscode/
 .nvim/
+.claude/
 !.vscode/launch.json.example
 .nvim/
 venv/
