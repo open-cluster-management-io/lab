@@ -188,6 +188,17 @@ func mergeKlusterletAnnotations(base, override map[string]string) map[string]str
 	return out
 }
 
+// syncManagedClusterLabels returns the ManagedCluster label set with Spoke ownership labels added or updated.
+func syncManagedClusterLabels(current map[string]string, spokeNamespace, spokeName string) map[string]string {
+	result := maps.Clone(current)
+	if result == nil {
+		result = map[string]string{}
+	}
+	result[v1beta1.LabelSpokeName] = spokeName
+	result[v1beta1.LabelSpokeNamespace] = spokeNamespace
+	return result
+}
+
 // syncManagedClusterAnnotations merges requested klusterlet annotations into the ManagedCluster's
 // existing annotations, preserving all non-klusterlet annotations while adding/updating/removing
 // only those with the klusterlet prefix.
@@ -288,6 +299,8 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 
 	// TODO - handle this via `klusterlet upgrade` once https://github.com/open-cluster-management-io/ocm/issues/1210 is resolved
 	if managedCluster != nil {
+		var needsUpdate bool
+
 		klusterletValuesAnnotations := map[string]string{}
 		if klusterletValues != nil {
 			klusterletValuesAnnotations = klusterletValues.Klusterlet.RegistrationConfiguration.ClusterAnnotations
@@ -296,11 +309,23 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 		updatedAnnotations := syncManagedClusterAnnotations(managedCluster.GetAnnotations(), requestedAnnotations)
 		if !reflect.DeepEqual(updatedAnnotations, managedCluster.GetAnnotations()) {
 			managedCluster.SetAnnotations(updatedAnnotations)
+			needsUpdate = true
+		}
+
+		updatedLabels := syncManagedClusterLabels(managedCluster.GetLabels(), spoke.Namespace, spoke.Name)
+		if !reflect.DeepEqual(updatedLabels, managedCluster.GetLabels()) {
+			managedCluster.SetLabels(updatedLabels)
+			needsUpdate = true
+		}
+
+		if needsUpdate {
 			if err = common.UpdateManagedCluster(ctx, clusterClient, managedCluster); err != nil {
 				return err
 			}
-			logger.V(1).Info("synced annotations to ManagedCluster")
+			logger.V(1).Info("synced ManagedCluster metadata")
 		}
+
+		spoke.Status.ManagedClusterName = managedCluster.Name
 	}
 
 	// precreate the namespace that the agent will be installed into
