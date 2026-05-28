@@ -166,6 +166,12 @@ const (
 
 	// LabelAddOnManagedBy is the label key for the lifecycle manager of an add-on resource.
 	LabelAddOnManagedBy = "addon.open-cluster-management.io/managedBy"
+
+	// LabelSpokeName is set on a ManagedCluster to the metadata.name of the owning Spoke CR.
+	LabelSpokeName = "fleetconfig.open-cluster-management.io/spoke-name"
+
+	// LabelSpokeNamespace is set on a ManagedCluster to the metadata.namespace of the owning Spoke CR.
+	LabelSpokeNamespace = "fleetconfig.open-cluster-management.io/spoke-namespace"
 )
 
 // Registration driver types
