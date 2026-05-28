@@ -102,7 +102,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 		})
 
 		It("should verify addons configured on the hub and enabled on the spoke", func() {
-			ensureAddonCreated(tc, 0)
+			ensureAddonCreated(tc, 0, spoke.Status.ManagedClusterName)
 		})
 
 		It("should reconcile innocuous ClusterManager chart values onto the hub", func() {
@@ -349,7 +349,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 
 		It("should update addon template version and verify new resources are deployed", func() {
 			updateHubAddon(tc, hub)
-			ensureAddonCreated(tc, 1)
+			ensureAddonCreated(tc, 1, spoke.Status.ManagedClusterName)
 
 			By("verifying that the new addon template (v2.0.0) has variables correctly resolved")
 			ensureAddonVariablesResolved(tc, 1, spokeName, "updated-foo-value")

@@ -384,7 +384,7 @@ func assertKlusterletAnnotation(klusterlet *operatorv1.Klusterlet, key, expected
 	return nil
 }
 
-func ensureAddonCreated(tc *E2EContext, addonIdx int) {
+func ensureAddonCreated(tc *E2EContext, addonIdx int, mcaNamespace string) {
 	By("verifying that the addon is configured and propagated successfully")
 	EventuallyWithOffset(1, func() error {
 		addon := addonData[addonIdx]
@@ -400,8 +400,8 @@ func ensureAddonCreated(tc *E2EContext, addonIdx int) {
 			return err
 		}
 		mcao := addonv1alpha1.ManagedClusterAddOn{}
-		if err := tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Name: addon.name, Namespace: spokeName}, &mcao); err != nil {
-			utils.WarnError(err, "failed to get ManagedClusterAddOn %s in namespace %s", addon.name, spokeName)
+		if err := tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Name: addon.name, Namespace: mcaNamespace}, &mcao); err != nil {
+			utils.WarnError(err, "failed to get ManagedClusterAddOn %s in namespace %s", addon.name, mcaNamespace)
 			return err
 		}
 		managedBy, ok := mcao.Labels[v1alpha1.LabelAddOnManagedBy]

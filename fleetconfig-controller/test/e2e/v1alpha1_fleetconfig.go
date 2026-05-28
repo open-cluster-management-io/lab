@@ -77,7 +77,7 @@ var _ = Describe("fleetconfig", Label("v1alpha1"), Serial, Ordered, func() {
 		})
 
 		It("should verify addons configured on the hub and enabled on the spoke", func() {
-			ensureAddonCreated(tc, 0)
+			ensureAddonCreated(tc, 0, spokeName)
 		})
 
 		It("should verify spoke cluster annotations", func() {
@@ -120,7 +120,7 @@ var _ = Describe("fleetconfig", Label("v1alpha1"), Serial, Ordered, func() {
 
 		It("should update an addon and make sure its propagated to the spoke", func() {
 			updateFleetConfigAddon(tc, fc)
-			ensureAddonCreated(tc, 1)
+			ensureAddonCreated(tc, 1, spokeName)
 		})
 
 		It("should remove a spoke from the hub", func() {
