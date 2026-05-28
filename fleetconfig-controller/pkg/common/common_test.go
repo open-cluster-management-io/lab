@@ -37,13 +37,34 @@ func TestGetManagedCluster(t *testing.T) {
 			wantName:      "foo-1234abcd",
 		},
 		{
-			name: "label miss falls back to name (legacy adoption)",
+			name: "label miss falls back to name (legacy adoption, unlabeled)",
 			fixtures: []*clusterv1.ManagedCluster{
 				{ObjectMeta: metav1.ObjectMeta{Name: "legacy"}},
 			},
 			fallbackNames: []string{"legacy"},
 			ownerLabels:   map[string]string{labelName: "legacy", labelNs: "ns"},
 			wantName:      "legacy",
+		},
+		{
+			name: "legacy MC with labels (post-adoption) hits via label lookup",
+			fixtures: []*clusterv1.ManagedCluster{
+				{ObjectMeta: metav1.ObjectMeta{
+					Name:   "legacy",
+					Labels: map[string]string{labelName: "legacy", labelNs: "ns"},
+				}},
+			},
+			fallbackNames: []string{"legacy"},
+			ownerLabels:   map[string]string{labelName: "legacy", labelNs: "ns"},
+			wantName:      "legacy",
+		},
+		{
+			name: "new MC without labels (crash mid-join) hits via derived-name fallback",
+			fixtures: []*clusterv1.ManagedCluster{
+				{ObjectMeta: metav1.ObjectMeta{Name: "foo-abcd1234"}},
+			},
+			fallbackNames: []string{"foo-abcd1234", "foo"},
+			ownerLabels:   map[string]string{labelName: "foo", labelNs: "ns1"},
+			wantName:      "foo-abcd1234",
 		},
 		{
 			name: "collision guard rejects MC owned by different Spoke",
