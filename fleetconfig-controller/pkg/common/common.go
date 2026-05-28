@@ -74,7 +74,7 @@ func AddOnClient(kubeconfig []byte) (*addonapi.Clientset, error) {
 // GetManagedCluster retrieves a Spoke's ManagedCluster. With ownerLabels, it prefers a label match
 // and falls back to each name in fallbackNames in order, returning the first hit whose existing
 // labels do not conflict with ownerLabels. Returns (nil, nil) if no ManagedCluster is found.
-func GetManagedCluster(ctx context.Context, client *clusterapi.Clientset, fallbackNames []string, ownerLabels map[string]string) (*clusterv1.ManagedCluster, error) {
+func GetManagedCluster(ctx context.Context, client clusterapi.Interface, fallbackNames []string, ownerLabels map[string]string) (*clusterv1.ManagedCluster, error) {
 	if len(ownerLabels) > 0 {
 		parts := make([]string, 0, len(ownerLabels))
 		for k, v := range ownerLabels {
@@ -125,7 +125,7 @@ func conflictsWithOwnerLabels(existing, ownerLabels map[string]string) bool {
 }
 
 // getManagedClusterLegacy fetches a ManagedCluster by its cluster-scoped name. Returns (nil, nil) when the ManagedCluster does not exist.
-func getManagedClusterLegacy(ctx context.Context, client *clusterapi.Clientset, name string) (*clusterv1.ManagedCluster, error) {
+func getManagedClusterLegacy(ctx context.Context, client clusterapi.Interface, name string) (*clusterv1.ManagedCluster, error) {
 	managedCluster, err := client.ClusterV1().ManagedClusters().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {

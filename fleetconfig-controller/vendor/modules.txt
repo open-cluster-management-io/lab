@@ -735,6 +735,7 @@ k8s.io/client-go/applyconfigurations/storage/v1alpha1
 k8s.io/client-go/applyconfigurations/storage/v1beta1
 k8s.io/client-go/applyconfigurations/storagemigration/v1beta1
 k8s.io/client-go/discovery
+k8s.io/client-go/discovery/fake
 k8s.io/client-go/dynamic
 k8s.io/client-go/features
 k8s.io/client-go/gentype
@@ -1007,11 +1008,16 @@ open-cluster-management.io/api/client/addon/clientset/versioned/scheme
 open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1alpha1
 open-cluster-management.io/api/client/addon/clientset/versioned/typed/addon/v1beta1
 open-cluster-management.io/api/client/cluster/clientset/versioned
+open-cluster-management.io/api/client/cluster/clientset/versioned/fake
 open-cluster-management.io/api/client/cluster/clientset/versioned/scheme
 open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1
+open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1/fake
 open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1alpha1
+open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1alpha1/fake
 open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta1
+open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta1/fake
 open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta2
+open-cluster-management.io/api/client/cluster/clientset/versioned/typed/cluster/v1beta2/fake
 open-cluster-management.io/api/client/operator/clientset/versioned
 open-cluster-management.io/api/client/operator/clientset/versioned/scheme
 open-cluster-management.io/api/client/operator/clientset/versioned/typed/operator/v1
