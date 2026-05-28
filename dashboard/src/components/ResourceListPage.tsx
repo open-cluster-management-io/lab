@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -57,6 +57,7 @@ export default function ResourceListPage() {
 
   const [selectedResource, setSelectedResource] = useState<ManagedResource | null>(null);
   const selectedId = searchParams.get('selected');
+  const selectReqSeq = useRef(0);
 
   const loadResources = async () => {
     setLoading(true);
@@ -90,9 +91,17 @@ export default function ResourceListPage() {
   }, [resources, searchTerm, filterKind, filterCluster, filterNamespace]);
 
   const handleSelect = async (resource: ManagedResource) => {
+    const req = ++selectReqSeq.current;
     setSearchParams({ selected: resource.id });
-    const full = await fetchManagedResource(resource.cluster, resource.manifestWorkName, resource.ordinal);
-    setSelectedResource(full || resource);
+    setSelectedResource(resource);
+    try {
+      const full = await fetchManagedResource(resource.cluster, resource.manifestWorkName, resource.ordinal);
+      if (req !== selectReqSeq.current) return;
+      setSelectedResource(full || resource);
+    } catch {
+      if (req !== selectReqSeq.current) return;
+      setSelectedResource(resource);
+    }
   };
 
   const handleCloseDetail = () => {

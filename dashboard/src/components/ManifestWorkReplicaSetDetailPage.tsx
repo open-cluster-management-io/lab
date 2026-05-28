@@ -23,9 +23,12 @@ export default function ManifestWorkReplicaSetDetailPage() {
     const load = async () => {
       try {
         setLoading(true);
+        setError(null);
+        setMwrs(null);
         const data = await fetchManifestWorkReplicaSet(namespace, name);
         if (!data) {
           setError('ManifestWorkReplicaSet not found');
+          return;
         }
         setMwrs(data);
       } catch {

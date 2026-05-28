@@ -65,6 +65,9 @@ function ResourceNode({ data }: { data: ResData }) {
   const color = borderColor(data.status);
   return (
     <Box
+      role="button"
+      tabIndex={0}
+      aria-label={`Open ${data.kind} ${data.name}`}
       sx={{
         background: '#fff',
         border: '1px solid #e0e0e0',
@@ -75,8 +78,15 @@ function ResourceNode({ data }: { data: ResData }) {
         boxShadow: 1,
         cursor: 'pointer',
         '&:hover': { boxShadow: 4, borderColor: color },
+        '&:focus-visible': { outline: `2px solid ${color}`, outlineOffset: 2 },
       }}
       onClick={() => navigate(data.path)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          navigate(data.path);
+        }
+      }}
     >
       <Handle type="target" position={Position.Left} isConnectable={false} style={{ background: color }} />
       <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 'bold' }} display="block">
@@ -189,17 +199,26 @@ function MWRSFlowChartInner({ mwrs }: InnerProps) {
   const { requestLayout } = useAutoLayout(edges, { direction: 'LR', nodeSpacing: 30, rankSpacing: 80 });
 
   useEffect(() => {
+    let cancelled = false;
     setIsLoading(true);
     setError(null);
     fetchManifestWorksByReplicaSet(mwrs.namespace, mwrs.name)
       .then((mws) => {
+        if (cancelled) return;
         const { nodes: n, edges: e } = buildGraph(mwrs, mws);
         setNodes(n);
         setEdges(e);
         requestLayout();
       })
-      .catch(() => setError('Failed to load ManifestWorks'))
-      .finally(() => setIsLoading(false));
+      .catch(() => {
+        if (!cancelled) setError('Failed to load ManifestWorks');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [mwrs.namespace, mwrs.name]);
 
   if (isLoading) {

@@ -23,9 +23,12 @@ export default function ManifestWorkDetailPage() {
     const load = async () => {
       try {
         setLoading(true);
+        setError(null);
+        setMw(null);
         const data = await fetchManifestWorkByName(namespace, name);
         if (!data) {
           setError('ManifestWork not found');
+          return;
         }
         setMw(data);
       } catch {

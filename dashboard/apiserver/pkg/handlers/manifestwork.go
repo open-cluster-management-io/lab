@@ -25,6 +25,7 @@ func convertStatusFeedback(sf workv1.StatusFeedbackResult) *models.StatusFeedbac
 				Integer: fv.Value.Integer,
 				String:  fv.Value.String,
 				Boolean: fv.Value.Boolean,
+				JsonRaw: fv.Value.JsonRaw,
 			},
 		}
 		result.Values = append(result.Values, val)

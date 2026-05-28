@@ -23,7 +23,7 @@ func GetAllManifestWorkReplicaSets(c *gin.Context, ocmClient *client.OCMClient, 
 
 	list, err := ocmClient.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets("").List(ctx, metav1.ListOptions{})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeK8sError(c, err, "manifestworkreplicasets not found", "failed to list manifestworkreplicasets")
 		return
 	}
 
@@ -46,7 +46,7 @@ func GetManifestWorkReplicaSets(c *gin.Context, ocmClient *client.OCMClient, ctx
 
 	list, err := ocmClient.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeK8sError(c, err, "manifestworkreplicasets not found", "failed to list manifestworkreplicasets")
 		return
 	}
 
@@ -70,7 +70,7 @@ func GetManifestWorkReplicaSet(c *gin.Context, ocmClient *client.OCMClient, ctx 
 
 	item, err := ocmClient.WorkClient.WorkV1alpha1().ManifestWorkReplicaSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeK8sError(c, err, "manifestworkreplicaset not found", "failed to get manifestworkreplicaset")
 		return
 	}
 
@@ -93,7 +93,7 @@ func GetManifestWorksByReplicaSet(c *gin.Context, ocmClient *client.OCMClient, c
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeK8sError(c, err, "manifestworks not found", "failed to list manifestworks")
 		return
 	}
 

@@ -35,13 +35,13 @@ interface Props {
 export default function StatusFeedbackDisplay({ feedback, variant = 'table', maxItems }: Props) {
   if (!feedback?.values?.length) return null;
 
-  const items = maxItems ? feedback.values.slice(0, maxItems) : feedback.values;
+  const hasLimit = typeof maxItems === 'number';
+  const items = hasLimit ? feedback.values.slice(0, Math.max(0, maxItems)) : feedback.values;
+  const remaining = feedback.values.length - items.length;
 
   if (variant === 'compact') {
     const summary = items.map(v => `${v.name}=${formatValue(v.fieldValue)}`).join(', ');
-    const extra = maxItems && feedback.values.length > maxItems
-      ? ` (+${feedback.values.length - maxItems})`
-      : '';
+    const extra = remaining > 0 ? ` (+${remaining})` : '';
     return (
       <Typography variant="caption" color="text.secondary" noWrap>
         {summary}{extra}
@@ -61,9 +61,9 @@ export default function StatusFeedbackDisplay({ feedback, variant = 'table', max
             color="info"
           />
         ))}
-        {maxItems && feedback.values.length > maxItems && (
+        {remaining > 0 && (
           <Chip
-            label={`+${feedback.values.length - maxItems}`}
+            label={`+${remaining}`}
             size="small"
             variant="outlined"
           />

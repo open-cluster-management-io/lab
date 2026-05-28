@@ -16,15 +16,43 @@ export default function ResourceDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!cluster || !manifestwork || ordinal === undefined) return;
+    if (!cluster || !manifestwork || ordinal === undefined) {
+      setResource(null);
+      setError('Invalid resource identifier');
+      setLoading(false);
+      return;
+    }
+
+    const parsedOrdinal = Number.parseInt(ordinal, 10);
+    if (Number.isNaN(parsedOrdinal)) {
+      setResource(null);
+      setError('Invalid resource identifier');
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
     setLoading(true);
-    fetchManagedResource(cluster, manifestwork, parseInt(ordinal, 10))
+    setError(null);
+    setResource(null);
+    fetchManagedResource(cluster, manifestwork, parsedOrdinal)
       .then((r) => {
-        if (!r) setError('Resource not found');
-        else setResource(r);
+        if (cancelled) return;
+        if (!r) {
+          setError('Resource not found');
+          return;
+        }
+        setResource(r);
       })
-      .catch(() => setError('Failed to load resource'))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!cancelled) setError('Failed to load resource');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [cluster, manifestwork, ordinal]);
 
   const title = resource

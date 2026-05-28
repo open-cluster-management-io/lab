@@ -77,6 +77,10 @@ export default function OverviewPage() {
         ])
         setMwrsList(mwrsData)
         setAllMWs(mwData)
+      } catch (error) {
+        console.error('Failed to load WorkReplicaSets overview data:', error)
+        setMwrsList([])
+        setAllMWs([])
       } finally {
         setMwrsLoading(false)
       }

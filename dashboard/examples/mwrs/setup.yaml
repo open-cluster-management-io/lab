@@ -9,6 +9,12 @@ metadata:
 spec:
   clusterSet: default
 ---
+# Ensure the monitoring namespace exists
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+---
 # ManagedClusterSetBinding for the "monitoring" namespace
 apiVersion: cluster.open-cluster-management.io/v1beta2
 kind: ManagedClusterSetBinding
@@ -17,12 +23,6 @@ metadata:
   namespace: monitoring
 spec:
   clusterSet: default
----
-# Ensure the monitoring namespace exists
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: monitoring
 ---
 # Placement: select all clusters for the "default" namespace
 apiVersion: cluster.open-cluster-management.io/v1beta1

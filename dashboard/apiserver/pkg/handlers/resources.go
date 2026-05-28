@@ -70,7 +70,7 @@ func GetManagedResources(c *gin.Context, ocmClient *client.OCMClient, ctx contex
 
 	list, err := ocmClient.WorkClient.WorkV1().ManifestWorks(listNamespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeK8sError(c, err, "manifestworks not found", "failed to list manifestworks")
 		return
 	}
 
@@ -186,7 +186,7 @@ func GetManagedResource(c *gin.Context, ocmClient *client.OCMClient, ctx context
 
 	mw, err := ocmClient.WorkClient.WorkV1().ManifestWorks(cluster).Get(ctx, manifestwork, metav1.GetOptions{})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		writeK8sError(c, err, "manifestwork not found", "failed to get manifestwork")
 		return
 	}
 
