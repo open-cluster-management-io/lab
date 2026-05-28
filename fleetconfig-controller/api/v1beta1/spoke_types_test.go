@@ -9,9 +9,9 @@ import (
 
 func TestDerivedManagedClusterName(t *testing.T) {
 	tests := []struct {
-		name     string
-		spoke    *Spoke
-		check    func(t *testing.T, got string)
+		name  string
+		spoke *Spoke
+		check func(t *testing.T, got string)
 	}{
 		{
 			name: "short name + namespace",
