@@ -389,7 +389,7 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 	}
 
 	if !spoke.IsHubAsSpoke() {
-		err = r.bindAddonAgent(ctx, spoke)
+		err = r.bindAddonAgent(ctx, spoke, managedCluster.Name)
 		if err != nil {
 			return err
 		}
@@ -398,7 +398,7 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 	spokeCopy := spoke.DeepCopy()
 	r.configureFCCAddOn(spokeCopy)
 
-	enabledAddons, err := handleSpokeAddons(ctx, addonC, spokeCopy)
+	enabledAddons, err := handleSpokeAddons(ctx, addonC, spokeCopy, managedCluster.Name)
 	if err != nil {
 		msg := fmt.Sprintf("failed to enable addons for spoke cluster %s: %s", spoke.Name, err.Error())
 		spoke.SetConditions(true, v1beta1.NewCondition(
@@ -643,8 +643,9 @@ func forceDeleteManifestWorksInNamespace(ctx context.Context, workC *workapi.Cli
 
 // hubForceDeleteUnreachableSpoke performs the hub-side escape hatch for an unreachable spoke: delete ManifestWorks,
 // clear their finalizers, and drop finalizers that gate on the spoke/FCC agent or OCM work cleanup.
-func hubForceDeleteUnreachableSpoke(ctx context.Context, spoke *v1beta1.Spoke, workC *workapi.Clientset) error {
-	if err := forceDeleteManifestWorksInNamespace(ctx, workC, spoke.Name); err != nil {
+// mcName is the ManagedCluster name on the hub (== name of the cluster namespace holding ManifestWorks).
+func hubForceDeleteUnreachableSpoke(ctx context.Context, spoke *v1beta1.Spoke, mcName string, workC *workapi.Clientset) error {
+	if err := forceDeleteManifestWorksInNamespace(ctx, workC, mcName); err != nil {
 		return err
 	}
 	spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
@@ -669,11 +670,35 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 		return true, fmt.Errorf("failed to create addon client for cleanup: %w", err)
 	}
 
+	// Resolve the ManagedCluster name authoritatively from the hub, covering both the derived
+	// post-fix name and the legacy spoke.Name. If nothing is found, there's nothing to clean
+	// up on the hub; drop hub finalizers so deletion can proceed.
+	ownerLabels := map[string]string{
+		v1beta1.LabelSpokeName:      spoke.Name,
+		v1beta1.LabelSpokeNamespace: spoke.Namespace,
+	}
+	managedCluster, err := common.GetManagedCluster(
+		ctx, clusterC,
+		[]string{spoke.DerivedManagedClusterName(), spoke.Name},
+		ownerLabels,
+	)
+	if err != nil {
+		return true, err
+	}
+	if managedCluster == nil {
+		logger.Info("ManagedCluster not found on hub; dropping hub finalizers", "spoke", spoke.Name)
+		spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
+			return s == v1beta1.HubCleanupPreflightFinalizer || s == v1beta1.HubCleanupFinalizer
+		})
+		return false, nil
+	}
+	mcName := managedCluster.Name
+
 	skipPreflight := false
 	if spokeForceDeleteEnabled(spoke) {
 		logger.Info("Spoke has force-delete annotation; assuming unreachable spoke: clearing ManifestWork finalizers and hub/spoke cleanup gate finalizers",
 			"spoke", spoke.Name)
-		if err := hubForceDeleteUnreachableSpoke(ctx, spoke, workC); err != nil {
+		if err := hubForceDeleteUnreachableSpoke(ctx, spoke, mcName, workC); err != nil {
 			return true, err
 		}
 		skipPreflight = true
@@ -683,7 +708,7 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 	if skipPreflight {
 		status = preflightDone
 	} else {
-		status, err = r.hubCleanupPreflight(ctx, spoke, addonC, workC, clusterC, pivotComplete)
+		status, err = r.hubCleanupPreflight(ctx, spoke, managedCluster, addonC, workC, clusterC, pivotComplete)
 		if err != nil {
 			return true, err
 		}
@@ -709,28 +734,28 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 		return true, nil
 	}
 
-	if err := r.DeleteAllOf(ctx, &certificatesv1.CertificateSigningRequest{}, client.MatchingLabels{"open-cluster-management.io/cluster-name": spoke.Name}); err != nil {
+	if err := r.DeleteAllOf(ctx, &certificatesv1.CertificateSigningRequest{}, client.MatchingLabels{"open-cluster-management.io/cluster-name": mcName}); err != nil {
 		return true, err
 	}
 
-	err = r.waitForAgentAddonDeleted(ctx, spoke, spoke.DeepCopy(), addonC, workC)
+	err = r.waitForAgentAddonDeleted(ctx, spoke, spoke.DeepCopy(), mcName, addonC, workC)
 	if err != nil {
 		return true, err
 	}
 
 	// remove ManagedCluster and block until deleted
-	err = clusterC.ClusterV1().ManagedClusters().Delete(ctx, spoke.Name, metav1.DeleteOptions{})
+	err = clusterC.ClusterV1().ManagedClusters().Delete(ctx, mcName, metav1.DeleteOptions{})
 	if err != nil && !kerrs.IsNotFound(err) {
 		return true, err
 	}
 
-	err = r.waitForManagedClusterDeleted(ctx, spoke.Name, clusterC)
+	err = r.waitForManagedClusterDeleted(ctx, mcName, clusterC)
 	if err != nil {
 		return true, err
 	}
 
 	// remove Namespace
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: spoke.Name}}
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: mcName}}
 	err = r.Delete(ctx, ns)
 	if err != nil && !kerrs.IsNotFound(err) {
 		return true, err
@@ -743,20 +768,9 @@ func (r *SpokeReconciler) doHubCleanup(ctx context.Context, spoke *v1beta1.Spoke
 	return false, nil
 }
 
-func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta1.Spoke, addonC *addonapi.Clientset, workC *workapi.Clientset, clusterC *clusterapi.Clientset, pivotComplete bool) (preflightStatus, error) {
+func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta1.Spoke, managedCluster *clusterv1.ManagedCluster, addonC *addonapi.Clientset, workC *workapi.Clientset, clusterC *clusterapi.Clientset, pivotComplete bool) (preflightStatus, error) {
 	logger := log.FromContext(ctx)
-	// skip clean up if the ManagedCluster resource is not found or if any manifestWorks exist
-	managedCluster, err := clusterC.ClusterV1().ManagedClusters().Get(ctx, spoke.Name, metav1.GetOptions{})
-	if kerrs.IsNotFound(err) {
-		logger.Info("ManagedCluster resource not found; nothing to do")
-		// remove both hub finalizers
-		spoke.Finalizers = slices.DeleteFunc(spoke.Finalizers, func(s string) bool {
-			return s == v1beta1.HubCleanupPreflightFinalizer || s == v1beta1.HubCleanupFinalizer
-		})
-		return preflightSkipped, nil
-	} else if err != nil {
-		return "", fmt.Errorf("unexpected error listing managedClusters: %w", err)
-	}
+	mcName := managedCluster.Name
 
 	if spoke.Spec.CleanupConfig.ForceClusterDrain {
 		// Apply workload-cleanup taint to remove non-addon workloads via Placement descheduling.
@@ -768,18 +782,18 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 			if err := common.UpdateManagedCluster(ctx, clusterC, managedCluster); err != nil {
 				return "", fmt.Errorf("failed to add workload-cleanup taint to ManagedCluster: %w", err)
 			}
-			logger.V(1).Info("added workload-cleanup taint to ManagedCluster", "spokeName", spoke.Name, "taint", managedClusterWorkloadCleanupTaint.Key)
+			logger.V(1).Info("added workload-cleanup taint to ManagedCluster", "managedCluster", mcName, "taint", managedClusterWorkloadCleanupTaint.Key)
 		}
 	}
 
-	manifestWorks, err := workC.WorkV1().ManifestWorks(managedCluster.Name).List(ctx, metav1.ListOptions{})
+	manifestWorks, err := workC.WorkV1().ManifestWorks(mcName).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to list manifestWorks for managedCluster %s: %w", managedCluster.Name, err)
+		return "", fmt.Errorf("failed to list manifestWorks for managedCluster %s: %w", mcName, err)
 	}
 
 	// check that the number of manifestWorks is the same as the number of addons enabled for that spoke
 	if len(manifestWorks.Items) > 0 && !allOwnersAddOns(manifestWorks.Items) {
-		msg := fmt.Sprintf("Waiting for non-addon ManifestWorks to be removed from ManagedCluster %s before cleanup can proceed", managedCluster.Name)
+		msg := fmt.Sprintf("Waiting for non-addon ManifestWorks to be removed from ManagedCluster %s before cleanup can proceed", mcName)
 		logger.Info(msg)
 		spoke.SetConditions(true, v1beta1.NewCondition(
 			msg, v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
@@ -799,7 +813,7 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 		spokeCopy.Spec.AddOns = append(spokeCopy.Spec.AddOns, v1beta1.AddOn{ConfigName: v1beta1.FCCAddOnName})
 		r.configureFCCAddOn(spokeCopy)
 	}
-	if _, err := handleSpokeAddons(ctx, addonC, spokeCopy); err != nil {
+	if _, err := handleSpokeAddons(ctx, addonC, spokeCopy, mcName); err != nil {
 		spoke.SetConditions(true, v1beta1.NewCondition(
 			err.Error(), v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionFalse,
 		))
@@ -813,7 +827,7 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 	// Apply terminating taint to remove all remaining workloads including addons.
 	// This taint should not be tolerated by anything - it signals final cluster termination.
 	// We need to re-fetch the ManagedCluster to get the latest version after the first taint.
-	managedCluster, err = clusterC.ClusterV1().ManagedClusters().Get(ctx, spoke.Name, metav1.GetOptions{})
+	managedCluster, err = clusterC.ClusterV1().ManagedClusters().Get(ctx, mcName, metav1.GetOptions{})
 	if err != nil && !kerrs.IsNotFound(err) {
 		return "", fmt.Errorf("failed to get ManagedCluster for terminating taint: %w", err)
 	}
@@ -824,12 +838,12 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 		if err := common.UpdateManagedCluster(ctx, clusterC, managedCluster); err != nil {
 			return "", fmt.Errorf("failed to add terminating taint to ManagedCluster: %w", err)
 		}
-		logger.V(1).Info("added terminating taint to ManagedCluster", "spokeName", spoke.Name, "taint", managedClusterTerminatingTaint.Key)
+		logger.V(1).Info("added terminating taint to ManagedCluster", "managedCluster", mcName, "taint", managedClusterTerminatingTaint.Key)
 	}
 
 	if len(spoke.Status.EnabledAddons) > 0 {
 		// Wait for addon manifestWorks to be fully cleaned up before proceeding with unjoin
-		if err := waitForAddonManifestWorksCleanup(ctx, workC, spoke.Name, addonCleanupTimeout, shouldCleanAll); err != nil {
+		if err := waitForAddonManifestWorksCleanup(ctx, workC, mcName, addonCleanupTimeout, shouldCleanAll); err != nil {
 			msg := fmt.Sprintf("Waiting for addon ManifestWorks cleanup for spoke %s: %v", spoke.Name, err)
 			logger.Info(msg)
 			spoke.SetConditions(true, v1beta1.NewCondition(
@@ -845,10 +859,10 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 	return preflightDone, nil
 }
 
-func (r *SpokeReconciler) waitForAgentAddonDeleted(ctx context.Context, spoke *v1beta1.Spoke, spokeCopy *v1beta1.Spoke, addonC *addonapi.Clientset, workC *workapi.Clientset) error {
+func (r *SpokeReconciler) waitForAgentAddonDeleted(ctx context.Context, spoke *v1beta1.Spoke, spokeCopy *v1beta1.Spoke, mcName string, addonC *addonapi.Clientset, workC *workapi.Clientset) error {
 	// delete fcc agent addon
 	spokeCopy.Spec.AddOns = nil
-	if _, err := handleSpokeAddons(ctx, addonC, spokeCopy); err != nil {
+	if _, err := handleSpokeAddons(ctx, addonC, spokeCopy, mcName); err != nil {
 		spoke.SetConditions(true, v1beta1.NewCondition(
 			err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
 		))
@@ -860,7 +874,7 @@ func (r *SpokeReconciler) waitForAgentAddonDeleted(ctx context.Context, spoke *v
 	))
 
 	// at this point, klusterlet-work-agent is uninstalled, so nothing can remove this finalizer. all resources are cleaned up by the spoke's controller, so to prevent a dangling mw/namespace, we remove the finalizer manually
-	mwList, err := workC.WorkV1().ManifestWorks(spoke.Name).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", manifestWorkAddOnLabelKey, v1beta1.FCCAddOnName)})
+	mwList, err := workC.WorkV1().ManifestWorks(mcName).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", manifestWorkAddOnLabelKey, v1beta1.FCCAddOnName)})
 	if err != nil {
 		return err
 	}
@@ -874,7 +888,7 @@ func (r *SpokeReconciler) waitForAgentAddonDeleted(ctx context.Context, spoke *v
 			return err
 		}
 
-		_, err = workC.WorkV1().ManifestWorks(spoke.Name).Patch(
+		_, err = workC.WorkV1().ManifestWorks(mcName).Patch(
 			ctx,
 			mw.Name,
 			types.MergePatchType,
@@ -887,7 +901,7 @@ func (r *SpokeReconciler) waitForAgentAddonDeleted(ctx context.Context, spoke *v
 	}
 
 	// Wait for all manifestWorks to be cleaned up
-	if err := waitForAddonManifestWorksCleanup(ctx, workC, spoke.Name, addonCleanupTimeout, true); err != nil {
+	if err := waitForAddonManifestWorksCleanup(ctx, workC, mcName, addonCleanupTimeout, true); err != nil {
 		spoke.SetConditions(true, v1beta1.NewCondition(
 			err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
 		))

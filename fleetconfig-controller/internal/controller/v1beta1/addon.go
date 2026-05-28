@@ -399,15 +399,15 @@ func handleAddonDelete(ctx context.Context, addonC *addonapi.Clientset, addons [
 	return nil
 }
 
-func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke *v1beta1.Spoke) ([]string, error) {
+func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke *v1beta1.Spoke, mcName string) ([]string, error) {
 	logger := log.FromContext(ctx)
 	addons := spoke.Spec.AddOns
 
-	mcas, err := addonC.AddonV1alpha1().ManagedClusterAddOns(spoke.Name).List(ctx, metav1.ListOptions{
+	mcas, err := addonC.AddonV1alpha1().ManagedClusterAddOns(mcName).List(ctx, metav1.ListOptions{
 		LabelSelector: v1beta1.ManagedBySelector.String(),
 	})
 	if err != nil {
-		logger.V(1).Info("failed to list ManagedClusterAddOns, assuming none enabled", "error", err, "spokeName", spoke.Name)
+		logger.V(1).Info("failed to list ManagedClusterAddOns, assuming none enabled", "error", err, "managedCluster", mcName)
 		mcas = &addonv1alpha1.ManagedClusterAddOnList{}
 	}
 
@@ -432,13 +432,13 @@ func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke *v
 		}
 	}
 
-	if err := handleAddonDisable(ctx, addonC, spoke.Name, addonsToDisable); err != nil {
+	if err := handleAddonDisable(ctx, addonC, mcName, addonsToDisable); err != nil {
 		return nil, err
 	}
 
 	// Enable/update all requested addons — applyMCA and applyAddOnDeploymentConfig
 	// are idempotent and converge the spec directly, no hash comparison needed.
-	enabledAddons, err := handleAddonEnable(ctx, addonC, spoke.Name, addons)
+	enabledAddons, err := handleAddonEnable(ctx, addonC, mcName, addons)
 	if err != nil {
 		return enabledAddons, err
 	}
@@ -446,13 +446,13 @@ func handleSpokeAddons(ctx context.Context, addonC *addonapi.Clientset, spoke *v
 	return enabledAddons, nil
 }
 
-func handleAddonEnable(ctx context.Context, addonC *addonapi.Clientset, spokeName string, addons []v1beta1.AddOn) ([]string, error) {
+func handleAddonEnable(ctx context.Context, addonC *addonapi.Clientset, mcName string, addons []v1beta1.AddOn) ([]string, error) {
 	if len(addons) == 0 {
 		return nil, nil
 	}
 
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("enableAddOns", "managedcluster", spokeName)
+	logger.V(0).Info("enableAddOns", "managedcluster", mcName)
 
 	var enableErrs []error
 	enabledAddons := make([]string, 0, len(addons))
@@ -462,7 +462,7 @@ func handleAddonEnable(ctx context.Context, addonC *addonapi.Clientset, spokeNam
 
 		var mcaConfigs []addonv1alpha1.AddOnConfig
 		if a.DeploymentConfig != nil {
-			if err := applyAddOnDeploymentConfig(ctx, addonC, a.ConfigName, spokeName, a.DeploymentConfig); err != nil {
+			if err := applyAddOnDeploymentConfig(ctx, addonC, a.ConfigName, mcName, a.DeploymentConfig); err != nil {
 				enableErrs = append(enableErrs, fmt.Errorf("failed to apply addon deployment config for %s: %v", a.ConfigName, err))
 				continue
 			}
@@ -473,7 +473,7 @@ func handleAddonEnable(ctx context.Context, addonC *addonapi.Clientset, spokeNam
 						Resource: AddOnDeploymentConfigResource,
 					},
 					ConfigReferent: addonv1alpha1.ConfigReferent{
-						Namespace: spokeName,
+						Namespace: mcName,
 						Name:      a.ConfigName,
 					},
 				},
@@ -483,7 +483,7 @@ func handleAddonEnable(ctx context.Context, addonC *addonapi.Clientset, spokeNam
 		mca := &addonv1alpha1.ManagedClusterAddOn{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        a.ConfigName,
-				Namespace:   spokeName,
+				Namespace:   mcName,
 				Labels:      v1beta1.ManagedByLabels,
 				Annotations: annotations,
 			},
@@ -498,7 +498,7 @@ func handleAddonEnable(ctx context.Context, addonC *addonapi.Clientset, spokeNam
 		}
 
 		enabledAddons = append(enabledAddons, a.ConfigName)
-		logger.V(1).Info("enabled addon", "managedcluster", spokeName, "addon", a.ConfigName)
+		logger.V(1).Info("enabled addon", "managedcluster", mcName, "addon", a.ConfigName)
 	}
 
 	if len(enableErrs) > 0 {
@@ -573,26 +573,26 @@ func applyAddOnDeploymentConfig(ctx context.Context, addonC *addonapi.Clientset,
 	return err
 }
 
-func handleAddonDisable(ctx context.Context, addonC *addonapi.Clientset, spokeName string, addonNames []string) error {
+func handleAddonDisable(ctx context.Context, addonC *addonapi.Clientset, mcName string, addonNames []string) error {
 	if len(addonNames) == 0 {
 		return nil
 	}
 
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("disableAddOns", "managedcluster", spokeName)
+	logger.V(0).Info("disableAddOns", "managedcluster", mcName)
 
 	var errs []error
 	for _, name := range addonNames {
-		err := addonC.AddonV1alpha1().ManagedClusterAddOns(spokeName).Delete(ctx, name, metav1.DeleteOptions{})
+		err := addonC.AddonV1alpha1().ManagedClusterAddOns(mcName).Delete(ctx, name, metav1.DeleteOptions{})
 		if kerrs.IsNotFound(err) {
-			logger.V(5).Info("addon already disabled (not found)", "managedcluster", spokeName, "addon", name)
+			logger.V(5).Info("addon already disabled (not found)", "managedcluster", mcName, "addon", name)
 			continue
 		}
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to disable addon %s: %w", name, err))
 			continue
 		}
-		logger.V(1).Info("disabled addon", "managedcluster", spokeName, "addon", name)
+		logger.V(1).Info("disabled addon", "managedcluster", mcName, "addon", name)
 	}
 
 	if len(errs) > 0 {
@@ -795,12 +795,12 @@ func isAddonInstalled(ctx context.Context, addonC *addonapi.Clientset, addonName
 
 // waitForAddonManifestWorksCleanup polls for addon-related manifestWorks to be removed
 // after addon disable operation to avoid race conditions during spoke unjoin
-func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Clientset, spokeName string, timeout time.Duration, shouldCleanAll bool) error {
+func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Clientset, mcName string, timeout time.Duration, shouldCleanAll bool) error {
 	logger := log.FromContext(ctx)
-	logger.V(1).Info("waiting for addon manifestWorks cleanup", "spokeName", spokeName, "timeout", timeout)
+	logger.V(1).Info("waiting for addon manifestWorks cleanup", "mcName", mcName, "timeout", timeout)
 
 	err := wait.PollUntilContextTimeout(ctx, addonCleanupPollInterval, timeout, true, func(ctx context.Context) (bool, error) {
-		manifestWorks, err := workC.WorkV1().ManifestWorks(spokeName).List(ctx, metav1.ListOptions{})
+		manifestWorks, err := workC.WorkV1().ManifestWorks(mcName).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			logger.V(3).Info("failed to list manifestWorks during cleanup wait", "error", err)
 			// Return false to continue polling on transient errors
@@ -816,7 +816,7 @@ func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Client
 
 		if len(manifestWorks.Items) == expectedWorks {
 			if shouldCleanAll {
-				logger.V(1).Info("addon manifestWorks cleanup completed", "spokeName", spokeName, "remainingManifestWorks", len(manifestWorks.Items))
+				logger.V(1).Info("addon manifestWorks cleanup completed", "mcName", mcName, "remainingManifestWorks", len(manifestWorks.Items))
 				return true, nil
 			}
 			mw := manifestWorks.Items[0]
@@ -824,12 +824,12 @@ func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Client
 			if !ok || val != v1beta1.FCCAddOnName {
 				return false, fmt.Errorf("unexpected remaining ManifestWork: expected %s, got label=%q (ok=%t)", v1beta1.FCCAddOnName, val, ok)
 			}
-			logger.V(1).Info("addon manifestWorks cleanup completed", "spokeName", spokeName, "remainingManifestWork", mw.Name)
+			logger.V(1).Info("addon manifestWorks cleanup completed", "mcName", mcName, "remainingManifestWork", mw.Name)
 			return true, nil
 		}
 
 		logger.V(3).Info("waiting for addon manifestWorks cleanup",
-			"spokeName", spokeName,
+			"mcName", mcName,
 			"addonManifestWorks", len(manifestWorks.Items))
 
 		// Continue polling
@@ -837,7 +837,7 @@ func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Client
 	})
 
 	if err != nil {
-		return fmt.Errorf("timeout waiting for addon manifestWorks cleanup for spoke %s: %w", spokeName, err)
+		return fmt.Errorf("timeout waiting for addon manifestWorks cleanup for spoke %s: %w", mcName, err)
 	}
 
 	return nil
@@ -855,7 +855,7 @@ func allOwnersAddOns(mws []workv1.ManifestWork) bool {
 }
 
 // bindAddonAgent creates the necessary bindings for fcc agent to access hub resources
-func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spoke) error {
+func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spoke, mcName string) error {
 	roleName := os.Getenv(v1beta1.ClusterRoleNameEnvVar)
 	if roleName == "" {
 		roleName = v1beta1.DefaultFCCManagerRole
@@ -867,12 +867,12 @@ func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spo
 		Name:     roleName,
 	}
 
-	err := r.createBinding(ctx, roleRef, spoke.Namespace, spoke.Name)
+	err := r.createBinding(ctx, roleRef, spoke.Namespace, mcName)
 	if err != nil {
 		return err
 	}
 	if spoke.Spec.HubRef.Namespace != spoke.Namespace {
-		err = r.createBinding(ctx, roleRef, spoke.Spec.HubRef.Namespace, spoke.Name)
+		err = r.createBinding(ctx, roleRef, spoke.Spec.HubRef.Namespace, mcName)
 		if err != nil {
 			return err
 		}
@@ -883,7 +883,7 @@ func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spo
 // createBinding creates a role binding for a given role.
 // The role binding follows a different naming format than OCM uses for addon agents.
 // We need to append the spoke name to avoid possible conflicts in cases where multiple spokes exist in 1 namespace
-func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.RoleRef, namespace, spokeName string) error {
+func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.RoleRef, namespace, mcName string) error {
 	logger := log.FromContext(ctx)
 
 	bindingLabels := maps.Clone(v1beta1.ManagedByLabels)
@@ -891,7 +891,7 @@ func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.Role
 	binding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("open-cluster-management:%s:%s:agent-%s",
-				v1beta1.FCCAddOnName, strings.ToLower(roleRef.Kind), spokeName),
+				v1beta1.FCCAddOnName, strings.ToLower(roleRef.Kind), mcName),
 			Namespace: namespace,
 			Labels:    bindingLabels,
 		},
@@ -900,7 +900,7 @@ func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.Role
 			{
 				Kind:     rbacv1.GroupKind,
 				APIGroup: rbacv1.GroupName,
-				Name:     clusterAddonGroup(spokeName, v1beta1.FCCAddOnName),
+				Name:     clusterAddonGroup(mcName, v1beta1.FCCAddOnName),
 			},
 		},
 	}
