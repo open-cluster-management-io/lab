@@ -263,7 +263,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 				if err != nil {
 					return err
 				}
-				managedCluster, err := clusterC.ClusterV1().ManagedClusters().Get(tc.ctx, spokeName, metav1.GetOptions{})
+				managedCluster, err := clusterC.ClusterV1().ManagedClusters().Get(tc.ctx, spoke.Status.ManagedClusterName, metav1.GetOptions{})
 				if err != nil {
 					utils.WarnError(err, "failed to get ManagedCluster")
 					return err
@@ -382,7 +382,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 				}
 
 				By("ensuring the ManagedCluster is deleted")
-				_, err = clusterC.ClusterV1().ManagedClusters().Get(tc.ctx, spokeName, metav1.GetOptions{})
+				_, err = clusterC.ClusterV1().ManagedClusters().Get(tc.ctx, spoke.Status.ManagedClusterName, metav1.GetOptions{})
 				if err != nil {
 					if !kerrs.IsNotFound(err) {
 						return err
@@ -396,7 +396,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 
 				By("ensuring the ManagedCluster namespace is deleted")
 				ns := &corev1.Namespace{}
-				err = tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Name: spokeName}, ns)
+				err = tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Name: spoke.Status.ManagedClusterName}, ns)
 				if err != nil {
 					if !kerrs.IsNotFound(err) {
 						return err
