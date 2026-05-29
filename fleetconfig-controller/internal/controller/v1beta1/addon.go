@@ -880,9 +880,9 @@ func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spo
 	return nil
 }
 
-// createBinding creates a role binding for a given role.
-// The role binding follows a different naming format than OCM uses for addon agents.
-// We need to append the spoke name to avoid possible conflicts in cases where multiple spokes exist in 1 namespace
+// createBinding creates a RoleBinding for a given role.
+// The RoleBinding follows a different naming format than OCM uses for addon agents.
+// The ManagedCluster name is appended to the RoleBinding name and used to build the addon agent's subject group
 func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.RoleRef, namespace, mcName string) error {
 	logger := log.FromContext(ctx)
 

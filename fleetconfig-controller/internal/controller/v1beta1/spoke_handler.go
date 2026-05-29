@@ -976,7 +976,14 @@ func (r *SpokeReconciler) doSpokeCleanup(ctx context.Context, spoke *v1beta1.Spo
 		return true, err
 	}
 
-	err = r.unjoinSpoke(ctx, spoke, spokeKubeconfig)
+	// Prefer the recorded ManagedCluster name from status (set during join); fall back to
+	// spoke.Name for legacy spokes that pre-date the status field.
+	mcName := spoke.Status.ManagedClusterName
+	if mcName == "" {
+		mcName = spoke.Name
+	}
+
+	err = r.unjoinSpoke(ctx, spoke, mcName, spokeKubeconfig)
 	if err != nil {
 		return true, err
 	}
@@ -1424,13 +1431,13 @@ func (r *SpokeReconciler) upgradeSpoke(ctx context.Context, spoke *v1beta1.Spoke
 }
 
 // unjoinSpoke unjoins a spoke from the hub
-func (r *SpokeReconciler) unjoinSpoke(ctx context.Context, spoke *v1beta1.Spoke, spokeKubeconfig []byte) error {
+func (r *SpokeReconciler) unjoinSpoke(ctx context.Context, spoke *v1beta1.Spoke, mcName string, spokeKubeconfig []byte) error {
 	logger := log.FromContext(ctx)
-	logger.V(0).Info("unjoinSpoke", "spoke", spoke.Name)
+	logger.V(0).Info("unjoinSpoke", "spoke", spoke.Name, "managedCluster", mcName)
 
 	unjoinArgs := append([]string{
 		"unjoin",
-		"--cluster-name", spoke.GetName(),
+		"--cluster-name", mcName,
 		fmt.Sprintf("--purge-operator=%t", spoke.Spec.CleanupConfig.PurgeKlusterletOperator),
 	}, spoke.BaseArgs()...)
 
