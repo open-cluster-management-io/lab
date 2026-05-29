@@ -1011,7 +1011,14 @@ func effectiveGRPCJoinServerAndCA(hub *v1beta1.Hub) (server, ca string, err erro
 
 // appendJoinSpokeTransportAndAuthArgs appends hub endpoint, hub TLS, registration drivers, hosted-mode kubeconfig,
 // proxy, and addon-kubeclient flags for clusteradm join.
-func (r *SpokeReconciler) appendJoinSpokeTransportAndAuthArgs(ctx context.Context, joinArgs []string, spoke *v1beta1.Spoke, hub *v1beta1.Hub, tokenMeta *tokenMeta) ([]string, error) {
+func (r *SpokeReconciler) appendJoinSpokeTransportAndAuthArgs(ctx context.Context, joinArgs []string, spoke *v1beta1.Spoke, hub *v1beta1.Hub, tokenMeta *tokenMeta) ([]string, func(), error) {
+	var cleanups []func()
+	cleanup := func() {
+		for _, c := range cleanups {
+			c()
+		}
+	}
+
 	// Use hub API server from spec if provided and not forced to use internal endpoint,
 	// otherwise fall back to the hub API server from the tokenMeta
 	if hub.Spec.APIServer != "" && !spoke.Spec.Klusterlet.ForceInternalEndpointLookup {
@@ -1023,10 +1030,10 @@ func (r *SpokeReconciler) appendJoinSpokeTransportAndAuthArgs(ctx context.Contex
 	if hub.Spec.Ca != "" {
 		caFile, caCleanup, err := file.TmpFile([]byte(hub.Spec.Ca), "ca")
 		if caCleanup != nil {
-			defer caCleanup()
+			cleanups = append(cleanups, caCleanup)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("failed to write hub CA to disk: %w", err)
+			return nil, cleanup, fmt.Errorf("failed to write hub CA to disk: %w", err)
 		}
 		joinArgs = append([]string{fmt.Sprintf("--ca-file=%s", caFile)}, joinArgs...)
 	}
@@ -1049,14 +1056,14 @@ func (r *SpokeReconciler) appendJoinSpokeTransportAndAuthArgs(ctx context.Contex
 	if hub.Spec.RegistrationAuth.Driver == v1beta1.GRPCRegistrationDriver {
 		grpcServer, grpcCA, err := effectiveGRPCJoinServerAndCA(hub)
 		if err != nil {
-			return nil, err
+			return nil, cleanup, err
 		}
 		grpcCAFile, grpcCACleanup, err := file.TmpFile([]byte(grpcCA), "grpc-ca")
 		if grpcCACleanup != nil {
-			defer grpcCACleanup()
+			cleanups = append(cleanups, grpcCACleanup)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("failed to write gRPC CA to disk: %w", err)
+			return nil, cleanup, fmt.Errorf("failed to write gRPC CA to disk: %w", err)
 		}
 		joinArgs = append(joinArgs,
 			fmt.Sprintf("--registration-auth=%s", v1beta1.GRPCRegistrationDriver),
@@ -1071,14 +1078,14 @@ func (r *SpokeReconciler) appendJoinSpokeTransportAndAuthArgs(ctx context.Contex
 		)
 		raw, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, spoke.Spec.Klusterlet.ManagedClusterKubeconfig, spoke.Namespace)
 		if err != nil {
-			return nil, err
+			return nil, cleanup, err
 		}
 		mgdKcfg, mgdKcfgCleanup, err := file.TmpFile(raw, "kubeconfig")
 		if mgdKcfgCleanup != nil {
-			defer mgdKcfgCleanup()
+			cleanups = append(cleanups, mgdKcfgCleanup)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("failed to write managedClusterKubeconfig to disk: %w", err)
+			return nil, cleanup, fmt.Errorf("failed to write managedClusterKubeconfig to disk: %w", err)
 		}
 		joinArgs = append(joinArgs, "--managed-cluster-kubeconfig", mgdKcfg)
 	}
@@ -1086,10 +1093,10 @@ func (r *SpokeReconciler) appendJoinSpokeTransportAndAuthArgs(ctx context.Contex
 	if spoke.Spec.ProxyCa != "" {
 		proxyCaFile, proxyCaCleanup, err := file.TmpFile([]byte(spoke.Spec.ProxyCa), "proxy-ca")
 		if proxyCaCleanup != nil {
-			defer proxyCaCleanup()
+			cleanups = append(cleanups, proxyCaCleanup)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("failed to write proxy CA to disk: %w", err)
+			return nil, cleanup, fmt.Errorf("failed to write proxy CA to disk: %w", err)
 		}
 		joinArgs = append(joinArgs, fmt.Sprintf("--proxy-ca-file=%s", proxyCaFile))
 	}
@@ -1105,7 +1112,7 @@ func (r *SpokeReconciler) appendJoinSpokeTransportAndAuthArgs(ctx context.Contex
 		}
 	}
 
-	return joinArgs, nil
+	return joinArgs, cleanup, nil
 }
 
 // joinSpoke joins a Spoke cluster to the Hub cluster
@@ -1155,7 +1162,10 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, h
 	// resources args
 	joinArgs = append(joinArgs, arg_utils.PrepareResources(spoke.Spec.Klusterlet.Resources)...)
 
-	joinArgs, err = r.appendJoinSpokeTransportAndAuthArgs(ctx, joinArgs, spoke, hub, tokenMeta)
+	joinArgs, transportCleanup, err := r.appendJoinSpokeTransportAndAuthArgs(ctx, joinArgs, spoke, hub, tokenMeta)
+	if transportCleanup != nil {
+		defer transportCleanup()
+	}
 	if err != nil {
 		return err
 	}
