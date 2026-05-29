@@ -24,8 +24,29 @@ type ManifestResourceStatus struct {
 
 // ManifestCondition represents the conditions of resources deployed on a managed cluster
 type ManifestCondition struct {
-	ResourceMeta ManifestResourceMeta `json:"resourceMeta"`
-	Conditions   []Condition          `json:"conditions"`
+	ResourceMeta   ManifestResourceMeta `json:"resourceMeta"`
+	Conditions     []Condition          `json:"conditions"`
+	StatusFeedback *StatusFeedbackResult `json:"statusFeedback,omitempty"`
+}
+
+// StatusFeedbackResult represents the values of fields synced back from spoke clusters
+type StatusFeedbackResult struct {
+	Values []FeedbackValue `json:"values,omitempty"`
+}
+
+// FeedbackValue represents a single synced status field value
+type FeedbackValue struct {
+	Name  string     `json:"name"`
+	Value FieldValue `json:"fieldValue"`
+}
+
+// FieldValue represents a typed value from a status field
+type FieldValue struct {
+	Type    string  `json:"type"`
+	Integer *int64  `json:"integer,omitempty"`
+	String  *string `json:"string,omitempty"`
+	Boolean *bool   `json:"boolean,omitempty"`
+	JsonRaw *string `json:"jsonRaw,omitempty"`
 }
 
 // ManifestResourceMeta represents the metadata of a resource in a manifest

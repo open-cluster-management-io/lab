@@ -1,7 +1,7 @@
 # OCM Dashboard
 
 ![Node.js](https://img.shields.io/badge/node-%3E%3D22.0.0-green)
-![Go](https://img.shields.io/badge/go-%3E%3D1.23-blue)
+![Go](https://img.shields.io/badge/go-%3E%3D1.25-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 
 ---
@@ -34,7 +34,9 @@
 
 ## Project Overview
 
-A dashboard for displaying and monitoring Open Cluster Management (OCM) clusters, placements, cluster sets, manifest works, and addons.
+A dashboard for displaying and monitoring Open Cluster Management (OCM) clusters, placements, cluster sets, manifest works, manifest work replica sets, deployed resources, and addons.
+
+> See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed component and API documentation.
 
 ![OCM Dashboard](./public/images/demo.gif)
 
@@ -50,11 +52,14 @@ The OCM Dashboard follows a modern architecture pattern for Kubernetes dashboard
 ### Frontend Components
 
 - **Authentication**: Bearer token authentication (JWT) stored in localStorage
-- **Overview Page**: High-level KPIs for clusters, cluster sets, and placements
+- **Overview Page**: High-level KPIs for clusters, cluster sets, placements, and WorkReplicaSets (with links to failed MWRS)
 - **Cluster List & Detail**: Table view and detail drawer for clusters, including status, version, claims, and addons
 - **Placement List & Detail**: Table view and detail drawer for placements, including status, predicates, and decisions
 - **ClusterSet List & Detail**: Table view and detail drawer for ManagedClusterSets, including cluster and binding counts
-- **ManifestWorks List**: View manifest works for clusters, including manifest and condition details
+- **WorkReplicaSets List & Detail**: Table/drawer list of ManifestWorkReplicaSets with tabbed detail (Overview, ManifestWorks, Graph)
+- **ManifestWorks List & Detail**: Cross-namespace table of all ManifestWorks with tabbed detail (Overview, Graph)
+- **Resources List & Detail**: Global view of all deployed resources extracted from ManifestWork specs, filterable by Kind/Cluster/Namespace
+- **Flow Chart Visualizations**: ReactFlow-based graphs showing MWRS -> ManifestWorks -> Resources and ManifestWork -> Resources relationships
 - **Addons List**: View managed cluster addons, including status, registrations, and supported configs
 - **Login Page**: Token-based login with development mode support
 - **Layout**: Responsive layout with navigation drawer and app bar
@@ -62,24 +67,8 @@ The OCM Dashboard follows a modern architecture pattern for Kubernetes dashboard
 
 ### Backend Components
 
-- **API Server**: Go service built with Gin, providing endpoints for OCM resources:
-  - `GET /api/clusters` - List all ManagedClusters
-  - `GET /api/clusters/:name` - Get details for a specific ManagedCluster
-  - `GET /api/clustersets` - List all ManagedClusterSets
-  - `GET /api/clustersets/:name` - Get details for a specific ManagedClusterSet
-  - `GET /api/clustersetbindings` - List all ManagedClusterSetBindings
-  - `GET /api/clustersetbindings/:namespace` - List bindings in a namespace
-  - `GET /api/clustersetbindings/:namespace/:name` - Get a specific binding
-  - `GET /api/placements` - List all Placements
-  - `GET /api/placements/:namespace` - List Placements in a namespace
-  - `GET /api/placements/:namespace/:name` - Get a specific Placement
-  - `GET /api/placements/:namespace/:name/decisions` - Get PlacementDecisions for a Placement
-  - `GET /api/manifestworks/:namespace` - List ManifestWorks in a namespace (cluster)
-  - `GET /api/manifestworks/:namespace/:name` - Get a specific ManifestWork
-  - `GET /api/addons/:name` - List all Addons for a cluster
-  - `GET /api/addons/:name/:addonName` - Get a specific Addon for a cluster
-  - `GET /api/stream/clusters` - SSE endpoint for real-time ManagedCluster updates
-- **Authentication**: Basic authorization header check. TokenReview validation is a TODO. Can be bypassed with `DASHBOARD_BYPASS_AUTH=true`.
+- **API Server**: Go service built with Gin, providing REST endpoints for OCM resources. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full API reference.
+- **Authentication**: Kubernetes TokenReview validation of Bearer tokens. Can be bypassed with `DASHBOARD_BYPASS_AUTH=true`.
 - **Kubernetes Client**: Uses `client-go` to interact with the Kubernetes API for OCM resources (ManagedCluster, ManagedClusterSet, Placement, ManifestWork, Addon, etc.)
 - **Mock Data Mode**: Supports running with mock data for development via `DASHBOARD_USE_MOCK=true`.
 
@@ -89,23 +78,26 @@ The OCM Dashboard follows a modern architecture pattern for Kubernetes dashboard
 
 **Frontend:**
 
-- Read-only view of clusters, placements, cluster sets, manifest works, and addons
-- Table and detail views for all major OCM resources
+- Read-only view of clusters, placements, cluster sets, manifest works, WorkReplicaSets, deployed resources, and addons
+- Table, detail drawer, and full-page detail views for all major OCM resources
+- Flow chart visualizations (MWRS -> ManifestWorks -> Resources, ManifestWork -> Resources) using ReactFlow with dagre auto-layout
+- Overview dashboard with KPIs for clusters, cluster sets, placements, and WorkReplicaSets (including degraded/failed counts)
+- OCM StatusFeedback display — values synced from spoke clusters (e.g., readyReplicas, clusterIP) shown in resource tables, detail views, and graph nodes
+- Feedback-aware degraded status detection — identifies unhealthy workloads (Applied but not healthy) using StatusFeedback for Deployments, DaemonSets, Jobs, and Pods. Surfaces degraded state and diagnostic reasons across all dashboard views.
 - Real-time cluster status updates via SSE
 - Authentication flow with token support (bearer token in localStorage)
 - Responsive UI with Material UI components
-- Overview dashboard with KPIs
-- Error handling and loading states
 
 **Backend:**
 
-- API endpoints for all major OCM resources (Clusters, ClusterSets, ClusterSetBindings, Placements, ManifestWorks, Addons)
-- Placement and PlacementDecision support
-- ManifestWork and Addon support
+- REST API endpoints for all major OCM resources (Clusters, ClusterSets, ClusterSetBindings, Placements, ManifestWorks, ManifestWorkReplicaSets, Resources, Addons)
+- Cross-namespace listing for ManifestWorks, ManifestWorkReplicaSets, and Resources
+- ManifestWorks-by-ReplicaSet endpoint using OCM label selectors
+- Resources extracted from ManifestWork specs with Kind/Cluster/Namespace filtering
+- StatusFeedback extraction from ManifestWork resource status (per-resource feedback values synced from spoke clusters)
 - SSE endpoint for streaming cluster updates
-- Kubernetes client integration using `client-go`
+- OCM typed clients via `open-cluster-management.io/api` v1.2.0
 - Support for in-cluster and out-of-cluster kubeconfig
-- CORS configured for broad access (e.g. `*`)
 - Debug mode (`DASHBOARD_DEBUG=true`) and mock data mode (`DASHBOARD_USE_MOCK=true`)
 
 ---
@@ -114,8 +106,8 @@ The OCM Dashboard follows a modern architecture pattern for Kubernetes dashboard
 
 ### Prerequisites
 
-- Node.js 18+ and npm/pnpm
-- Go 1.22+ (for backend development)
+- Node.js 22+ and npm/pnpm
+- Go 1.25+ (for backend development)
 - Docker with buildx support (for building images)
 - Access to a Kubernetes cluster with OCM installed (for backend integration)
 - Make (for using the Makefile commands)
@@ -437,15 +429,20 @@ metadata:
 rules:
   - apiGroups: ["cluster.open-cluster-management.io"]
     resources:
-      [
-        "managedclusters",
-        "managedclustersets",
-        "managedclustersetbindings",
-        "placements",
-        "placementdecisions",
-        "manifestworks",
-        "managedclusteraddons",
-      ]
+      - managedclusters
+      - managedclustersets
+      - managedclustersetbindings
+      - placements
+      - placementdecisions
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["work.open-cluster-management.io"]
+    resources:
+      - manifestworks
+      - manifestworkreplicasets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["addon.open-cluster-management.io"]
+    resources:
+      - managedclusteraddons
     verbs: ["get", "list", "watch"]
   - apiGroups: ["authentication.k8s.io"]
     resources: ["tokenreviews"]
@@ -472,13 +469,10 @@ roleRef:
 ## Next Steps
 
 1. Fully implement real-time updates using SSE with actual Kubernetes informers in the backend.
-2. Implement robust TokenReview authentication in the backend.
-3. Enhance error handling and user feedback in both frontend and backend.
-4. Create a Helm chart for deployment.
-5. Add comprehensive unit and integration tests for both frontend and backend.
-6. Improve UI/UX, potentially adding more visualizations or actions.
-7. Add support for more OCM resource types and actions as needed.
-8. Optimize frontend testing and mock implementation.
+2. Add comprehensive unit and integration tests for both frontend and backend.
+3. Improve UI/UX, potentially adding more visualizations or actions.
+4. Add support for write operations (create/update/delete) for OCM resources.
+5. Code-split the frontend bundle to reduce initial load size.
 
 ---
 
