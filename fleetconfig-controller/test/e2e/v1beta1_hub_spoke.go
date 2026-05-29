@@ -291,12 +291,12 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 
 			By("creating a ManifestWork in the hub-as-spoke cluster namespace")
 			EventuallyWithOffset(1, func() error {
-				return createManifestWork(tc.ctx, hubAsSpokeName)
+				return createManifestWork(tc.ctx, hubAsSpoke.Status.ManagedClusterName)
 			}, 1*time.Minute, 1*time.Second).Should(Succeed())
 
 			By("ensuring the test-namespace namespace is created on the hub")
 			EventuallyWithOffset(1, func() error {
-				return assertNamespace(tc.ctx, hubAsSpokeName, tc.kClient)
+				return assertNamespace(tc.ctx, hubAsSpoke.Status.ManagedClusterName, tc.kClient)
 			}, 2*time.Minute, 10*time.Second).Should(Succeed())
 		})
 
@@ -487,7 +487,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 			}, 5*time.Minute, 10*time.Second).Should(Succeed())
 
 			By("deleting the manifest work from the hub")
-			ExpectWithOffset(1, deleteManifestWork(tc.ctx, hubAsSpokeName)).To(Succeed())
+			ExpectWithOffset(1, deleteManifestWork(tc.ctx, hubAsSpoke.Status.ManagedClusterName)).To(Succeed())
 
 			By("ensuring the Hub and hub-as-spoke Spoke are deleted once the ManifestWork is deleted")
 			ensureResourceDeleted(
