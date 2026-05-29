@@ -1013,7 +1013,7 @@ func effectiveGRPCJoinServerAndCA(hub *v1beta1.Hub) (server, ca string, err erro
 // proxy, and addon-kubeclient flags for clusteradm join.
 //
 // Returns (joinArgs, cleanup, err). The cleanup func is always non-nil and removes any temp files written by
-// this call. Callers must defer cleanup() immediatley after this call including on error paths.
+// this call. Callers must defer cleanup() immediately after this call including on error paths.
 func (r *SpokeReconciler) appendJoinSpokeTransportAndAuthArgs(ctx context.Context, joinArgs []string, spoke *v1beta1.Spoke, hub *v1beta1.Hub, tokenMeta *tokenMeta) ([]string, func(), error) {
 	var cleanups []func()
 	cleanup := func() {
