@@ -53,6 +53,8 @@ spec:
                 env:
                 - name: KUBERNETES_CLUSTER_DOMAIN
                   value: {{ quote .Values.kubernetesClusterDomain }}
+                - name: SPOKE_NAME
+                  value: '{{ `{{SPOKE_NAME}}` }}'
                 - name: CLUSTER_NAMESPACE
                   value: '{{ `{{CLUSTER_NAMESPACE}}` }}'
                 - name: HUB_NAMESPACE

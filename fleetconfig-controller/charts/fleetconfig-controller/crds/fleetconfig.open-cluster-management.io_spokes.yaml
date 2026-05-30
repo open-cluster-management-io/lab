@@ -18,6 +18,9 @@ spec:
     - jsonPath: .status.phase
       name: PHASE
       type: string
+    - jsonPath: .status.managedClusterName
+      name: MANAGED_CLUSTER
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date
@@ -2687,6 +2690,10 @@ spec:
                 description: |-
                   KlusterletHash is a hash of merged klusterlet chart values plus join-relevant klusterlet fields
                   (e.g. addon kubeClient registration auth) used to detect upgrade/reconcile needs.
+                type: string
+              managedClusterName:
+                description: ManagedClusterName is the name of the ManagedCluster
+                  associated with this Spoke.
                 type: string
               phase:
                 description: Phase is the current phase of the Spoke reconcile.

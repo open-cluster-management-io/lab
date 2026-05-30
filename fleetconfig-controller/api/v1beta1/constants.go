@@ -100,8 +100,8 @@ const (
 	// DefaultHubKubeconfigPath is the path of the mounted kubeconfig when the controller is running in a Spoke cluster. Used if the environment variable is not set.
 	DefaultHubKubeconfigPath = "/managed/hub-kubeconfig/kubeconfig"
 
-	// SpokeNameEnvVar is the environment variable containing the name of the Spoke resource.
-	SpokeNameEnvVar = "CLUSTER_NAME"
+	// SpokeNameEnvVar is the environment variable containing the name of the Spoke CR.
+	SpokeNameEnvVar = "SPOKE_NAME"
 
 	// SpokeNamespaceEnvVar is the environment variable containing the namespace of the Spoke resource.
 	SpokeNamespaceEnvVar = "CLUSTER_NAMESPACE"
@@ -166,6 +166,12 @@ const (
 
 	// LabelAddOnManagedBy is the label key for the lifecycle manager of an add-on resource.
 	LabelAddOnManagedBy = "addon.open-cluster-management.io/managedBy"
+
+	// LabelSpokeName is set on a ManagedCluster to the metadata.name of the owning Spoke CR.
+	LabelSpokeName = "fleetconfig.open-cluster-management.io/spoke-name"
+
+	// LabelSpokeNamespace is set on a ManagedCluster to the metadata.namespace of the owning Spoke CR.
+	LabelSpokeNamespace = "fleetconfig.open-cluster-management.io/spoke-namespace"
 )
 
 // Registration driver types

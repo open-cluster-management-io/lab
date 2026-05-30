@@ -33,11 +33,17 @@ go.work.sum
 # env file
 .env
 
+# misc
+Taskfile.yaml
+.task/
+
 # Editor/IDE
 *__debug_bin*
 .devspace/
 .idea/
 .vscode/
+.nvim/
+.claude/
 !.vscode/launch.json.example
 .nvim/
 venv/

@@ -80,7 +80,7 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 		logger.V(0).Info("handleSpokes: reconciling spoke cluster", "name", spoke.Name)
 
 		// check if the spoke has already been joined to the hub
-		managedCluster, err := common.GetManagedCluster(ctx, clusterClient, spoke.Name)
+		managedCluster, err := common.GetManagedCluster(ctx, clusterClient, []string{spoke.Name}, nil)
 		if err != nil {
 			logger.Error(err, "failed to get managedCluster", "spoke", spoke.Name)
 			continue
@@ -107,7 +107,7 @@ func handleSpokes(ctx context.Context, kClient client.Client, fc *v1alpha1.Fleet
 			}
 			logger.V(0).Info("handleSpokes: accepted spoke cluster", "name", spoke.Name)
 
-			managedCluster, err = common.GetManagedCluster(ctx, clusterClient, spoke.Name)
+			managedCluster, err = common.GetManagedCluster(ctx, clusterClient, []string{spoke.Name}, nil)
 			if err != nil {
 				logger.Error(err, "failed to get managedCluster after join", "spoke", spoke.Name)
 				continue

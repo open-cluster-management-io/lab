@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"maps"
 	"reflect"
@@ -134,6 +136,19 @@ func (s *Spoke) IsManagedBy(om metav1.ObjectMeta) bool {
 // IsHubAsSpoke returns true if the cluster is a hub-as-spoke. Determined either by name `hub-as-spoke` or an InCluster kubeconfig
 func (s *Spoke) IsHubAsSpoke() bool {
 	return s.Name == ManagedClusterTypeHubAsSpoke || s.Spec.Kubeconfig.InCluster
+}
+
+// DerivedManagedClusterName returns the ManagedCluster name to assign when joining a brand-new Spoke.
+// Format: <truncated spoke.Name>-<8 hex chars of sha256(namespace/name)>
+// Legacy Spokes that were joined before this scheme existed keep their original name and never invoke this function.
+func (s *Spoke) DerivedManagedClusterName() string {
+	h := sha256.Sum256([]byte(s.Namespace + "/" + s.Name))
+	suffix := hex.EncodeToString(h[:])[:8]
+	base := s.Name
+	if len(base) > 54 { // 63 - 1 (separator) - 8 (hash)
+		base = base[:54]
+	}
+	return base + "-" + suffix
 }
 
 // PivotComplete return true if the spoke's agent has successfully started managing day 2 operations.
@@ -319,12 +334,17 @@ type SpokeStatus struct {
 	// +kubebuilder:default:=""
 	// +optional
 	KlusterletHash string `json:"klusterletHash,omitempty"`
+
+	// ManagedClusterName is the name of the ManagedCluster associated with this Spoke.
+	// +optional
+	ManagedClusterName string `json:"managedClusterName,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:path=spokes
 // +kubebuilder:printcolumn:name="PHASE",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="MANAGED_CLUSTER",type=string,JSONPath=`.status.managedClusterName`
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=".metadata.creationTimestamp"
 
 // Spoke is the Schema for the spokes API

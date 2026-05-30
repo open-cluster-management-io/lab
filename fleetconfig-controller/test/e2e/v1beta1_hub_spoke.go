@@ -102,7 +102,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 		})
 
 		It("should verify addons configured on the hub and enabled on the spoke", func() {
-			ensureAddonCreated(tc, 0)
+			ensureAddonCreated(tc, 0, spoke.Status.ManagedClusterName)
 		})
 
 		It("should reconcile innocuous ClusterManager chart values onto the hub", func() {
@@ -174,7 +174,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 
 		It("should verify initial addon variables are correctly resolved", func() {
 			By("verifying that the initial FOO and CLUSTER_NAME variables are resolved in deployed resources")
-			ensureAddonVariablesResolved(tc, 0, spokeName, "initial-foo-value")
+			ensureAddonVariablesResolved(tc, 0, spoke.Status.ManagedClusterName, "initial-foo-value")
 		})
 
 		It("should verify spoke cluster annotations", func() {
@@ -263,7 +263,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 				if err != nil {
 					return err
 				}
-				managedCluster, err := clusterC.ClusterV1().ManagedClusters().Get(tc.ctx, spokeName, metav1.GetOptions{})
+				managedCluster, err := clusterC.ClusterV1().ManagedClusters().Get(tc.ctx, spoke.Status.ManagedClusterName, metav1.GetOptions{})
 				if err != nil {
 					utils.WarnError(err, "failed to get ManagedCluster")
 					return err
@@ -291,12 +291,12 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 
 			By("creating a ManifestWork in the hub-as-spoke cluster namespace")
 			EventuallyWithOffset(1, func() error {
-				return createManifestWork(tc.ctx, hubAsSpokeName)
+				return createManifestWork(tc.ctx, hubAsSpoke.Status.ManagedClusterName)
 			}, 1*time.Minute, 1*time.Second).Should(Succeed())
 
 			By("ensuring the test-namespace namespace is created on the hub")
 			EventuallyWithOffset(1, func() error {
-				return assertNamespace(tc.ctx, hubAsSpokeName, tc.kClient)
+				return assertNamespace(tc.ctx, hubAsSpoke.Status.ManagedClusterName, tc.kClient)
 			}, 2*time.Minute, 10*time.Second).Should(Succeed())
 		})
 
@@ -344,15 +344,15 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 			}, 1*time.Minute, 5*time.Second).Should(Succeed())
 
 			By("verifying that the updated FOO variable is correctly resolved in deployed resources")
-			ensureAddonVariablesResolved(tc, 0, spokeName, "updated-foo-value")
+			ensureAddonVariablesResolved(tc, 0, spoke.Status.ManagedClusterName, "updated-foo-value")
 		})
 
 		It("should update addon template version and verify new resources are deployed", func() {
 			updateHubAddon(tc, hub)
-			ensureAddonCreated(tc, 1)
+			ensureAddonCreated(tc, 1, spoke.Status.ManagedClusterName)
 
 			By("verifying that the new addon template (v2.0.0) has variables correctly resolved")
-			ensureAddonVariablesResolved(tc, 1, spokeName, "updated-foo-value")
+			ensureAddonVariablesResolved(tc, 1, spoke.Status.ManagedClusterName, "updated-foo-value")
 		})
 
 		It("should delete a Spoke", func() {
@@ -382,7 +382,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 				}
 
 				By("ensuring the ManagedCluster is deleted")
-				_, err = clusterC.ClusterV1().ManagedClusters().Get(tc.ctx, spokeName, metav1.GetOptions{})
+				_, err = clusterC.ClusterV1().ManagedClusters().Get(tc.ctx, spoke.Status.ManagedClusterName, metav1.GetOptions{})
 				if err != nil {
 					if !kerrs.IsNotFound(err) {
 						return err
@@ -396,7 +396,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 
 				By("ensuring the ManagedCluster namespace is deleted")
 				ns := &corev1.Namespace{}
-				err = tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Name: spokeName}, ns)
+				err = tc.kClient.Get(tc.ctx, ktypes.NamespacedName{Name: spoke.Status.ManagedClusterName}, ns)
 				if err != nil {
 					if !kerrs.IsNotFound(err) {
 						return err
@@ -487,7 +487,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 			}, 5*time.Minute, 10*time.Second).Should(Succeed())
 
 			By("deleting the manifest work from the hub")
-			ExpectWithOffset(1, deleteManifestWork(tc.ctx, hubAsSpokeName)).To(Succeed())
+			ExpectWithOffset(1, deleteManifestWork(tc.ctx, hubAsSpoke.Status.ManagedClusterName)).To(Succeed())
 
 			By("ensuring the Hub and hub-as-spoke Spoke are deleted once the ManifestWork is deleted")
 			ensureResourceDeleted(

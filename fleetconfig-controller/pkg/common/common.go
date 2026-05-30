@@ -6,6 +6,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,8 +71,61 @@ func AddOnClient(kubeconfig []byte) (*addonapi.Clientset, error) {
 	return addonC, nil
 }
 
-// GetManagedCluster retrieves a ManagedCluster resource from the Hub cluster for a particular Spoke cluster.
-func GetManagedCluster(ctx context.Context, client *clusterapi.Clientset, name string) (*clusterv1.ManagedCluster, error) {
+// GetManagedCluster retrieves a Spoke's ManagedCluster. With ownerLabels, it prefers a label match
+// and falls back to each name in fallbackNames in order, returning the first hit whose existing
+// labels do not conflict with ownerLabels. Returns (nil, nil) if no ManagedCluster is found.
+func GetManagedCluster(ctx context.Context, client clusterapi.Interface, fallbackNames []string, ownerLabels map[string]string) (*clusterv1.ManagedCluster, error) {
+	if len(ownerLabels) > 0 {
+		parts := make([]string, 0, len(ownerLabels))
+		for k, v := range ownerLabels {
+			parts = append(parts, fmt.Sprintf("%s=%s", k, v))
+		}
+		list, err := client.ClusterV1().ManagedClusters().List(ctx, metav1.ListOptions{LabelSelector: strings.Join(parts, ",")})
+		if err != nil {
+			return nil, fmt.Errorf("list ManagedClusters by owner labels: %w", err)
+		}
+		if len(list.Items) > 1 {
+			return nil, fmt.Errorf("expected at most one ManagedCluster matching owner labels %v, got %d", ownerLabels, len(list.Items))
+		}
+		if len(list.Items) == 1 {
+			return &list.Items[0], nil
+		}
+		// No labeled match, fall through to name-based lookup for legacy / mid-join adoption.
+	}
+
+	for _, name := range fallbackNames {
+		if name == "" {
+			continue
+		}
+		mc, err := getManagedClusterLegacy(ctx, client, name)
+		if err != nil {
+			return nil, err
+		}
+		if mc == nil {
+			continue
+		}
+		// Collision guard: skip a ManagedCluster owned by a different Spoke.
+		if conflictsWithOwnerLabels(mc.Labels, ownerLabels) {
+			continue
+		}
+		return mc, nil
+	}
+	return nil, nil
+}
+
+// conflictsWithOwnerLabels reports whether the existing labels carry any of the ownerLabels keys
+// with a non-matching value, indicating the ManagedCluster is claimed by a different owner.
+func conflictsWithOwnerLabels(existing, ownerLabels map[string]string) bool {
+	for k, want := range ownerLabels {
+		if got, has := existing[k]; has && got != want {
+			return true
+		}
+	}
+	return false
+}
+
+// getManagedClusterLegacy fetches a ManagedCluster by its cluster-scoped name. Returns (nil, nil) when the ManagedCluster does not exist.
+func getManagedClusterLegacy(ctx context.Context, client clusterapi.Interface, name string) (*clusterv1.ManagedCluster, error) {
 	managedCluster, err := client.ClusterV1().ManagedClusters().Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {

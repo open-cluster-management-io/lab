@@ -319,17 +319,18 @@ func TestHandleAddonEnable(t *testing.T) {
 func TestHandleSpokeAddons(t *testing.T) {
 	addonC := newAddonClient(t)
 	ctx := context.Background()
-	ns := "spoke-addon-test-ns"
-	ensureNamespace(t, ctx, ns)
+	spokeName := "spoke-addon-test"
+	mcName := "spoke-addon-test-mc"
+	ensureNamespace(t, ctx, mcName)
 
 	t.Cleanup(func() {
-		cleanupMCAs(t, ctx, addonC, ns)
-		cleanupADCs(t, ctx, addonC, ns)
+		cleanupMCAs(t, ctx, addonC, mcName)
+		cleanupADCs(t, ctx, addonC, mcName)
 	})
 
 	t.Run("enables addons from empty state", func(t *testing.T) {
 		spoke := &v1beta1.Spoke{
-			ObjectMeta: metav1.ObjectMeta{Name: ns},
+			ObjectMeta: metav1.ObjectMeta{Name: spokeName},
 			Spec: v1beta1.SpokeSpec{
 				AddOns: []v1beta1.AddOn{
 					{ConfigName: "addon-a"},
@@ -337,7 +338,7 @@ func TestHandleSpokeAddons(t *testing.T) {
 				},
 			},
 		}
-		enabled, err := handleSpokeAddons(ctx, addonC, spoke)
+		enabled, err := handleSpokeAddons(ctx, addonC, spoke, mcName)
 		if err != nil {
 			t.Fatalf("handleSpokeAddons: %v", err)
 		}
@@ -348,14 +349,14 @@ func TestHandleSpokeAddons(t *testing.T) {
 
 	t.Run("disables addons removed from spec", func(t *testing.T) {
 		spoke := &v1beta1.Spoke{
-			ObjectMeta: metav1.ObjectMeta{Name: ns},
+			ObjectMeta: metav1.ObjectMeta{Name: spokeName},
 			Spec: v1beta1.SpokeSpec{
 				AddOns: []v1beta1.AddOn{
 					{ConfigName: "addon-a"},
 				},
 			},
 		}
-		enabled, err := handleSpokeAddons(ctx, addonC, spoke)
+		enabled, err := handleSpokeAddons(ctx, addonC, spoke, mcName)
 		if err != nil {
 			t.Fatalf("handleSpokeAddons: %v", err)
 		}
@@ -364,7 +365,7 @@ func TestHandleSpokeAddons(t *testing.T) {
 		}
 
 		// addon-b should be deleted
-		_, err = addonC.AddonV1alpha1().ManagedClusterAddOns(ns).Get(ctx, "addon-b", metav1.GetOptions{})
+		_, err = addonC.AddonV1alpha1().ManagedClusterAddOns(mcName).Get(ctx, "addon-b", metav1.GetOptions{})
 		if err == nil {
 			t.Error("addon-b MCA should have been deleted")
 		}
@@ -372,10 +373,10 @@ func TestHandleSpokeAddons(t *testing.T) {
 
 	t.Run("empty spec disables all", func(t *testing.T) {
 		spoke := &v1beta1.Spoke{
-			ObjectMeta: metav1.ObjectMeta{Name: ns},
+			ObjectMeta: metav1.ObjectMeta{Name: spokeName},
 			Spec:       v1beta1.SpokeSpec{},
 		}
-		enabled, err := handleSpokeAddons(ctx, addonC, spoke)
+		enabled, err := handleSpokeAddons(ctx, addonC, spoke, mcName)
 		if err != nil {
 			t.Fatalf("handleSpokeAddons: %v", err)
 		}
