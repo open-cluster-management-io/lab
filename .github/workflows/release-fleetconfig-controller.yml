@@ -14,8 +14,10 @@ jobs:
     steps:
       - name: enforce main branch
         if: github.ref != 'refs/heads/main'
+        env:
+          REF: ${{ github.ref }}
         run: |
-          echo "::error::release workflow must be dispatched from main, got ${{ github.ref }}"
+          echo "::error::release workflow must be dispatched from main, got $REF"
           exit 1
 
       - name: checkout code
@@ -55,5 +57,5 @@ jobs:
           tag="fleetconfig-controller/${{ steps.version.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$tag" -m "release ${tag} triggered by ${{ github.actor }}"
+          git tag -a "$tag" -m "release ${tag} triggered by ${GITHUB_ACTOR}"
           git push origin "$tag"
