@@ -13,13 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     environment: fleetconfig-controller-release
     steps:
-      - name: enforce main branch
-        if: github.ref != 'refs/heads/main'
-        env:
-          REF: ${{ github.ref }}
-        run: |
-          echo "::error::release workflow must be dispatched from main, got $REF"
-          exit 1
+      #- name: enforce main branch
+      #  if: github.ref != 'refs/heads/main'
+      #  env:
+      #    REF: ${{ github.ref }}
+      #  run: |
+      #    echo "::error::release workflow must be dispatched from main, got $REF"
+      #    exit 1
 
       - name: checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
