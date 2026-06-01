@@ -332,9 +332,11 @@ func TestHandleSpokeAddons(t *testing.T) {
 		spoke := &v1beta1.Spoke{
 			ObjectMeta: metav1.ObjectMeta{Name: spokeName},
 			Spec: v1beta1.SpokeSpec{
-				AddOns: []v1beta1.AddOn{
-					{ConfigName: "addon-a"},
-					{ConfigName: "addon-b"},
+				SpokeSpecBase: v1beta1.SpokeSpecBase{
+					AddOns: []v1beta1.AddOn{
+						{ConfigName: "addon-a"},
+						{ConfigName: "addon-b"},
+					},
 				},
 			},
 		}
@@ -351,8 +353,10 @@ func TestHandleSpokeAddons(t *testing.T) {
 		spoke := &v1beta1.Spoke{
 			ObjectMeta: metav1.ObjectMeta{Name: spokeName},
 			Spec: v1beta1.SpokeSpec{
-				AddOns: []v1beta1.AddOn{
-					{ConfigName: "addon-a"},
+				SpokeSpecBase: v1beta1.SpokeSpecBase{
+					AddOns: []v1beta1.AddOn{
+						{ConfigName: "addon-a"},
+					},
 				},
 			},
 		}

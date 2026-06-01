@@ -82,6 +82,12 @@ var _ = Describe("Spoke Controller", Ordered, func() {
 					Namespace: spokeNN.Namespace,
 				},
 				Spec: v1beta1.SpokeSpec{
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						CreateNamespace: true,
+						SyncLabels:      false,
+						Timeout:         300,
+						LogVerbosity:    0,
+					},
 					HubRef: v1beta1.HubRef{
 						Name:      testHubNN.Name,
 						Namespace: testHubNN.Namespace,
@@ -89,10 +95,6 @@ var _ = Describe("Spoke Controller", Ordered, func() {
 					Kubeconfig: v1beta1.Kubeconfig{
 						InCluster: true,
 					},
-					CreateNamespace: true,
-					SyncLabels:      false,
-					Timeout:         300,
-					LogVerbosity:    0,
 				},
 			}
 		})

@@ -107,9 +107,11 @@ func TestValidateSpokeRegistrationWithHub(t *testing.T) {
 			spoke: &v1beta1.Spoke{
 				ObjectMeta: spokeMeta,
 				Spec: v1beta1.SpokeSpec{
-					Klusterlet: v1beta1.Klusterlet{
-						Values: &v1beta1.KlusterletChartConfig{
-							KlusterletChartConfig: chart.KlusterletChartConfig{GRPCConfig: "url: test"},
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Klusterlet: v1beta1.Klusterlet{
+							Values: &v1beta1.KlusterletChartConfig{
+								KlusterletChartConfig: chart.KlusterletChartConfig{GRPCConfig: "url: test"},
+							},
 						},
 					},
 				},
@@ -127,7 +129,9 @@ func TestValidateSpokeRegistrationWithHub(t *testing.T) {
 			spoke: &v1beta1.Spoke{
 				ObjectMeta: spokeMeta,
 				Spec: v1beta1.SpokeSpec{
-					Klusterlet: v1beta1.Klusterlet{ValuesFrom: &v1beta1.ConfigMapRef{Name: "v", Key: "k"}},
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Klusterlet: v1beta1.Klusterlet{ValuesFrom: &v1beta1.ConfigMapRef{Name: "v", Key: "k"}},
+					},
 				},
 			},
 			wantErrs: 1,
@@ -143,7 +147,9 @@ func TestValidateSpokeRegistrationWithHub(t *testing.T) {
 			spoke: &v1beta1.Spoke{
 				ObjectMeta: spokeMeta,
 				Spec: v1beta1.SpokeSpec{
-					Klusterlet: v1beta1.Klusterlet{ValuesFrom: &v1beta1.ConfigMapRef{Name: "v", Key: "k"}},
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Klusterlet: v1beta1.Klusterlet{ValuesFrom: &v1beta1.ConfigMapRef{Name: "v", Key: "k"}},
+					},
 				},
 			},
 			wantErrs: 0,
@@ -154,7 +160,9 @@ func TestValidateSpokeRegistrationWithHub(t *testing.T) {
 			spoke: &v1beta1.Spoke{
 				ObjectMeta: spokeMeta,
 				Spec: v1beta1.SpokeSpec{
-					Klusterlet: v1beta1.Klusterlet{ValuesFrom: &v1beta1.ConfigMapRef{Name: "missing", Key: "k"}},
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Klusterlet: v1beta1.Klusterlet{ValuesFrom: &v1beta1.ConfigMapRef{Name: "missing", Key: "k"}},
+					},
 				},
 			},
 			wantErrs: 1,
@@ -170,7 +178,9 @@ func TestValidateSpokeRegistrationWithHub(t *testing.T) {
 			spoke: &v1beta1.Spoke{
 				ObjectMeta: spokeMeta,
 				Spec: v1beta1.SpokeSpec{
-					Klusterlet: v1beta1.Klusterlet{ValuesFrom: &v1beta1.ConfigMapRef{Name: "v", Key: "k"}},
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Klusterlet: v1beta1.Klusterlet{ValuesFrom: &v1beta1.ConfigMapRef{Name: "v", Key: "k"}},
+					},
 				},
 			},
 			wantErrs: 1,

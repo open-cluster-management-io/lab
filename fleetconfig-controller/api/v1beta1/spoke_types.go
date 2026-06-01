@@ -29,25 +29,35 @@ import (
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 )
 
-// SpokeSpec defines the desired state of Spoke
+// SpokeSpec defines the desired state of Spoke.
 type SpokeSpec struct {
+	// SpokeSpecBase holds all Spoke fields shared with downstream consumers
+	// (e.g. types that need to embed the same fields but redefine the
+	// credential-bearing fields below).
+	SpokeSpecBase `json:",inline"`
+
+	// HubRef is a reference to the Hub that this Spoke is managed by.
+	// +required
+	HubRef HubRef `json:"hubRef"`
+
+	// Kubeconfig details for the Spoke cluster.
+	// +required
+	Kubeconfig Kubeconfig `json:"kubeconfig"`
+}
+
+// SpokeSpecBase contains every Spoke field except HubRef and Kubeconfig.
+// It is the embeddable base for downstream types that need the same shape
+// but with different requiredness on the credential-bearing fields.
+type SpokeSpecBase struct {
 	// If true, create open-cluster-management namespace and agent namespace (open-cluster-management-agent for Default mode,
 	// <klusterlet-name> for Hosted mode), otherwise use existing one.
 	// +kubebuilder:default:=true
 	// +optional
 	CreateNamespace bool `json:"createNamespace,omitempty"`
 
-	// HubRef is a reference to the Hub that this Spoke is managed by.
-	// +required
-	HubRef HubRef `json:"hubRef"`
-
 	// If true, sync the labels from klusterlet to all agent resources.
 	// +optional
 	SyncLabels bool `json:"syncLabels,omitempty"`
-
-	// Kubeconfig details for the Spoke cluster.
-	// +required
-	Kubeconfig Kubeconfig `json:"kubeconfig"`
 
 	// Proxy CA certificate, optional
 	// +optional
