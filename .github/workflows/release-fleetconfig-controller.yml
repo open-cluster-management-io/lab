@@ -1,0 +1,68 @@
+name: release fleetconfig-controller
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+
+jobs:
+  tag:
+    name: tag and push
+    runs-on: ubuntu-latest
+    environment: fleetconfig-controller-release
+    steps:
+      - name: enforce main branch
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::release workflow must be dispatched from main, got ${{ github.ref }}"
+          exit 1
+
+      - name: checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+          ref: main
+
+      - name: authorize actor against fleetconfig-controller/OWNERS
+        run: |
+          set -euo pipefail
+          actor="${{ github.actor }}"
+          if ! yq eval '.approvers[]' fleetconfig-controller/OWNERS | grep -Fxq "$actor"; then
+            echo "::error::user $actor is not an approver in fleetconfig-controller/OWNERS"
+            exit 1
+          fi
+
+      - name: read version from values.yaml
+        id: version
+        run: |
+          set -euo pipefail
+          values_file="fleetconfig-controller/charts/fleetconfig-controller/values.yaml"
+          version=$(yq eval '.image.tag' "$values_file")
+          if [[ -z "$version" || "$version" == "null" ]]; then
+            echo "::error::could not read .image.tag from $values_file"
+            exit 1
+          fi
+          if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::.image.tag value '$version' in $values_file is not a vX.Y.Z semver"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: ensure tag does not already exist on origin
+        run: |
+          set -euo pipefail
+          tag="fleetconfig-controller/${{ steps.version.outputs.version }}"
+          if [[ -n "$(git ls-remote --tags origin "refs/tags/$tag")" ]]; then
+            echo "::error::tag $tag already exists on origin. Bump .image.tag in fleetconfig-controller/charts/fleetconfig-controller/values.yaml and retry."
+            exit 1
+          fi
+
+      - name: create and push tag
+        run: |
+          set -euo pipefail
+          tag="fleetconfig-controller/${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "release ${tag} triggered by ${{ github.actor }}"
+          git push origin "$tag"
