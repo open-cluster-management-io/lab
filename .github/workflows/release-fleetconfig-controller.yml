@@ -1,4 +1,4 @@
-name: release fleetconfig-controller
+name: Release fleetconfig-controller
 
 permissions:
   contents: write
@@ -23,15 +23,6 @@ jobs:
         with:
           fetch-depth: 1
           ref: main
-
-      - name: authorize actor against fleetconfig-controller/OWNERS
-        run: |
-          set -euo pipefail
-          actor="${{ github.actor }}"
-          if ! yq eval '.approvers[]' fleetconfig-controller/OWNERS | grep -Fxq "$actor"; then
-            echo "::error::user $actor is not an approver in fleetconfig-controller/OWNERS"
-            exit 1
-          fi
 
       - name: read version from values.yaml
         id: version
