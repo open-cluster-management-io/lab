@@ -2,6 +2,7 @@ name: Release fleetconfig-controller
 
 permissions:
   contents: write
+  actions: write
 
 on:
   workflow_dispatch:
@@ -59,3 +60,12 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "$tag" -m "release ${tag} triggered by ${GITHUB_ACTOR}"
           git push origin "$tag"
+
+      - name: dispatch downstream release workflows
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="fleetconfig-controller/${{ steps.version.outputs.version }}"
+          gh workflow run release.yml --ref "refs/tags/$tag"
+          gh workflow run releaseimage.yml --ref "refs/tags/$tag"
