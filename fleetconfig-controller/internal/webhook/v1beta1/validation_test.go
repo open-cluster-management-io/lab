@@ -355,16 +355,20 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			name: "no changes",
 			oldSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					CreateNamespace: true,
-					Timeout:         300,
-					LogVerbosity:    0,
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						CreateNamespace: true,
+						Timeout:         300,
+						LogVerbosity:    0,
+					},
 				},
 			},
 			newSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					CreateNamespace: true,
-					Timeout:         300,
-					LogVerbosity:    0,
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						CreateNamespace: true,
+						Timeout:         300,
+						LogVerbosity:    0,
+					},
 				},
 			},
 			wantErr: false,
@@ -373,15 +377,19 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			name: "allowed - klusterlet annotations change",
 			oldSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					Klusterlet: v1beta1.Klusterlet{
-						Annotations: map[string]string{"old": "value"},
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Klusterlet: v1beta1.Klusterlet{
+							Annotations: map[string]string{"old": "value"},
+						},
 					},
 				},
 			},
 			newSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					Klusterlet: v1beta1.Klusterlet{
-						Annotations: map[string]string{"new": "value"},
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Klusterlet: v1beta1.Klusterlet{
+							Annotations: map[string]string{"new": "value"},
+						},
 					},
 				},
 			},
@@ -412,15 +420,19 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			name: "allowed - addOns change",
 			oldSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					AddOns: []v1beta1.AddOn{
-						{ConfigName: "old-addon"},
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						AddOns: []v1beta1.AddOn{
+							{ConfigName: "old-addon"},
+						},
 					},
 				},
 			},
 			newSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					AddOns: []v1beta1.AddOn{
-						{ConfigName: "new-addon"},
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						AddOns: []v1beta1.AddOn{
+							{ConfigName: "new-addon"},
+						},
 					},
 				},
 			},
@@ -430,15 +442,19 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			name: "allowed - cleanupConfig change (non-purgeKubeconfigSecret field)",
 			oldSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					CleanupConfig: v1beta1.CleanupConfig{
-						PurgeKlusterletOperator: true,
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						CleanupConfig: v1beta1.CleanupConfig{
+							PurgeKlusterletOperator: true,
+						},
 					},
 				},
 			},
 			newSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					CleanupConfig: v1beta1.CleanupConfig{
-						PurgeKlusterletOperator: false,
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						CleanupConfig: v1beta1.CleanupConfig{
+							PurgeKlusterletOperator: false,
+						},
 					},
 				},
 			},
@@ -448,12 +464,16 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			name: "allowed - timeout change",
 			oldSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					Timeout: 300,
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Timeout: 300,
+					},
 				},
 			},
 			newSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					Timeout: 600,
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Timeout: 600,
+					},
 				},
 			},
 			wantErr: false,
@@ -462,12 +482,16 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			name: "allowed - logVerbosity change",
 			oldSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					LogVerbosity: 0,
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						LogVerbosity: 0,
+					},
 				},
 			},
 			newSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					LogVerbosity: 5,
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						LogVerbosity: 5,
+					},
 				},
 			},
 			wantErr: false,
@@ -476,16 +500,20 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			name: "allowed - addon kubeClient registration auth change",
 			oldSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					Klusterlet: v1beta1.Klusterlet{
-						AddonKubeClientRegistrationAuth: "",
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Klusterlet: v1beta1.Klusterlet{
+							AddonKubeClientRegistrationAuth: "",
+						},
 					},
 				},
 			},
 			newSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					Klusterlet: v1beta1.Klusterlet{
-						AddonKubeClientRegistrationAuth: v1beta1.AddonKubeClientRegistrationAuthToken,
-						AddonTokenExpirationSeconds:     3600,
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Klusterlet: v1beta1.Klusterlet{
+							AddonKubeClientRegistrationAuth: v1beta1.AddonKubeClientRegistrationAuthToken,
+							AddonTokenExpirationSeconds:     3600,
+						},
 					},
 				},
 			},
@@ -516,12 +544,16 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			name: "disallowed - CreateNamespace change",
 			oldSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					CreateNamespace: true,
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						CreateNamespace: true,
+					},
 				},
 			},
 			newSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					CreateNamespace: false,
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						CreateNamespace: false,
+					},
 				},
 			},
 			wantErr: true,
@@ -531,15 +563,19 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			name: "disallowed - klusterlet mode change",
 			oldSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					Klusterlet: v1beta1.Klusterlet{
-						Mode: "Default",
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Klusterlet: v1beta1.Klusterlet{
+							Mode: "Default",
+						},
 					},
 				},
 			},
 			newSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					Klusterlet: v1beta1.Klusterlet{
-						Mode: "Hosted",
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Klusterlet: v1beta1.Klusterlet{
+							Mode: "Hosted",
+						},
 					},
 				},
 			},
@@ -550,15 +586,19 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			name: "disallowed - klusterlet feature gates change",
 			oldSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					Klusterlet: v1beta1.Klusterlet{
-						FeatureGates: "AddonManagement=true",
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Klusterlet: v1beta1.Klusterlet{
+							FeatureGates: "AddonManagement=true",
+						},
 					},
 				},
 			},
 			newSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					Klusterlet: v1beta1.Klusterlet{
-						FeatureGates: "AddonManagement=true,ClusterClaim=true",
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Klusterlet: v1beta1.Klusterlet{
+							FeatureGates: "AddonManagement=true,ClusterClaim=true",
+						},
 					},
 				},
 			},
@@ -569,34 +609,38 @@ func TestAllowSpokeUpdate(t *testing.T) {
 			name: "multiple allowed changes",
 			oldSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					Timeout:      300,
-					LogVerbosity: 0,
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Timeout:      300,
+						LogVerbosity: 0,
+						Klusterlet: v1beta1.Klusterlet{
+							Annotations: map[string]string{"old": "value"},
+						},
+						AddOns: []v1beta1.AddOn{
+							{ConfigName: "old-addon"},
+						},
+					},
 					Kubeconfig: v1beta1.Kubeconfig{
 						InCluster: true,
-					},
-					Klusterlet: v1beta1.Klusterlet{
-						Annotations: map[string]string{"old": "value"},
-					},
-					AddOns: []v1beta1.AddOn{
-						{ConfigName: "old-addon"},
 					},
 				},
 			},
 			newSpoke: &v1beta1.Spoke{
 				Spec: v1beta1.SpokeSpec{
-					Timeout:      600,
-					LogVerbosity: 5,
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						Timeout:      600,
+						LogVerbosity: 5,
+						Klusterlet: v1beta1.Klusterlet{
+							Annotations: map[string]string{"new": "value"},
+						},
+						AddOns: []v1beta1.AddOn{
+							{ConfigName: "new-addon"},
+						},
+					},
 					Kubeconfig: v1beta1.Kubeconfig{
 						SecretReference: &v1beta1.SecretReference{
 							Name:          "new-secret",
 							KubeconfigKey: "kubeconfig",
 						},
-					},
-					Klusterlet: v1beta1.Klusterlet{
-						Annotations: map[string]string{"new": "value"},
-					},
-					AddOns: []v1beta1.AddOn{
-						{ConfigName: "new-addon"},
 					},
 				},
 			},

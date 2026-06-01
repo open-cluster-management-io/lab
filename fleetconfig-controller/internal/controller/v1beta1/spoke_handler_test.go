@@ -201,7 +201,7 @@ func TestAppendJoinSpokeTransportAndAuthArgs_CleanupLifecycle(t *testing.T) {
 			},
 			spoke: &v1beta1.Spoke{
 				ObjectMeta: metav1.ObjectMeta{Name: "spoke", Namespace: "ns"},
-				Spec:       v1beta1.SpokeSpec{ProxyCa: "fake-proxy-ca"},
+				Spec:       v1beta1.SpokeSpec{SpokeSpecBase: v1beta1.SpokeSpecBase{ProxyCa: "fake-proxy-ca"}},
 			},
 			wantFlags: []string{"--proxy-ca-file="},
 		},
@@ -215,7 +215,7 @@ func TestAppendJoinSpokeTransportAndAuthArgs_CleanupLifecycle(t *testing.T) {
 			},
 			spoke: &v1beta1.Spoke{
 				ObjectMeta: metav1.ObjectMeta{Name: "spoke", Namespace: "ns"},
-				Spec:       v1beta1.SpokeSpec{ProxyCa: "fake-proxy-ca"},
+				Spec:       v1beta1.SpokeSpec{SpokeSpecBase: v1beta1.SpokeSpecBase{ProxyCa: "fake-proxy-ca"}},
 			},
 			wantFlags: []string{"--ca-file=", "--proxy-ca-file="},
 		},
