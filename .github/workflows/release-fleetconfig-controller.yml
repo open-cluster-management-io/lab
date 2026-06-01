@@ -67,5 +67,5 @@ jobs:
         run: |
           set -euo pipefail
           tag="fleetconfig-controller/${{ steps.version.outputs.version }}"
-          gh workflow run release.yml --ref "refs/tags/$tag"
-          gh workflow run releaseimage.yml --ref "refs/tags/$tag"
+          gh workflow run release.yml --ref "$tag"
+          gh workflow run releaseimage.yml --ref "$tag"
