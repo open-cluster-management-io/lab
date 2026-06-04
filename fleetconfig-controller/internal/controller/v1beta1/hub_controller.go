@@ -352,6 +352,14 @@ func (r *HubReconciler) clusterManagerChartState(ctx context.Context, hub *v1bet
 	if err != nil {
 		return nil, "", false, err
 	}
+	if merged == nil {
+		merged = &v1beta1.ClusterManagerChartConfig{}
+	}
+	// Fold feature gates into the merged values so a featureGates change alters the
+	// hash (triggering an upgrade) and is carried in --cluster-manager-values-file.
+	if err := applyHubFeatureGates(merged, hub.Spec.ClusterManager.FeatureGates); err != nil {
+		return nil, "", false, fmt.Errorf("failed to apply hub %s feature gates to cluster-manager values: %w", hub.Name, err)
+	}
 	currHash, err = hash.ComputeHash(merged)
 	if err != nil {
 		return nil, "", false, fmt.Errorf("failed to compute hash of hub %s cluster-manager values: %w", hub.Name, err)
@@ -769,7 +777,7 @@ func prepareClusterManagerChartValuesArgs(values *v1beta1.ClusterManagerChartCon
 	if values.IsEmpty() {
 		return nil, nil, nil
 	}
-	valuesYAML, err := yaml.Marshal(values)
+	valuesYAML, err := marshalClusterManagerValues(values)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to marshal cluster-manager values to YAML: %w", err)
 	}
@@ -778,6 +786,45 @@ func prepareClusterManagerChartValuesArgs(values *v1beta1.ClusterManagerChartCon
 		return nil, nil, fmt.Errorf("failed to write cluster-manager values to disk: %w", err)
 	}
 	return []string{"--cluster-manager-values-file", valuesFile}, valuesCleanup, nil
+}
+
+// marshalClusterManagerValues serializes the cluster-manager chart values, dropping
+// fields that would otherwise be written as invalid zero values and clobber settings
+// derived from clusteradm flags (on init) or carried forward from the live
+// ClusterManager CR (on upgrade, where --cluster-manager-values-file is merged last).
+//
+// ClusterManagerConfig.ResourceRequirement is a non-pointer struct whose Type field
+// has no omitempty, so it always marshals as `resourceRequirement: {type: ""}`. An
+// empty QoS type is rejected by the ClusterManager webhook, so when it is unset the
+// whole resourceRequirement block is pruned, leaving --resource-qos-class / the CR
+// value intact.
+func marshalClusterManagerValues(values *v1beta1.ClusterManagerChartConfig) ([]byte, error) {
+	raw, err := yaml.Marshal(values)
+	if err != nil {
+		return nil, err
+	}
+	asMap := map[string]any{}
+	if err := yaml.Unmarshal(raw, &asMap); err != nil {
+		return nil, err
+	}
+	pruneEmptyResourceRequirement(asMap)
+	return yaml.Marshal(asMap)
+}
+
+// pruneEmptyResourceRequirement removes clusterManager.resourceRequirement from the
+// values map when its QoS type is empty. See marshalClusterManagerValues.
+func pruneEmptyResourceRequirement(values map[string]any) {
+	clusterManager, ok := values["clusterManager"].(map[string]any)
+	if !ok {
+		return
+	}
+	resourceRequirement, ok := clusterManager["resourceRequirement"].(map[string]any)
+	if !ok {
+		return
+	}
+	if qosType, _ := resourceRequirement["type"].(string); qosType == "" {
+		delete(clusterManager, "resourceRequirement")
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -283,7 +283,7 @@ func TestAllowHubUpdate(t *testing.T) {
 			errMsg:  errAllowedHubUpdate,
 		},
 		{
-			name: "disallowed - ClusterManager non-source change",
+			name: "allowed - ClusterManager featureGates change",
 			oldHub: &v1beta1.Hub{
 				Spec: v1beta1.HubSpec{
 					ClusterManager: &v1beta1.ClusterManager{
@@ -295,6 +295,24 @@ func TestAllowHubUpdate(t *testing.T) {
 				Spec: v1beta1.HubSpec{
 					ClusterManager: &v1beta1.ClusterManager{
 						FeatureGates: "AddonManagement=true,ResourceCleanup=true",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "disallowed - ClusterManager non-mutable change",
+			oldHub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					ClusterManager: &v1beta1.ClusterManager{
+						PurgeOperator: false,
+					},
+				},
+			},
+			newHub: &v1beta1.Hub{
+				Spec: v1beta1.HubSpec{
+					ClusterManager: &v1beta1.ClusterManager{
+						PurgeOperator: true,
 					},
 				},
 			},

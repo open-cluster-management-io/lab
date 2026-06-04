@@ -375,6 +375,18 @@ github.com/ulikunitz/xz/lzma
 # github.com/x448/float16 v0.8.4
 ## explicit; go 1.11
 github.com/x448/float16
+# go.opentelemetry.io/otel v1.43.0
+## explicit; go 1.25.0
+go.opentelemetry.io/otel/attribute
+go.opentelemetry.io/otel/attribute/internal
+go.opentelemetry.io/otel/attribute/internal/xxhash
+go.opentelemetry.io/otel/codes
+go.opentelemetry.io/otel/semconv/v1.40.0
+# go.opentelemetry.io/otel/trace v1.43.0
+## explicit; go 1.25.0
+go.opentelemetry.io/otel/trace
+go.opentelemetry.io/otel/trace/embedded
+go.opentelemetry.io/otel/trace/internal/telemetry
 # go.podman.io/storage v1.62.0
 ## explicit; go 1.24.0
 go.podman.io/storage/pkg/archive
@@ -958,6 +970,16 @@ k8s.io/client-go/util/watchlist
 k8s.io/client-go/util/workqueue
 # k8s.io/cluster-bootstrap v0.33.0
 ## explicit; go 1.24.0
+# k8s.io/component-base v0.36.1
+## explicit; go 1.26.0
+k8s.io/component-base/featuregate
+k8s.io/component-base/metrics
+k8s.io/component-base/metrics/api/v1
+k8s.io/component-base/metrics/internal
+k8s.io/component-base/metrics/legacyregistry
+k8s.io/component-base/metrics/prometheus/feature
+k8s.io/component-base/metrics/prometheusextension
+k8s.io/component-base/version
 # k8s.io/klog v1.0.0
 ## explicit; go 1.12
 k8s.io/klog
@@ -1029,6 +1051,7 @@ open-cluster-management.io/api/cluster/v1
 open-cluster-management.io/api/cluster/v1alpha1
 open-cluster-management.io/api/cluster/v1beta1
 open-cluster-management.io/api/cluster/v1beta2
+open-cluster-management.io/api/feature
 open-cluster-management.io/api/operator/v1
 open-cluster-management.io/api/work/v1
 open-cluster-management.io/api/work/v1alpha1
