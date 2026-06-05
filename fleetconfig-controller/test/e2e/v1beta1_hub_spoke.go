@@ -344,7 +344,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 			By("re-enabling the ManifestWorkReplicaSet feature gate")
 			hub, err = utils.GetHub(tc.ctx, tc.kClient, v1beta1hubNN)
 			Expect(err).NotTo(HaveOccurred())
-			patchFeatureGates = "DefaultClusterSet=true,ManifestWorkReplicaSet=true,ResourceCleanup=false"
+			patchFeatureGates = "DefaultClusterSet=true,ManifestWorkReplicaSet=true,ResourceCleanup=true"
 			Expect(utils.UpdateHubFeatureGates(tc.ctx, tc.kClient, hub, patchFeatureGates)).To(Succeed())
 		})
 
