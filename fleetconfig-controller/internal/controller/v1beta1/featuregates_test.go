@@ -26,58 +26,66 @@ import (
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 )
 
-func enable(feature string) operatorv1.FeatureGate {
-	return operatorv1.FeatureGate{Feature: feature, Mode: operatorv1.FeatureGateModeTypeEnable}
-}
-
-func disable(feature string) operatorv1.FeatureGate {
-	return operatorv1.FeatureGate{Feature: feature, Mode: operatorv1.FeatureGateModeTypeDisable}
+// gateMode returns the mode set for feature, and whether it is present at all.
+func gateMode(gates []operatorv1.FeatureGate, feature string) (operatorv1.FeatureGateModeType, bool) {
+	for _, g := range gates {
+		if g.Feature == feature {
+			return g.Mode, true
+		}
+	}
+	return "", false
 }
 
 func TestHubFeatureGates(t *testing.T) {
+	type want struct {
+		registration map[string]operatorv1.FeatureGateModeType
+		work         map[string]operatorv1.FeatureGateModeType
+		addOnManager map[string]operatorv1.FeatureGateModeType
+	}
 	tests := []struct {
-		name             string
-		featureGates     string
-		wantRegistration []operatorv1.FeatureGate
-		wantWork         []operatorv1.FeatureGate
-		wantAddOnManager []operatorv1.FeatureGate
-		wantErr          bool
+		name         string
+		featureGates string
+		want         want
+		wantErr      bool
 	}{
 		{
-			name:         "empty string yields only default-enabled gates",
+			name:         "empty string yields component defaults, fully explicit",
 			featureGates: "",
-			// DefaultClusterSet and ResourceCleanup default to true for registration.
-			wantRegistration: []operatorv1.FeatureGate{enable("DefaultClusterSet"), enable("ResourceCleanup")},
-			wantWork:         nil,
-			// AddonManagement defaults to true.
-			wantAddOnManager: []operatorv1.FeatureGate{enable("AddonManagement")},
-		},
-		{
-			name:         "enable a default-off registration gate",
-			featureGates: "ManagedClusterAutoApproval=true",
-			wantRegistration: []operatorv1.FeatureGate{
-				enable("DefaultClusterSet"), enable("ManagedClusterAutoApproval"), enable("ResourceCleanup"),
+			want: want{
+				// DefaultClusterSet and ResourceCleanup default on; everything else off.
+				registration: map[string]operatorv1.FeatureGateModeType{
+					"DefaultClusterSet": operatorv1.FeatureGateModeTypeEnable,
+					"ResourceCleanup":   operatorv1.FeatureGateModeTypeEnable,
+					"ClusterProfile":    operatorv1.FeatureGateModeTypeDisable,
+				},
+				work: map[string]operatorv1.FeatureGateModeType{
+					"ManifestWorkReplicaSet": operatorv1.FeatureGateModeTypeDisable,
+				},
+				addOnManager: map[string]operatorv1.FeatureGateModeType{
+					"AddonManagement": operatorv1.FeatureGateModeTypeEnable,
+				},
 			},
-			wantWork:         nil,
-			wantAddOnManager: []operatorv1.FeatureGate{enable("AddonManagement")},
 		},
 		{
-			name:         "disable a default-on gate is recorded as Disable",
-			featureGates: "AddonManagement=false,ResourceCleanup=false",
-			wantRegistration: []operatorv1.FeatureGate{
-				enable("DefaultClusterSet"), disable("ResourceCleanup"),
-			},
-			wantWork:         nil,
-			wantAddOnManager: []operatorv1.FeatureGate{disable("AddonManagement")},
-		},
-		{
-			name:         "gates are routed to the owning component",
+			name:         "enabling a default-off work gate routes to workConfiguration",
 			featureGates: "ManifestWorkReplicaSet=true",
-			wantRegistration: []operatorv1.FeatureGate{
-				enable("DefaultClusterSet"), enable("ResourceCleanup"),
+			want: want{
+				work: map[string]operatorv1.FeatureGateModeType{
+					"ManifestWorkReplicaSet": operatorv1.FeatureGateModeTypeEnable,
+				},
 			},
-			wantWork:         []operatorv1.FeatureGate{enable("ManifestWorkReplicaSet")},
-			wantAddOnManager: []operatorv1.FeatureGate{enable("AddonManagement")},
+		},
+		{
+			name:         "disabling a default-on gate is recorded as Disable",
+			featureGates: "ResourceCleanup=false,AddonManagement=false",
+			want: want{
+				registration: map[string]operatorv1.FeatureGateModeType{
+					"ResourceCleanup": operatorv1.FeatureGateModeTypeDisable,
+				},
+				addOnManager: map[string]operatorv1.FeatureGateModeType{
+					"AddonManagement": operatorv1.FeatureGateModeTypeDisable,
+				},
+			},
 		},
 		{
 			name:         "unparseable string returns an error",
@@ -97,16 +105,50 @@ func TestHubFeatureGates(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if !reflect.DeepEqual(registration, tt.wantRegistration) {
-				t.Errorf("registration = %+v, want %+v", registration, tt.wantRegistration)
-			}
-			if !reflect.DeepEqual(work, tt.wantWork) {
-				t.Errorf("work = %+v, want %+v", work, tt.wantWork)
-			}
-			if !reflect.DeepEqual(addOnManager, tt.wantAddOnManager) {
-				t.Errorf("addOnManager = %+v, want %+v", addOnManager, tt.wantAddOnManager)
-			}
+			assertGateModes(t, "registration", registration, tt.want.registration)
+			assertGateModes(t, "work", work, tt.want.work)
+			assertGateModes(t, "addOnManager", addOnManager, tt.want.addOnManager)
 		})
+	}
+}
+
+func assertGateModes(t *testing.T, component string, gates []operatorv1.FeatureGate, want map[string]operatorv1.FeatureGateModeType) {
+	t.Helper()
+	for feature, wantMode := range want {
+		gotMode, ok := gateMode(gates, feature)
+		if !ok {
+			t.Errorf("%s: feature %q missing from list %+v", component, feature, gates)
+			continue
+		}
+		if gotMode != wantMode {
+			t.Errorf("%s: feature %q mode = %q, want %q", component, feature, gotMode, wantMode)
+		}
+	}
+}
+
+// TestHubFeatureGatesExplicit asserts every known gate is listed explicitly, even
+// when disabled. This is what lets a disabled default-off gate (e.g.
+// ManifestWorkReplicaSet) override a previously-enabled ClusterManager value rather
+// than being dropped by omitempty. See featureGatesForComponent.
+func TestHubFeatureGatesExplicit(t *testing.T) {
+	registration, work, addOnManager, err := hubFeatureGates("ManifestWorkReplicaSet=false")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// All components list every known gate.
+	if len(registration) != 6 {
+		t.Errorf("registration: want 6 explicit gates, got %d: %+v", len(registration), registration)
+	}
+	if len(work) != 4 {
+		t.Errorf("work: want 4 explicit gates, got %d: %+v", len(work), work)
+	}
+	if len(addOnManager) != 1 {
+		t.Errorf("addOnManager: want 1 explicit gate, got %d: %+v", len(addOnManager), addOnManager)
+	}
+	// The disabled default-off gate must be present and explicitly Disable.
+	mode, ok := gateMode(work, "ManifestWorkReplicaSet")
+	if !ok || mode != operatorv1.FeatureGateModeTypeDisable {
+		t.Errorf("ManifestWorkReplicaSet should be explicitly disabled, got mode=%q present=%v", mode, ok)
 	}
 }
 
@@ -142,7 +184,6 @@ func TestMarshalClusterManagerValues(t *testing.T) {
 		if strings.Contains(string(out), "resourceRequirement") {
 			t.Errorf("expected empty resourceRequirement to be pruned, got:\n%s", out)
 		}
-		// Feature gates must still be present.
 		if !strings.Contains(string(out), "AddonManagement") {
 			t.Errorf("expected feature gates to be retained, got:\n%s", out)
 		}
@@ -159,6 +200,22 @@ func TestMarshalClusterManagerValues(t *testing.T) {
 			t.Errorf("expected resourceRequirement with a set type to be retained, got:\n%s", out)
 		}
 	})
+
+	t.Run("disabled default-off work gate is written so it overrides the ClusterManager", func(t *testing.T) {
+		values := &v1beta1.ClusterManagerChartConfig{}
+		if err := applyHubFeatureGates(values, "ManifestWorkReplicaSet=false"); err != nil {
+			t.Fatal(err)
+		}
+		out, err := marshalClusterManagerValues(values)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// The work feature gates must be present (not an empty workConfiguration: {})
+		// so the merge replaces the CR value rather than leaving it stale.
+		if !strings.Contains(string(out), "ManifestWorkReplicaSet") {
+			t.Errorf("expected ManifestWorkReplicaSet to be written explicitly, got:\n%s", out)
+		}
+	})
 }
 
 func TestApplyHubFeatureGates(t *testing.T) {
@@ -166,13 +223,12 @@ func TestApplyHubFeatureGates(t *testing.T) {
 	if err := applyHubFeatureGates(values, "ManifestWorkReplicaSet=true"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got := values.ClusterManager.WorkConfiguration.FeatureGates; !reflect.DeepEqual(
-		got, []operatorv1.FeatureGate{enable("ManifestWorkReplicaSet")},
-	) {
-		t.Errorf("work feature gates = %+v, want ManifestWorkReplicaSet enabled", got)
+	mode, ok := gateMode(values.ClusterManager.WorkConfiguration.FeatureGates, "ManifestWorkReplicaSet")
+	if !ok || mode != operatorv1.FeatureGateModeTypeEnable {
+		t.Errorf("work ManifestWorkReplicaSet mode = %q present = %v, want Enable", mode, ok)
 	}
 	if len(values.ClusterManager.AddOnManagerConfiguration.FeatureGates) == 0 {
-		t.Error("expected addon-manager feature gates to be populated with defaults")
+		t.Error("expected addon-manager feature gates to be populated")
 	}
 	if err := applyHubFeatureGates(values, "BadGate"); err == nil {
 		t.Error("expected error for invalid feature gate string")

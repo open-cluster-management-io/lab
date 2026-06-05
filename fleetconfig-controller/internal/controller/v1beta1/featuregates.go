@@ -51,8 +51,7 @@ func applyHubFeatureGates(values *v1beta1.ClusterManagerChartConfig, featureGate
 
 // hubFeatureGates parses the comma-separated feature-gate string (same format as
 // 'clusteradm init --feature-gates', e.g. "AddonManagement=true,ResourceCleanup=false")
-// and returns the registration, work, and addon-manager FeatureGate lists that
-// clusteradm would apply for a hub.
+// and returns the registration, work, and addon-manager FeatureGate lists for a hub.
 func hubFeatureGates(featureGates string) (registration, work, addOnManager []operatorv1.FeatureGate, err error) {
 	fg := featuregate.NewFeatureGate()
 	for _, defaults := range []map[featuregate.Feature]featuregate.FeatureSpec{
@@ -71,43 +70,36 @@ func hubFeatureGates(featureGates string) (registration, work, addOnManager []op
 		}
 	}
 
-	return convertToFeatureGateAPI(fg, ocmfeature.DefaultHubRegistrationFeatureGates),
-		convertToFeatureGateAPI(fg, ocmfeature.DefaultHubWorkFeatureGates),
-		convertToFeatureGateAPI(fg, ocmfeature.DefaultHubAddonManagerFeatureGates),
+	return featureGatesForComponent(fg, ocmfeature.DefaultHubRegistrationFeatureGates),
+		featureGatesForComponent(fg, ocmfeature.DefaultHubWorkFeatureGates),
+		featureGatesForComponent(fg, ocmfeature.DefaultHubAddonManagerFeatureGates),
 		nil
 }
 
-// convertToFeatureGateAPI converts the parsed feature gates into the operatorv1
-// FeatureGate list for a single component, scoped to that component's known gates.
+// featureGatesForComponent returns the operatorv1 FeatureGate list for a single
+// component, with an explicit Enable/Disable entry for every gate known to that
+// component.
 //
-// Ported from open-cluster-management.io/clusteradm
-// pkg/genericclioptions.ConvertToFeatureGateAPI so that 'clusteradm init' and the
-// values-file path used by 'clusteradm upgrade clustermanager' produce identical
-// gates. The result is sorted by feature name so the cluster-manager values hash is
-// stable across reconciles (Go map iteration order is otherwise non-deterministic,
-// which would cause spurious upgrades).
-func convertToFeatureGateAPI(featureGates featuregate.MutableFeatureGate, defaultFeatureGate map[featuregate.Feature]featuregate.FeatureSpec) []operatorv1.FeatureGate {
-	var features []operatorv1.FeatureGate
-	featureGatesMap := featureGates.GetAll()
-
-	// enable user-specified feature gates
-	for feature := range featureGatesMap {
-		if _, ok := defaultFeatureGate[feature]; !ok {
-			continue
-		}
+// Unlike clusteradm's init-time conversion (which omits disabled default-off gates
+// and lets the operator default apply), every gate is listed explicitly. The lists
+// are written to --cluster-manager-values-file, which 'clusteradm upgrade
+// clustermanager' merges onto the existing ClusterManager via yaml.Unmarshal: a
+// slice replaces wholesale, but a *missing* key is left untouched. An empty list is
+// dropped by omitempty, so a disabled default-off gate (e.g. ManifestWorkReplicaSet,
+// whose component has no default-on gates) would otherwise produce
+// `workConfiguration: {}` and never override a previously-enabled value. Emitting all
+// gates explicitly makes the merge set the exact desired state on every reconcile.
+//
+// Sorted by feature name so the cluster-manager values hash is stable across
+// reconciles (Go map iteration order is otherwise non-deterministic).
+func featureGatesForComponent(featureGates featuregate.MutableFeatureGate, defaultFeatureGate map[featuregate.Feature]featuregate.FeatureSpec) []operatorv1.FeatureGate {
+	features := make([]operatorv1.FeatureGate, 0, len(defaultFeatureGate))
+	for feature := range defaultFeatureGate {
+		mode := operatorv1.FeatureGateModeTypeDisable
 		if featureGates.Enabled(feature) {
-			features = append(features, operatorv1.FeatureGate{Feature: string(feature), Mode: operatorv1.FeatureGateModeTypeEnable})
-		} else if defaultFeatureGate[feature].Default {
-			// Explicitly disable the feature gate that is enabled by default
-			features = append(features, operatorv1.FeatureGate{Feature: string(feature), Mode: operatorv1.FeatureGateModeTypeDisable})
+			mode = operatorv1.FeatureGateModeTypeEnable
 		}
-	}
-
-	// enable default feature gates
-	for feature, spec := range defaultFeatureGate {
-		if _, ok := featureGatesMap[feature]; !ok && spec.Default {
-			features = append(features, operatorv1.FeatureGate{Feature: string(feature), Mode: operatorv1.FeatureGateModeTypeEnable})
-		}
+		features = append(features, operatorv1.FeatureGate{Feature: string(feature), Mode: mode})
 	}
 
 	sort.Slice(features, func(i, j int) bool {
