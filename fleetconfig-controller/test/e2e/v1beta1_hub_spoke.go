@@ -311,12 +311,12 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 				workBefore = cmBefore.Spec.WorkConfiguration.FeatureGates
 			}
 			Expect(featureGateHasMode(workBefore, "ManifestWorkReplicaSet", operatorv1.FeatureGateModeTypeEnable)).
-				To(BeFalse(), "ManifestWorkReplicaSet should not be enabled before the change")
+				To(BeTrue(), "ManifestWorkReplicaSet should be enabled before the change")
 
 			By("patching the Hub's feature gates")
 			hub, err := utils.GetHub(tc.ctx, tc.kClient, v1beta1hubNN)
 			Expect(err).NotTo(HaveOccurred())
-			patchFeatureGates := "DefaultClusterSet=true,ManifestWorkReplicaSet=true,ResourceCleanup=false"
+			patchFeatureGates := "DefaultClusterSet=true,ManifestWorkReplicaSet=false,ResourceCleanup=false"
 			Expect(utils.UpdateHubFeatureGates(tc.ctx, tc.kClient, hub, patchFeatureGates)).To(Succeed())
 
 			By("verifying the feature gate change is propagated to the ClusterManager")
@@ -332,8 +332,8 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 				if cm.Spec.RegistrationConfiguration != nil {
 					registration = cm.Spec.RegistrationConfiguration.FeatureGates
 				}
-				if !featureGateHasMode(work, "ManifestWorkReplicaSet", operatorv1.FeatureGateModeTypeEnable) {
-					return fmt.Errorf("ManifestWorkReplicaSet not enabled on workConfiguration: %+v", work)
+				if featureGateHasMode(work, "ManifestWorkReplicaSet", operatorv1.FeatureGateModeTypeEnable) {
+					return fmt.Errorf("ManifestWorkReplicaSet still enabled on workConfiguration: %+v", work)
 				}
 				if !featureGateHasMode(registration, "ResourceCleanup", operatorv1.FeatureGateModeTypeDisable) {
 					return fmt.Errorf("ResourceCleanup not disabled on registrationConfiguration: %+v", registration)
