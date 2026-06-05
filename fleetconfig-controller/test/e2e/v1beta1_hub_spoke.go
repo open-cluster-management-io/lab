@@ -340,6 +340,12 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 				}
 				return nil
 			}, 5*time.Minute, 10*time.Second).Should(Succeed())
+
+			By("re-enabling the ManifestWorkReplicaSet feature gate")
+			hub, err = utils.GetHub(tc.ctx, tc.kClient, v1beta1hubNN)
+			Expect(err).NotTo(HaveOccurred())
+			patchFeatureGates = "DefaultClusterSet=true,ManifestWorkReplicaSet=true,ResourceCleanup=false"
+			Expect(utils.UpdateHubFeatureGates(tc.ctx, tc.kClient, hub, patchFeatureGates)).To(Succeed())
 		})
 
 		It("should update addon variable values and verify resources are updated", func() {
