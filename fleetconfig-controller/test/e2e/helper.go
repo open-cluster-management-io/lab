@@ -631,3 +631,13 @@ func deployV1alpha1FleetConfig(tc *E2EContext) error {
 	}
 	return nil
 }
+
+// featureGateHasMode reports whether gates contains feature set to mode.
+func featureGateHasMode(gates []operatorv1.FeatureGate, feature string, mode operatorv1.FeatureGateModeType) bool {
+	for _, g := range gates {
+		if g.Feature == feature && g.Mode == mode {
+			return true
+		}
+	}
+	return false
+}

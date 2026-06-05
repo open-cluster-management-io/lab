@@ -24,7 +24,7 @@ import (
 const (
 	warnHubNotFound       = "hub not found, cannot validate spoke addons"
 	errAllowedSpokeUpdate = "spoke contains changes which are not allowed; only changes to spec.klusterlet.annotations, spec.klusterlet.values, spec.klusterlet.valuesFrom, spec.klusterlet.addonKubeClientRegistrationAuth, spec.klusterlet.addonTokenExpirationSeconds, spec.kubeconfig, spec.addOns, spec.cleanupConfig (any field), spec.timeout, and spec.logVerbosity are allowed when updating a spoke"
-	errAllowedHubUpdate   = "only changes to spec.apiServer, spec.clusterManager.source.*, spec.clusterManager.values, spec.clusterManager.valuesFrom, spec.hubAddOns, spec.addOnConfigs, spec.logVerbosity, spec.timeout, spec.registrationAuth, and spec.kubeconfig are allowed when updating the hub"
+	errAllowedHubUpdate   = "only changes to spec.apiServer, spec.clusterManager.source.*, spec.clusterManager.values, spec.clusterManager.valuesFrom, spec.clusterManager.featureGates, spec.hubAddOns, spec.addOnConfigs, spec.logVerbosity, spec.timeout, spec.registrationAuth, and spec.kubeconfig are allowed when updating the hub"
 )
 
 func isKubeconfigValid(kubeconfig v1beta1.Kubeconfig) (bool, string) {
@@ -41,6 +41,9 @@ func isKubeconfigValid(kubeconfig v1beta1.Kubeconfig) (bool, string) {
 // Allowed changes include:
 // - spec.apiServer
 // - spec.clusterManager.source.*
+// - spec.clusterManager.values
+// - spec.clusterManager.valuesFrom
+// - spec.clusterManager.featureGates
 // - spec.hubAddOns
 // - spec.addOnConfigs
 // - spec.logVerbosity
@@ -52,16 +55,18 @@ func allowHubUpdate(oldHub, newHub *v1beta1.Hub) error {
 		oldHubCopy := oldHub.Spec.DeepCopy()
 		newHubCopy := newHub.Spec.DeepCopy()
 
-		// Allow changes to ClusterManager.Source, Values, and ValuesFrom
+		// Allow changes to ClusterManager.Source, Values, ValuesFrom, and FeatureGates
 		if oldHubCopy.ClusterManager != nil {
 			oldHubCopy.ClusterManager.Source = (v1beta1.OCMSource{})
 			oldHubCopy.ClusterManager.Values = nil
 			oldHubCopy.ClusterManager.ValuesFrom = nil
+			oldHubCopy.ClusterManager.FeatureGates = ""
 		}
 		if newHubCopy.ClusterManager != nil {
 			newHubCopy.ClusterManager.Source = (v1beta1.OCMSource{})
 			newHubCopy.ClusterManager.Values = nil
 			newHubCopy.ClusterManager.ValuesFrom = nil
+			newHubCopy.ClusterManager.FeatureGates = ""
 		}
 
 		// Allow changes to API Server

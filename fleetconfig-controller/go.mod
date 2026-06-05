@@ -15,6 +15,7 @@ require (
 	k8s.io/api v0.36.1
 	k8s.io/apimachinery v0.36.1
 	k8s.io/client-go v0.36.1
+	k8s.io/component-base v0.36.1
 	k8s.io/kubectl v0.36.1
 	k8s.io/utils v0.0.0-20260507154919-ff6756f316d2
 	open-cluster-management.io/api v1.3.0
@@ -106,6 +107,8 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
+	go.opentelemetry.io/otel v1.43.0 // indirect
+	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.podman.io/storage v1.62.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.1 // indirect

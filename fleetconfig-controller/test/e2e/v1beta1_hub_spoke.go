@@ -80,7 +80,7 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 	// 1. Cluster joining (spoke and hub-as-spoke) to the hub
 	// 2. Addon configuration on hub and installation on spoke; ClusterManager.Values applied on the hub
 	// 3. ManifestWork creation in hub-as-spoke namespace and namespace creation validation
-	// 4. Prevention of feature gate modifications during active operation
+	// 4. Propagation of feature gate modifications to the ClusterManager during active operation
 	// 5. Addon update and propagation
 	// 6. Spoke removal with proper deregistration from hub
 	// 7. ManagedCluster and namespace deletion validation
@@ -300,13 +300,52 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 			}, 2*time.Minute, 10*time.Second).Should(Succeed())
 		})
 
-		It("should not allow changes to the Hub resource", func() {
+		It("should propagate Hub feature gate changes to the ClusterManager", func() {
+			clusterManagerNN := ktypes.NamespacedName{Name: "cluster-manager"}
 
-			By("failing to patch the Hub's feature gates")
+			By("capturing the ClusterManager feature gates before the change")
+			cmBefore := &operatorv1.ClusterManager{}
+			Expect(tc.kClient.Get(tc.ctx, clusterManagerNN, cmBefore)).To(Succeed())
+			var workBefore []operatorv1.FeatureGate
+			if cmBefore.Spec.WorkConfiguration != nil {
+				workBefore = cmBefore.Spec.WorkConfiguration.FeatureGates
+			}
+			Expect(featureGateHasMode(workBefore, "ManifestWorkReplicaSet", operatorv1.FeatureGateModeTypeEnable)).
+				To(BeTrue(), "ManifestWorkReplicaSet should be enabled before the change")
+
+			By("patching the Hub's feature gates")
 			hub, err := utils.GetHub(tc.ctx, tc.kClient, v1beta1hubNN)
 			Expect(err).NotTo(HaveOccurred())
-			patchFeatureGates := "DefaultClusterSet=true,ManifestWorkReplicaSet=true,ResourceCleanup=false"
-			Expect(utils.UpdateHubFeatureGates(tc.ctx, tc.kClient, hub, patchFeatureGates)).ToNot(Succeed())
+			patchFeatureGates := "DefaultClusterSet=true,ManifestWorkReplicaSet=false,ResourceCleanup=false"
+			Expect(utils.UpdateHubFeatureGates(tc.ctx, tc.kClient, hub, patchFeatureGates)).To(Succeed())
+
+			By("verifying the feature gate change is propagated to the ClusterManager")
+			EventuallyWithOffset(1, func() error {
+				cm := &operatorv1.ClusterManager{}
+				if err := tc.kClient.Get(tc.ctx, clusterManagerNN, cm); err != nil {
+					return err
+				}
+				var work, registration []operatorv1.FeatureGate
+				if cm.Spec.WorkConfiguration != nil {
+					work = cm.Spec.WorkConfiguration.FeatureGates
+				}
+				if cm.Spec.RegistrationConfiguration != nil {
+					registration = cm.Spec.RegistrationConfiguration.FeatureGates
+				}
+				if featureGateHasMode(work, "ManifestWorkReplicaSet", operatorv1.FeatureGateModeTypeEnable) {
+					return fmt.Errorf("ManifestWorkReplicaSet still enabled on workConfiguration: %+v", work)
+				}
+				if !featureGateHasMode(registration, "ResourceCleanup", operatorv1.FeatureGateModeTypeDisable) {
+					return fmt.Errorf("ResourceCleanup not disabled on registrationConfiguration: %+v", registration)
+				}
+				return nil
+			}, 5*time.Minute, 10*time.Second).Should(Succeed())
+
+			By("re-enabling the ManifestWorkReplicaSet feature gate")
+			hub, err = utils.GetHub(tc.ctx, tc.kClient, v1beta1hubNN)
+			Expect(err).NotTo(HaveOccurred())
+			patchFeatureGates = "DefaultClusterSet=true,ManifestWorkReplicaSet=true,ResourceCleanup=true"
+			Expect(utils.UpdateHubFeatureGates(tc.ctx, tc.kClient, hub, patchFeatureGates)).To(Succeed())
 		})
 
 		It("should update addon variable values and verify resources are updated", func() {
