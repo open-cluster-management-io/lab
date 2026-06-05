@@ -357,9 +357,7 @@ func (r *HubReconciler) clusterManagerChartState(ctx context.Context, hub *v1bet
 	}
 	// Fold feature gates into the merged values so a featureGates change alters the
 	// hash (triggering an upgrade) and is carried in --cluster-manager-values-file.
-	if err := applyHubFeatureGates(merged, hub.Spec.ClusterManager.FeatureGates); err != nil {
-		return nil, "", false, fmt.Errorf("failed to apply hub %s feature gates to cluster-manager values: %w", hub.Name, err)
-	}
+	applyHubFeatureGates(merged, hub.Spec.ClusterManager.FeatureGates)
 	currHash, err = hash.ComputeHash(merged)
 	if err != nil {
 		return nil, "", false, fmt.Errorf("failed to compute hash of hub %s cluster-manager values: %w", hub.Name, err)

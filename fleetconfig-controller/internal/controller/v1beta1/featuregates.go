@@ -17,8 +17,9 @@ limitations under the License.
 package v1beta1
 
 import (
-	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 
 	"k8s.io/component-base/featuregate"
 	ocmfeature "open-cluster-management.io/api/feature"
@@ -27,79 +28,79 @@ import (
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 )
 
-// applyHubFeatureGates folds the hub's feature-gate string into the cluster-manager
-// chart values so that feature-gate changes are both detected and propagated.
+// applyHubFeatureGates writes the hub's explicitly-specified feature gates into the
+// cluster-manager chart values, routed to the registration/work/addon-manager
+// configuration each gate belongs to.
 //
-// clusteradm init applies feature gates via the --feature-gates flag, but
-// 'clusteradm upgrade clustermanager' has no such flag: it reconstructs the
-// registration/work/addon-manager configurations from the live ClusterManager CR
-// and then merges --cluster-manager-values-file on top (the file overrides the CR).
-// Writing the gates into the merged chart values therefore lets feature-gate changes
-// (a) alter the values hash, which is what triggers an upgrade, and (b) override the
-// gates carried forward from the CR during that upgrade. The translation mirrors
-// clusteradm's hub init so init and upgrade converge on the same ClusterManager.
-func applyHubFeatureGates(values *v1beta1.ClusterManagerChartConfig, featureGates string) error {
-	registration, work, addOnManager, err := hubFeatureGates(featureGates)
-	if err != nil {
-		return err
-	}
+// Only gates named in featureGates are written. Gates that are not specified are
+// deliberately left out so the ClusterManager operator applies its own default for
+// them: the operator's default is tied to the running OCM bundle and may differ from
+// (or be newer than) this controller's compiled-in defaults, and may be enabled. We
+// must not pin an unspecified gate to a default we guessed.
+//
+// clusteradm upgrade clustermanager merges the values file onto the live
+// ClusterManager via yaml.Unmarshal: a featureGates slice replaces that component's
+// gates wholesale, while a missing key is left untouched. So for a component the hub
+// specifies at least one gate in, the written slice fully defines that component's
+// gates (unspecified ones fall back to the operator default); for a component the hub
+// specifies nothing in, the slice is empty, omitempty drops the key, and the
+// ClusterManager keeps whatever clusteradm init established (again the operator
+// default). Writing each specified gate explicitly — including those set to false —
+// is what lets a change reach the ClusterManager; dropping disabled gates produced an
+// empty list that omitempty removed, so a disabled gate never overrode a
+// previously-enabled value.
+func applyHubFeatureGates(values *v1beta1.ClusterManagerChartConfig, featureGates string) {
+	registration, work, addOnManager := hubFeatureGates(featureGates)
 	values.ClusterManager.RegistrationConfiguration.FeatureGates = registration
 	values.ClusterManager.WorkConfiguration.FeatureGates = work
 	values.ClusterManager.AddOnManagerConfiguration.FeatureGates = addOnManager
-	return nil
 }
 
-// hubFeatureGates parses the comma-separated feature-gate string (same format as
-// 'clusteradm init --feature-gates', e.g. "AddonManagement=true,ResourceCleanup=false")
-// and returns the registration, work, and addon-manager FeatureGate lists for a hub.
-func hubFeatureGates(featureGates string) (registration, work, addOnManager []operatorv1.FeatureGate, err error) {
-	fg := featuregate.NewFeatureGate()
-	for _, defaults := range []map[featuregate.Feature]featuregate.FeatureSpec{
-		ocmfeature.DefaultHubRegistrationFeatureGates,
-		ocmfeature.DefaultHubWorkFeatureGates,
-		ocmfeature.DefaultHubAddonManagerFeatureGates,
-	} {
-		if err := fg.Add(defaults); err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to register hub feature gates: %w", err)
-		}
-	}
-
-	if featureGates != "" {
-		if err := fg.Set(featureGates); err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to parse feature gates %q: %w", featureGates, err)
-		}
-	}
-
-	return featureGatesForComponent(fg, ocmfeature.DefaultHubRegistrationFeatureGates),
-		featureGatesForComponent(fg, ocmfeature.DefaultHubWorkFeatureGates),
-		featureGatesForComponent(fg, ocmfeature.DefaultHubAddonManagerFeatureGates),
-		nil
+// hubFeatureGates parses the feature-gate string and returns the explicitly-specified
+// gates routed to the registration, work, and addon-manager components.
+func hubFeatureGates(featureGates string) (registration, work, addOnManager []operatorv1.FeatureGate) {
+	specified := parseFeatureGates(featureGates)
+	return componentFeatureGates(specified, ocmfeature.DefaultHubRegistrationFeatureGates),
+		componentFeatureGates(specified, ocmfeature.DefaultHubWorkFeatureGates),
+		componentFeatureGates(specified, ocmfeature.DefaultHubAddonManagerFeatureGates)
 }
 
-// featureGatesForComponent returns the operatorv1 FeatureGate list for a single
-// component, with an explicit Enable/Disable entry for every gate known to that
-// component.
-//
-// Unlike clusteradm's init-time conversion (which omits disabled default-off gates
-// and lets the operator default apply), every gate is listed explicitly. The lists
-// are written to --cluster-manager-values-file, which 'clusteradm upgrade
-// clustermanager' merges onto the existing ClusterManager via yaml.Unmarshal: a
-// slice replaces wholesale, but a *missing* key is left untouched. An empty list is
-// dropped by omitempty, so a disabled default-off gate (e.g. ManifestWorkReplicaSet,
-// whose component has no default-on gates) would otherwise produce
-// `workConfiguration: {}` and never override a previously-enabled value. Emitting all
-// gates explicitly makes the merge set the exact desired state on every reconcile.
-//
-// Sorted by feature name so the cluster-manager values hash is stable across
-// reconciles (Go map iteration order is otherwise non-deterministic).
-func featureGatesForComponent(featureGates featuregate.MutableFeatureGate, defaultFeatureGate map[featuregate.Feature]featuregate.FeatureSpec) []operatorv1.FeatureGate {
-	features := make([]operatorv1.FeatureGate, 0, len(defaultFeatureGate))
-	for feature := range defaultFeatureGate {
+// parseFeatureGates parses the comma-separated "key=bool" string (the same format as
+// clusteradm init --feature-gates, e.g. "AddonManagement=true,ResourceCleanup=false")
+// into a map of explicitly-set gates. Malformed or valueless pairs are skipped;
+// clusteradm validates the raw string against the running bundle when the hub is
+// initialized (the controller passes it verbatim via --feature-gates).
+func parseFeatureGates(featureGates string) map[string]bool {
+	specified := map[string]bool{}
+	for _, pair := range strings.Split(featureGates, ",") {
+		key, value, found := strings.Cut(strings.TrimSpace(pair), "=")
+		if !found {
+			continue
+		}
+		enabled, err := strconv.ParseBool(strings.TrimSpace(value))
+		if err != nil {
+			continue
+		}
+		specified[strings.TrimSpace(key)] = enabled
+	}
+	return specified
+}
+
+// componentFeatureGates returns operatorv1 FeatureGate entries for the specified gates
+// that belong to the given component, sorted by name so the cluster-manager values
+// hash is stable across reconciles (Go map iteration order is otherwise
+// non-deterministic). Gates not known to the component are skipped.
+func componentFeatureGates(specified map[string]bool, known map[featuregate.Feature]featuregate.FeatureSpec) []operatorv1.FeatureGate {
+	var features []operatorv1.FeatureGate
+	for name, enabled := range specified {
+		if _, ok := known[featuregate.Feature(name)]; !ok {
+			continue
+		}
 		mode := operatorv1.FeatureGateModeTypeDisable
-		if featureGates.Enabled(feature) {
+		if enabled {
 			mode = operatorv1.FeatureGateModeTypeEnable
 		}
-		features = append(features, operatorv1.FeatureGate{Feature: string(feature), Mode: mode})
+		features = append(features, operatorv1.FeatureGate{Feature: name, Mode: mode})
 	}
 
 	sort.Slice(features, func(i, j int) bool {
