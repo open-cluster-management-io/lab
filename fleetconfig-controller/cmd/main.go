@@ -36,6 +36,7 @@ import (
 	apiv1alpha1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
 	apiv1beta1 "github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/cmd/manager"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	clusterv1beta1 "open-cluster-management.io/api/cluster/v1beta1"
 	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	// +kubebuilder:scaffold:imports
@@ -50,6 +51,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(apiv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(apiv1beta1.AddToScheme(scheme))
+	utilruntime.Must(clusterv1.Install(scheme))
 	if err := clusterv1beta1.Install(scheme); err != nil {
 		panic(err)
 	}

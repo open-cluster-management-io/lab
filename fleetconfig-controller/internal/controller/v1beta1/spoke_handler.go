@@ -225,6 +225,76 @@ func syncManagedClusterAnnotations(current, requested map[string]string) map[str
 	return result
 }
 
+// syncSpokeAnnotations merges the ManagedCluster's annotations into the Spoke's existing
+// annotations. The merge is purely additive: every annotation present on the ManagedCluster
+// is added to (or updated on) the Spoke, but no existing Spoke annotation is ever removed.
+// It returns the merged annotation set and whether anything changed.
+func syncSpokeAnnotations(current, fromManagedCluster map[string]string) (map[string]string, bool) {
+	result := maps.Clone(current)
+	if result == nil {
+		result = map[string]string{}
+	}
+
+	changed := false
+	for k, v := range fromManagedCluster {
+		if existing, ok := result[k]; !ok || existing != v {
+			result[k] = v
+			changed = true
+		}
+	}
+
+	return result, changed
+}
+
+// syncManagedClusterMetadata reconciles metadata between the ManagedCluster and its Spoke:
+// it syncs the requested klusterlet annotations and Spoke ownership labels onto the ManagedCluster,
+// updating it only when something changed, then performs a purely additive sync of the
+// ManagedCluster's annotations back onto the Spoke.
+func (r *SpokeReconciler) syncManagedClusterMetadata(
+	ctx context.Context,
+	clusterClient *clusterapi.Clientset,
+	spoke *v1beta1.Spoke,
+	managedCluster *clusterv1.ManagedCluster,
+	klusterletValues *v1beta1.KlusterletChartConfig,
+) error {
+	logger := log.FromContext(ctx)
+
+	var needsUpdate bool
+
+	klusterletValuesAnnotations := map[string]string{}
+	if klusterletValues != nil {
+		klusterletValuesAnnotations = klusterletValues.Klusterlet.RegistrationConfiguration.ClusterAnnotations
+	}
+	requestedAnnotations := mergeKlusterletAnnotations(spoke.Spec.Klusterlet.Annotations, klusterletValuesAnnotations)
+	updatedAnnotations := syncManagedClusterAnnotations(managedCluster.GetAnnotations(), requestedAnnotations)
+	if !reflect.DeepEqual(updatedAnnotations, managedCluster.GetAnnotations()) {
+		managedCluster.SetAnnotations(updatedAnnotations)
+		needsUpdate = true
+	}
+
+	updatedLabels := syncManagedClusterLabels(managedCluster.GetLabels(), spoke.Namespace, spoke.Name)
+	if !reflect.DeepEqual(updatedLabels, managedCluster.GetLabels()) {
+		managedCluster.SetLabels(updatedLabels)
+		needsUpdate = true
+	}
+
+	if needsUpdate {
+		if err := common.UpdateManagedCluster(ctx, clusterClient, managedCluster); err != nil {
+			return err
+		}
+		logger.V(1).Info("synced ManagedCluster metadata")
+	}
+
+	// Purely additive sync of the ManagedCluster's annotations back onto the Spoke.
+	if merged, changed := syncSpokeAnnotations(spoke.GetAnnotations(), managedCluster.GetAnnotations()); changed {
+		spoke.SetAnnotations(merged)
+		logger.V(1).Info("synced ManagedCluster annotations to Spoke")
+	}
+
+	spoke.Status.ManagedClusterName = managedCluster.Name
+	return nil
+}
+
 // doHubWork handles hub-side work such as joins and addons
 func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, hubMeta hubMeta, klusterletValues *v1beta1.KlusterletChartConfig) error {
 	logger := log.FromContext(ctx)
@@ -295,35 +365,10 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 		logger.V(1).Info("Added SpokeCleanupFinalizer after successful join")
 	}
 
-	// TODO - handle this via `klusterlet upgrade` once https://github.com/open-cluster-management-io/ocm/issues/1210 is resolved
 	if managedCluster != nil {
-		var needsUpdate bool
-
-		klusterletValuesAnnotations := map[string]string{}
-		if klusterletValues != nil {
-			klusterletValuesAnnotations = klusterletValues.Klusterlet.RegistrationConfiguration.ClusterAnnotations
+		if err = r.syncManagedClusterMetadata(ctx, clusterClient, spoke, managedCluster, klusterletValues); err != nil {
+			return err
 		}
-		requestedAnnotations := mergeKlusterletAnnotations(spoke.Spec.Klusterlet.Annotations, klusterletValuesAnnotations)
-		updatedAnnotations := syncManagedClusterAnnotations(managedCluster.GetAnnotations(), requestedAnnotations)
-		if !reflect.DeepEqual(updatedAnnotations, managedCluster.GetAnnotations()) {
-			managedCluster.SetAnnotations(updatedAnnotations)
-			needsUpdate = true
-		}
-
-		updatedLabels := syncManagedClusterLabels(managedCluster.GetLabels(), spoke.Namespace, spoke.Name)
-		if !reflect.DeepEqual(updatedLabels, managedCluster.GetLabels()) {
-			managedCluster.SetLabels(updatedLabels)
-			needsUpdate = true
-		}
-
-		if needsUpdate {
-			if err = common.UpdateManagedCluster(ctx, clusterClient, managedCluster); err != nil {
-				return err
-			}
-			logger.V(1).Info("synced ManagedCluster metadata")
-		}
-
-		spoke.Status.ManagedClusterName = managedCluster.Name
 	}
 
 	// precreate the namespace that the agent will be installed into

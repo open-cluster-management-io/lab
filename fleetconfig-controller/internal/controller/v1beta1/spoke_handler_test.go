@@ -171,6 +171,123 @@ func TestSyncManagedClusterAnnotations(t *testing.T) {
 	}
 }
 
+func TestSyncSpokeAnnotations(t *testing.T) {
+	tests := []struct {
+		name               string
+		current            map[string]string
+		fromManagedCluster map[string]string
+		want               map[string]string
+		wantChanged        bool
+	}{
+		{
+			name:    "add annotations to spoke without any",
+			current: nil,
+			fromManagedCluster: map[string]string{
+				"agent.open-cluster-management.io/test": "true",
+			},
+			want: map[string]string{
+				"agent.open-cluster-management.io/test": "true",
+			},
+			wantChanged: true,
+		},
+		{
+			name: "additively merge, preserving existing spoke annotations",
+			current: map[string]string{
+				"keep.io/annotation": "keep-me",
+			},
+			fromManagedCluster: map[string]string{
+				"agent.open-cluster-management.io/test": "true",
+			},
+			want: map[string]string{
+				"keep.io/annotation":                    "keep-me",
+				"agent.open-cluster-management.io/test": "true",
+			},
+			wantChanged: true,
+		},
+		{
+			name: "update value of existing annotation",
+			current: map[string]string{
+				"agent.open-cluster-management.io/test": "false",
+			},
+			fromManagedCluster: map[string]string{
+				"agent.open-cluster-management.io/test": "true",
+			},
+			want: map[string]string{
+				"agent.open-cluster-management.io/test": "true",
+			},
+			wantChanged: true,
+		},
+		{
+			name: "never remove spoke annotations absent from ManagedCluster",
+			current: map[string]string{
+				"keep.io/annotation":  "keep-me",
+				"other.io/annotation": "also-keep",
+			},
+			fromManagedCluster: map[string]string{
+				"keep.io/annotation": "keep-me",
+			},
+			want: map[string]string{
+				"keep.io/annotation":  "keep-me",
+				"other.io/annotation": "also-keep",
+			},
+			wantChanged: false,
+		},
+		{
+			name: "no change when all ManagedCluster annotations already present",
+			current: map[string]string{
+				"keep.io/annotation":                    "keep-me",
+				"agent.open-cluster-management.io/test": "true",
+			},
+			fromManagedCluster: map[string]string{
+				"agent.open-cluster-management.io/test": "true",
+			},
+			want: map[string]string{
+				"keep.io/annotation":                    "keep-me",
+				"agent.open-cluster-management.io/test": "true",
+			},
+			wantChanged: false,
+		},
+		{
+			name:               "no change with empty ManagedCluster annotations",
+			current:            map[string]string{"keep.io/annotation": "keep-me"},
+			fromManagedCluster: map[string]string{},
+			want:               map[string]string{"keep.io/annotation": "keep-me"},
+			wantChanged:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, changed := syncSpokeAnnotations(tt.current, tt.fromManagedCluster)
+
+			if changed != tt.wantChanged {
+				t.Errorf("syncSpokeAnnotations() changed = %v, want %v", changed, tt.wantChanged)
+			}
+
+			if len(got) != len(tt.want) {
+				t.Errorf("syncSpokeAnnotations() returned %d annotations, want %d", len(got), len(tt.want))
+			}
+
+			for key, wantValue := range tt.want {
+				gotValue, ok := got[key]
+				if !ok {
+					t.Errorf("syncSpokeAnnotations() missing key %q", key)
+					continue
+				}
+				if gotValue != wantValue {
+					t.Errorf("syncSpokeAnnotations() key %q = %q, want %q", key, gotValue, wantValue)
+				}
+			}
+
+			for key := range got {
+				if _, ok := tt.want[key]; !ok {
+					t.Errorf("syncSpokeAnnotations() has unexpected key %q with value %q", key, got[key])
+				}
+			}
+		})
+	}
+}
+
 // TestAppendJoinSpokeTransportAndAuthArgs_CleanupLifecycle verifies that temp files
 // referenced by --ca-file, --grpc-ca-file, and --proxy-ca-file exist when the helper
 // returns, and are deleted once the returned cleanup func runs.
