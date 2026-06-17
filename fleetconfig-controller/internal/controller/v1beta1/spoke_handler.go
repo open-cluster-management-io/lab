@@ -8,7 +8,6 @@ import (
 	"maps"
 	"os"
 	"os/exec"
-	"reflect"
 	"slices"
 	"sort"
 	"strconv"
@@ -267,13 +266,13 @@ func (r *SpokeReconciler) syncManagedClusterMetadata(
 	}
 	requestedAnnotations := mergeKlusterletAnnotations(spoke.Spec.Klusterlet.Annotations, klusterletValuesAnnotations)
 	updatedAnnotations := syncManagedClusterAnnotations(managedCluster.GetAnnotations(), requestedAnnotations)
-	if !reflect.DeepEqual(updatedAnnotations, managedCluster.GetAnnotations()) {
+	if !maps.Equal(updatedAnnotations, managedCluster.GetAnnotations()) {
 		managedCluster.SetAnnotations(updatedAnnotations)
 		needsUpdate = true
 	}
 
 	updatedLabels := syncManagedClusterLabels(managedCluster.GetLabels(), spoke.Namespace, spoke.Name)
-	if !reflect.DeepEqual(updatedLabels, managedCluster.GetLabels()) {
+	if !maps.Equal(updatedLabels, managedCluster.GetLabels()) {
 		managedCluster.SetLabels(updatedLabels)
 		needsUpdate = true
 	}
