@@ -46,6 +46,7 @@ import (
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/kube"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/internal/watch"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/pkg/common"
+	clusterv1 "open-cluster-management.io/api/cluster/v1"
 )
 
 // SpokeReconciler reconciles a Spoke object
@@ -60,6 +61,7 @@ type SpokeReconciler struct {
 // +kubebuilder:rbac:groups=fleetconfig.open-cluster-management.io,resources=spokes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=fleetconfig.open-cluster-management.io,resources=spokes/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=fleetconfig.open-cluster-management.io,resources=spokes/finalizers,verbs=update
+// +kubebuilder:rbac:groups=cluster.open-cluster-management.io,resources=managedclusters,verbs=get;list;watch;update;patch
 
 // Reconcile is the main reconcile loop for the Spoke resource.
 func (r *SpokeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -264,6 +266,11 @@ func (r *SpokeReconciler) SetupWithManagerForHub(mgr ctrl.Manager) error {
 				},
 			}),
 		).
+		// watch ManagedClusters to sync metadata and status changes back to the owning Spoke
+		Watches(
+			&clusterv1.ManagedCluster{},
+			handler.EnqueueRequestsFromMapFunc(r.mapManagedClusterEventToSpoke),
+		).
 		Named("spoke").
 		Complete(r)
 }
@@ -384,6 +391,27 @@ func agentSelfDestruct(ctx context.Context, _ client.Client) error {
 func sharedFieldsChanged(oldSpec, newSpec *v1beta1.HubSpec) bool {
 	return !reflect.DeepEqual(oldSpec.RegistrationAuth, newSpec.RegistrationAuth) ||
 		!reflect.DeepEqual(oldSpec.ClusterManager.Source, newSpec.ClusterManager.Source)
+}
+
+func (r *SpokeReconciler) mapManagedClusterEventToSpoke(_ context.Context, obj client.Object) []reconcile.Request {
+	mc, ok := obj.(*clusterv1.ManagedCluster)
+	if !ok {
+		r.Log.V(1).Info("failed to enqueue spoke requests", "expected", "ManagedCluster", "got", fmt.Sprintf("%T", obj))
+		return nil
+	}
+
+	spokeName, hasName := mc.Labels[v1beta1.LabelSpokeName]
+	spokeNamespace, hasNamespace := mc.Labels[v1beta1.LabelSpokeNamespace]
+	if !hasName || !hasNamespace || spokeName == "" || spokeNamespace == "" {
+		return nil
+	}
+
+	return []reconcile.Request{{
+		NamespacedName: types.NamespacedName{
+			Name:      spokeName,
+			Namespace: spokeNamespace,
+		},
+	}}
 }
 
 func (r *SpokeReconciler) mapHubEventToSpoke(ctx context.Context, obj client.Object) []reconcile.Request {
