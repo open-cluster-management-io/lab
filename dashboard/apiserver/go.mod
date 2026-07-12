@@ -10,7 +10,7 @@ require (
 	k8s.io/apimachinery v0.36.2
 	k8s.io/client-go v0.36.2
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
-	open-cluster-management.io/api v0.16.2
+	open-cluster-management.io/api v1.3.0
 )
 
 require (
