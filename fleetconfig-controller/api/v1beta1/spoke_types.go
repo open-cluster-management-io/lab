@@ -180,11 +180,13 @@ type Klusterlet struct {
 
 	// A set of comma-separated pairs of the form 'key1=value1,key2=value2' that describe feature gates for alpha/experimental features.
 	// Options are:
-	//  - AddonManagement (ALPHA - default=true)
+	//  - AddonManagement (BETA - default=true)
 	//  - AllAlpha (ALPHA - default=false)
 	//  - AllBeta (BETA - default=false)
-	//  - ClusterClaim (ALPHA - default=true)
+	//  - ClusterClaim (BETA - default=true)
+	//  - ClusterProperty (ALPHA - default=false)
 	//  - ExecutorValidatingCaches (ALPHA - default=false)
+	//  - MultipleHubs (ALPHA - default=false)
 	//  - RawFeedbackJsonString (ALPHA - default=false)
 	//  - V1beta1CSRAPICompatibility (ALPHA - default=false)
 	// +kubebuilder:default:="AddonManagement=true,ClusterClaim=true"

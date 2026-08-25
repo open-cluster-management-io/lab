@@ -37,11 +37,13 @@ Uncomment and configure `fleetConfig.spokeFeatureGates` to enable feature gates 
 Do not disable the feature gates that are enabled by default.
 
 Available Spoke Feature Gates:
-- **AddonManagement** (ALPHA - default=true) - Enables addon management functionality
+- **AddonManagement** (BETA - default=true) - Enables addon management functionality
 - **AllAlpha** (ALPHA - default=false) - Enables all alpha features
 - **AllBeta** (BETA - default=false) - Enables all beta features
-- **ClusterClaim** (ALPHA - default=true) - Enables cluster claim functionality
+- **ClusterClaim** (BETA - default=true) - Enables cluster claim functionality
+- **ClusterProperty** (ALPHA - default=false) - Enables cluster property functionality
 - **ExecutorValidatingCaches** (ALPHA - default=false) - Enables executor validating caches
+- **MultipleHubs** (ALPHA - default=false) - Enables multiple bootstrap kubeconfigs connecting to different hubs
 - **RawFeedbackJsonString** (ALPHA - default=false) - Enables raw feedback JSON string support
 - **V1beta1CSRAPICompatibility** (ALPHA - default=false) - Enables v1beta1 CSR API compatibility
 ### Registration Authentication Configuration
@@ -54,11 +56,13 @@ Available fields:
 Feature gates for the Hub's Cluster Manager. Do not disable the feature gates that are enabled by default.
 
 Available Hub Cluster Manager Feature Gates:
-- **AddonManagement** (ALPHA - default=true) - Enables addon management functionality
+- **AddonManagement** (BETA - default=true) - Enables addon management functionality
 - **AllAlpha** (ALPHA - default=false) - Enables all alpha features
 - **AllBeta** (BETA - default=false) - Enables all beta features
 - **CloudEventsDrivers** (ALPHA - default=false) - Enables cloud events drivers
-- **DefaultClusterSet** (ALPHA - default=false) - Enables default cluster set functionality
+- **ClusterImporter** (ALPHA - default=false) - Enables auto import of managed clusters for certain cluster providers
+- **ClusterProfile** (ALPHA - default=false) - Enables syncing of ManagedCluster to ClusterProfile
+- **DefaultClusterSet** (ALPHA - default=true) - Enables default cluster set functionality
 - **ManagedClusterAutoApproval** (ALPHA - default=false) - Enables automatic managed cluster approval
 - **ManifestWorkReplicaSet** (ALPHA - default=false) - Enables manifest work replica set functionality
 - **NilExecutorValidating** (ALPHA - default=false) - Enables nil executor validation
@@ -90,7 +94,7 @@ Resource specifications for all klusterlet-managed containers.
 | `fleetConfig.timeout`                                                                     | Timeout in seconds for all clusteradm operations, including init, accept, join, upgrade, etc.                                                                                                                                                                                                                                                                                                                                                                                                         | `300`                             |
 | `fleetConfig.logVerbosity`                                                                | Log verbosity. Valid values: 0-10, 0 is the least verbose, 10 is the most verbose.                                                                                                                                                                                                                                                                                                                                                                                                                    | `0`                               |
 | `fleetConfig.spokeAnnotations`                                                            | Global annotations to apply to all spoke clusters. If not present, the 'agent.open-cluster-management.io/' prefix is added to each key. Each annotation is added to klusterlet.spec.registrationConfiguration.clusterAnnotations on every spoke and subsequently to the ManagedClusters on the hub. Per-spoke annotations take precedence over the global annotations.                                                                                                                                | `{}`                              |
-| `fleetConfig.spokeFeatureGates.ClusterClaim`                                              | ClusterClaim feature gate (ALPHA - default=true). Enables cluster claim functionality.                                                                                                                                                                                                                                                                                                                                                                                                                | `true`                            |
+| `fleetConfig.spokeFeatureGates.ClusterClaim`                                              | ClusterClaim feature gate (BETA - default=true). Enables cluster claim functionality.                                                                                                                                                                                                                                                                                                                                                                                                                 | `true`                            |
 | `fleetConfig.spokeFeatureGates.RawFeedbackJsonString`                                     | RawFeedbackJsonString feature gate (ALPHA - default=false). Enables raw feedback JSON string support.                                                                                                                                                                                                                                                                                                                                                                                                 | `true`                            |
 | `fleetConfig.source.bundleVersion`                                                        | Bundle version.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `v1.3.1`                          |
 | `fleetConfig.source.registry`                                                             | Image registry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `quay.io/open-cluster-management` |
