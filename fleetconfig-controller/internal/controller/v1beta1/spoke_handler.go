@@ -1251,10 +1251,14 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, m
 		"--wait=true",
 		// klusterlet args
 		"--mode", spoke.Spec.Klusterlet.Mode,
-		"--feature-gates", spoke.Spec.Klusterlet.FeatureGates,
 		fmt.Sprintf("--force-internal-endpoint-lookup=%t", spoke.Spec.Klusterlet.ForceInternalEndpointLookup),
 		fmt.Sprintf("--singleton=%t", spoke.Spec.Klusterlet.Singleton),
 	}, spoke.BaseArgs()...)
+
+	// Omit --feature-gates entirely when no gates are specified.
+	if spoke.Spec.Klusterlet.FeatureGates != "" {
+		joinArgs = append(joinArgs, "--feature-gates", spoke.Spec.Klusterlet.FeatureGates)
+	}
 
 	if hub.Spec.ClusterManager != nil {
 		// source args

@@ -547,7 +547,10 @@ func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub, hub
 		}
 	} else if hub.Spec.ClusterManager != nil {
 		// clustermanager args
-		initArgs = append(initArgs, "--feature-gates", hub.Spec.ClusterManager.FeatureGates)
+		// Omit --feature-gates entirely when no gates are specified.
+		if hub.Spec.ClusterManager.FeatureGates != "" {
+			initArgs = append(initArgs, "--feature-gates", hub.Spec.ClusterManager.FeatureGates)
+		}
 		initArgs = append(initArgs, fmt.Sprintf("--use-bootstrap-token=%t", hub.Spec.ClusterManager.UseBootstrapToken))
 		// source args
 		initArgs = append(initArgs, "--bundle-version", hub.Spec.ClusterManager.Source.BundleVersion)
