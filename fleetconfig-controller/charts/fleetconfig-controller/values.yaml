@@ -22,16 +22,18 @@ fleetConfig:
   ## Do not disable the feature gates that are enabled by default.
   ##
   ## Available Spoke Feature Gates:
-  ## - **AddonManagement** (ALPHA - default=true) - Enables addon management functionality
+  ## - **AddonManagement** (BETA - default=true) - Enables addon management functionality
   ## - **AllAlpha** (ALPHA - default=false) - Enables all alpha features
   ## - **AllBeta** (BETA - default=false) - Enables all beta features
-  ## - **ClusterClaim** (ALPHA - default=true) - Enables cluster claim functionality
+  ## - **ClusterClaim** (BETA - default=true) - Enables cluster claim functionality
+  ## - **ClusterProperty** (ALPHA - default=false) - Enables cluster property functionality
   ## - **ExecutorValidatingCaches** (ALPHA - default=false) - Enables executor validating caches
+  ## - **MultipleHubs** (ALPHA - default=false) - Enables multiple bootstrap kubeconfigs connecting to different hubs
   ## - **RawFeedbackJsonString** (ALPHA - default=false) - Enables raw feedback JSON string support
   ## - **V1beta1CSRAPICompatibility** (ALPHA - default=false) - Enables v1beta1 CSR API compatibility
   ## @descriptionEnd
   spokeFeatureGates:
-    ## @param fleetConfig.spokeFeatureGates.ClusterClaim ClusterClaim feature gate (ALPHA - default=true). Enables cluster claim functionality.
+    ## @param fleetConfig.spokeFeatureGates.ClusterClaim ClusterClaim feature gate (BETA - default=true). Enables cluster claim functionality.
     ClusterClaim: true
     ## @param fleetConfig.spokeFeatureGates.RawFeedbackJsonString RawFeedbackJsonString feature gate (ALPHA - default=false). Enables raw feedback JSON string support.
     RawFeedbackJsonString: true
@@ -82,11 +84,13 @@ fleetConfig:
       ## Feature gates for the Hub's Cluster Manager. Do not disable the feature gates that are enabled by default.
       ##
       ## Available Hub Cluster Manager Feature Gates:
-      ## - **AddonManagement** (ALPHA - default=true) - Enables addon management functionality
+      ## - **AddonManagement** (BETA - default=true) - Enables addon management functionality
       ## - **AllAlpha** (ALPHA - default=false) - Enables all alpha features
       ## - **AllBeta** (BETA - default=false) - Enables all beta features
       ## - **CloudEventsDrivers** (ALPHA - default=false) - Enables cloud events drivers
-      ## - **DefaultClusterSet** (ALPHA - default=false) - Enables default cluster set functionality
+      ## - **ClusterImporter** (ALPHA - default=false) - Enables auto import of managed clusters for certain cluster providers
+      ## - **ClusterProfile** (ALPHA - default=false) - Enables syncing of ManagedCluster to ClusterProfile
+      ## - **DefaultClusterSet** (ALPHA - default=true) - Enables default cluster set functionality
       ## - **ManagedClusterAutoApproval** (ALPHA - default=false) - Enables automatic managed cluster approval
       ## - **ManifestWorkReplicaSet** (ALPHA - default=false) - Enables manifest work replica set functionality
       ## - **NilExecutorValidating** (ALPHA - default=false) - Enables nil executor validation

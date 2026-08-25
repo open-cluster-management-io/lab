@@ -123,11 +123,14 @@ type Helm struct {
 type ClusterManager struct {
 	// A set of comma-separated pairs of the form 'key1=value1,key2=value2' that describe feature gates for alpha/experimental features.
 	// Options are:
-	//  - AddonManagement (ALPHA - default=true)
+	//  - AddonManagement (BETA - default=true)
 	//  - AllAlpha (ALPHA - default=false)
 	//  - AllBeta (BETA - default=false)
+	//  - CleanUpCompletedManifestWork (ALPHA - default=false)
 	//  - CloudEventsDrivers (ALPHA - default=false)
-	//  - DefaultClusterSet (ALPHA - default=false)
+	//  - ClusterImporter (ALPHA - default=false)
+	//  - ClusterProfile (ALPHA - default=false)
+	//  - DefaultClusterSet (ALPHA - default=true)
 	//  - ManagedClusterAutoApproval (ALPHA - default=false)
 	//  - ManifestWorkReplicaSet (ALPHA - default=false)
 	//  - NilExecutorValidating (ALPHA - default=false)
