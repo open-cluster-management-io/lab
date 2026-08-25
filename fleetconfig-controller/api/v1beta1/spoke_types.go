@@ -179,6 +179,9 @@ type Klusterlet struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// A set of comma-separated pairs of the form 'key1=value1,key2=value2' that describe feature gates for alpha/experimental features.
+	// Only the gates listed here are configured explicitly on the klusterlet. Any gate that is
+	// omitted falls back to the default of the OCM version in use, so gates marked default=true below
+	// are enabled even when this field is empty.
 	// Options are:
 	//  - AddonManagement (BETA - default=true)
 	//  - AllAlpha (ALPHA - default=false)
@@ -189,7 +192,6 @@ type Klusterlet struct {
 	//  - MultipleHubs (ALPHA - default=false)
 	//  - RawFeedbackJsonString (ALPHA - default=false)
 	//  - V1beta1CSRAPICompatibility (ALPHA - default=false)
-	// +kubebuilder:default:="AddonManagement=true,ClusterClaim=true"
 	// +optional
 	FeatureGates string `json:"featureGates,omitempty"`
 
