@@ -391,9 +391,11 @@ spec:
                       Each annotation is added to klusterlet.spec.registrationConfiguration.clusterAnnotations on the spoke and subsequently to the ManagedCluster on the hub.
                     type: object
                   featureGates:
-                    default: AddonManagement=true,ClusterClaim=true
                     description: |-
                       A set of comma-separated pairs of the form 'key1=value1,key2=value2' that describe feature gates for alpha/experimental features.
+                      Only the gates listed here are configured explicitly on the klusterlet. Any gate that is
+                      omitted falls back to the default of the OCM version in use, so gates marked default=true below
+                      are enabled even when this field is empty.
                       Options are:
                        - AddonManagement (BETA - default=true)
                        - AllAlpha (ALPHA - default=false)
