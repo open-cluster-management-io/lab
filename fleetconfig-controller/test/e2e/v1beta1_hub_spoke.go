@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -31,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ktypes "k8s.io/apimachinery/pkg/types"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	clusterv1beta2 "open-cluster-management.io/api/cluster/v1beta2"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
 	"open-cluster-management.io/ocm/pkg/operator/helpers/chart"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -99,6 +101,79 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = utils.CloneSpoke(hubAsSpoke, hubAsSpokeClone)
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		// On a fresh install the topology resources are created before the clustermanager's
+		// webhook exists, so a missing managedclustersets/bind RBAC rule goes undetected.
+		// The bindings must be deleted before the restart: CreateOrUpdate skips no-op writes,
+		// so recreating them is the only way to exercise the live webhook.
+		It("should recreate topology resources when the controller restarts after the hub is running", func() {
+			bindings := []ktypes.NamespacedName{
+				{Name: v1beta1.ManagedClusterSetGlobal, Namespace: v1beta1.NamespaceManagedClusterSetGlobal},
+				{Name: v1beta1.ManagedClusterSetDefault, Namespace: v1beta1.NamespaceManagedClusterSetDefault},
+				{Name: v1beta1.ManagedClusterSetSpokes, Namespace: v1beta1.NamespaceManagedClusterSetSpokes},
+			}
+
+			// The addon agent Deployments also carry the control-plane=controller-manager label.
+			managerDeployment := &appsv1.Deployment{}
+			deployments := &appsv1.DeploymentList{}
+			Expect(tc.kClient.List(tc.ctx, deployments, client.InNamespace(fcNamespace),
+				client.MatchingLabels{"control-plane": "controller-manager"})).To(Succeed())
+			for i := range deployments.Items {
+				if strings.HasSuffix(deployments.Items[i].Name, "-manager") {
+					managerDeployment = &deployments.Items[i]
+					break
+				}
+			}
+			Expect(managerDeployment.Name).NotTo(BeEmpty(), "no controller-manager deployment found in namespace "+fcNamespace)
+
+			By("deleting the ManagedClusterSetBindings created at startup")
+			for _, nn := range bindings {
+				binding := &clusterv1beta2.ManagedClusterSetBinding{
+					ObjectMeta: metav1.ObjectMeta{Name: nn.Name, Namespace: nn.Namespace},
+				}
+				err := tc.kClient.Delete(tc.ctx, binding)
+				Expect(client.IgnoreNotFound(err)).NotTo(HaveOccurred())
+			}
+
+			By("restarting the fleetconfig-controller manager")
+			if managerDeployment.Spec.Template.Annotations == nil {
+				managerDeployment.Spec.Template.Annotations = map[string]string{}
+			}
+			managerDeployment.Spec.Template.Annotations["fleetconfig.test/restartedAt"] = time.Now().Format(time.RFC3339)
+			Expect(tc.kClient.Update(tc.ctx, managerDeployment)).To(Succeed())
+
+			By("verifying the restarted manager recreates all ManagedClusterSetBindings")
+			Eventually(func() error {
+				for _, nn := range bindings {
+					binding := &clusterv1beta2.ManagedClusterSetBinding{}
+					if err := tc.kClient.Get(tc.ctx, nn, binding); err != nil {
+						return fmt.Errorf("ManagedClusterSetBinding %s not recreated: %w", nn, err)
+					}
+				}
+				return nil
+			}, 5*time.Minute, 5*time.Second).Should(Succeed())
+
+			By("verifying the manager deployment becomes available again")
+			Eventually(func() error {
+				d := &appsv1.Deployment{}
+				if err := tc.kClient.Get(tc.ctx, client.ObjectKeyFromObject(managerDeployment), d); err != nil {
+					return err
+				}
+				wantReplicas := int32(1)
+				if d.Spec.Replicas != nil {
+					wantReplicas = *d.Spec.Replicas
+				}
+				if d.Status.ObservedGeneration < d.Generation {
+					return fmt.Errorf("deployment %s not observed: generation %d, observed %d",
+						d.Name, d.Generation, d.Status.ObservedGeneration)
+				}
+				if d.Status.Replicas != wantReplicas || d.Status.UpdatedReplicas != wantReplicas || d.Status.AvailableReplicas != wantReplicas {
+					return fmt.Errorf("deployment %s not fully rolled out: %d replicas, %d updated, %d available (want %d)",
+						d.Name, d.Status.Replicas, d.Status.UpdatedReplicas, d.Status.AvailableReplicas, wantReplicas)
+				}
+				return nil
+			}, 5*time.Minute, 5*time.Second).Should(Succeed())
 		})
 
 		It("should verify addons configured on the hub and enabled on the spoke", func() {
