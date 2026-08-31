@@ -164,9 +164,13 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 				if d.Spec.Replicas != nil {
 					wantReplicas = *d.Spec.Replicas
 				}
-				if d.Status.UpdatedReplicas != wantReplicas || d.Status.AvailableReplicas != wantReplicas {
-					return fmt.Errorf("deployment %s not fully rolled out: %d/%d updated, %d/%d available",
-						d.Name, d.Status.UpdatedReplicas, wantReplicas, d.Status.AvailableReplicas, wantReplicas)
+				if d.Status.ObservedGeneration < d.Generation {
+					return fmt.Errorf("deployment %s not observed: generation %d, observed %d",
+						d.Name, d.Generation, d.Status.ObservedGeneration)
+				}
+				if d.Status.Replicas != wantReplicas || d.Status.UpdatedReplicas != wantReplicas || d.Status.AvailableReplicas != wantReplicas {
+					return fmt.Errorf("deployment %s not fully rolled out: %d replicas, %d updated, %d available (want %d)",
+						d.Name, d.Status.Replicas, d.Status.UpdatedReplicas, d.Status.AvailableReplicas, wantReplicas)
 				}
 				return nil
 			}, 5*time.Minute, 5*time.Second).Should(Succeed())
