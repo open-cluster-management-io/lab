@@ -212,8 +212,8 @@ github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJw
 github.com/opencontainers/image-spec v1.1.1/go.mod h1:qpqAh3Dmcf36wStyyWU+kCeDgrGnAve2nCC8+7h8Q0M=
 github.com/opencontainers/runtime-spec v1.3.0 h1:YZupQUdctfhpZy3TM39nN9Ika5CBWT5diQ8ibYCRkxg=
 github.com/opencontainers/runtime-spec v1.3.0/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
-github.com/openshift/build-machinery-go v0.0.0-20260629141115-154a2b810491 h1:P/vZSEsUuAHMnf89gQ6FKIl9jsbPnNJ3gIBM43xn2Bg=
-github.com/openshift/build-machinery-go v0.0.0-20260629141115-154a2b810491/go.mod h1:8jcm8UPtg2mCAsxfqKil1xrmRMI3a+XU2TZ9fF8A7TE=
+github.com/openshift/build-machinery-go v0.0.0-20260902143904-520f675c892b h1:ErTc+6D1n/rpRaUYP++h0YlOzM+q7UaAdqDZrzhA0ho=
+github.com/openshift/build-machinery-go v0.0.0-20260902143904-520f675c892b/go.mod h1:8jcm8UPtg2mCAsxfqKil1xrmRMI3a+XU2TZ9fF8A7TE=
 github.com/openshift/imagebuilder v1.2.22 h1:8x/nwCnA09Zkfp2UjhhySUTRe4EL4RACIEuT+6ik0/Y=
 github.com/openshift/imagebuilder v1.2.22/go.mod h1:5LX/Z+OhWMDsmhwVeu9rRxkzCAsbMITsxRY9jsxedFQ=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
