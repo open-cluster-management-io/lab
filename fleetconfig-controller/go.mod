@@ -9,7 +9,7 @@ require (
 	github.com/mitchellh/hashstructure/v2 v2.0.2
 	github.com/onsi/ginkgo/v2 v2.28.3
 	github.com/onsi/gomega v1.40.0
-	github.com/openshift/build-machinery-go v0.0.0-20260629141115-154a2b810491
+	github.com/openshift/build-machinery-go v0.0.0-20260902143904-520f675c892b
 	github.com/openshift/imagebuilder v1.2.22
 	github.com/pkg/errors v0.9.1
 	k8s.io/api v0.36.2
