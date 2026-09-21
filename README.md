@@ -27,6 +27,7 @@ For new add-on projects, please use the
 
 ## Current Projects
 
+- [ai-assistance](./ai-assistance/README.md): Vendor-neutral AI assistance content (prompts, guides) for OCM development.
 - [dashboard](./dashboard/README.md): OCM UI Dashboard.
 - [fleetconfig-controller](./fleetconfig-controller/README.md): Declarative orchestrator for OCM multi-clusters.
 - [headlamp-plugin](./headlamp-plugin/README.md): OCM Headlamp plugin for multicluster fleet visibility.
