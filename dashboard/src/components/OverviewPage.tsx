@@ -110,20 +110,20 @@ export default function OverviewPage() {
           break;
 
         case 'LabelSelector': {
-          // Use the label selector to filter clusters
-          const labelSelector = clusterSet.spec?.clusterSelector?.labelSelector;
+          // Use the selector's matchLabels to filter clusters
+          const matchLabels = clusterSet.spec?.clusterSelector?.labelSelector?.matchLabels;
 
-          if (!labelSelector || Object.keys(labelSelector).length === 0) {
-            // If labelSelector is empty, select all clusters (labels.Everything())
+          if (!matchLabels || Object.keys(matchLabels).length === 0) {
+            // With no matchLabels, include all clusters
             count = clusters.length;
           } else {
-            // Filter clusters based on the label selector
+            // Keep only clusters with every required label
             count = clusters.filter(cluster => {
               if (!cluster.labels) return false;
 
               // Check if all matchLabels are satisfied
-              for (const [key, value] of Object.entries(labelSelector)) {
-                if (typeof value === 'string' && cluster.labels[key] !== value) {
+              for (const [key, value] of Object.entries(matchLabels)) {
+                if (cluster.labels[key] !== value) {
                   return false;
                 }
               }
