@@ -806,6 +806,9 @@ func waitForAddonManifestWorksCleanup(ctx context.Context, workC *workapi.Client
 			// Return false to continue polling on transient errors
 			return false, nil
 		}
+		// the agent namespace ManifestWork is FCC-owned, not addon-owned, and is cleaned up
+		// separately, so it must not be counted as an addon ManifestWork here
+		manifestWorks.Items = slices.DeleteFunc(manifestWorks.Items, isAgentNamespaceManifestWork)
 
 		// for hub-as-spoke, or if the pivot failed, all addons must be removed.
 		// otherwise, fleetconfig-controller-agent must not be removed.
