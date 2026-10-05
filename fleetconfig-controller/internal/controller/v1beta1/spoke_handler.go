@@ -646,6 +646,31 @@ func deleteAgentNamespaceManifestWork(ctx context.Context, workC *workapi.Client
 	return nil
 }
 
+// clearManifestWorkFinalizers drops the finalizers from the named ManifestWork. It is used once the
+// klusterlet-work-agent has been uninstalled and can no longer remove them itself, where the
+// ManifestWork would otherwise terminate forever and block deletion of the cluster namespace.
+func clearManifestWorkFinalizers(ctx context.Context, workC *workapi.Clientset, mcName, mwName string) error {
+	patchBytes, err := json.Marshal(map[string]any{
+		"metadata": map[string]any{
+			"finalizers": nil,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	_, err = workC.WorkV1().ManifestWorks(mcName).Patch(
+		ctx,
+		mwName,
+		types.MergePatchType,
+		patchBytes,
+		metav1.PatchOptions{},
+	)
+	if err != nil && !kerrs.IsNotFound(err) {
+		return fmt.Errorf("failed to clear finalizers on ManifestWork %s/%s: %w", mcName, mwName, err)
+	}
+	return nil
+}
+
 func (r *SpokeReconciler) deleteKubeconfigSecret(ctx context.Context, spoke *v1beta1.Spoke) error {
 	if r.InstanceType != v1beta1.InstanceTypeManager ||
 		!spoke.PivotComplete() ||
@@ -1018,30 +1043,22 @@ func (r *SpokeReconciler) waitForAgentAddonDeleted(ctx context.Context, spoke *v
 		))
 		return err
 	}
+	// nothing is left on the spoke to remove this finalizer, so a dangling ManifestWork would block
+	// deletion of the cluster namespace
+	if err := clearManifestWorkFinalizers(ctx, workC, mcName, agentNamespaceManifestWorkName); err != nil {
+		spoke.SetConditions(true, v1beta1.NewCondition(
+			err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
+		))
+		return err
+	}
 
-	// at this point, klusterlet-work-agent is uninstalled, so nothing can remove this finalizer. all resources are cleaned up by the spoke's controller, so to prevent a dangling mw/namespace, we remove the finalizer manually
+	// at this point, klusterlet-work-agent is uninstalled, so nothing can remove these finalizers. all resources are cleaned up by the spoke's controller, so to prevent a dangling mw/namespace, we remove the finalizers manually
 	mwList, err := workC.WorkV1().ManifestWorks(mcName).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", manifestWorkAddOnLabelKey, v1beta1.FCCAddOnName)})
 	if err != nil {
 		return err
 	}
 	for _, mw := range mwList.Items {
-		patchBytes, err := json.Marshal(map[string]any{
-			"metadata": map[string]any{
-				"finalizers": nil,
-			},
-		})
-		if err != nil {
-			return err
-		}
-
-		_, err = workC.WorkV1().ManifestWorks(mcName).Patch(
-			ctx,
-			mw.Name,
-			types.MergePatchType,
-			patchBytes,
-			metav1.PatchOptions{},
-		)
-		if err != nil && !kerrs.IsNotFound(err) {
+		if err := clearManifestWorkFinalizers(ctx, workC, mcName, mw.Name); err != nil {
 			return err
 		}
 	}
