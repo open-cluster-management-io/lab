@@ -1022,8 +1022,8 @@ k8s.io/utils/net
 k8s.io/utils/ptr
 k8s.io/utils/third_party/forked/golang/btree
 k8s.io/utils/trace
-# open-cluster-management.io/api v1.3.0
-## explicit; go 1.25.0
+# open-cluster-management.io/api v1.4.0
+## explicit; go 1.26.0
 open-cluster-management.io/api/addon/v1alpha1
 open-cluster-management.io/api/addon/v1beta1
 open-cluster-management.io/api/client/addon/clientset/versioned
