@@ -30,3 +30,10 @@ const (
 
 	manifestWorkAddOnLabelKey = "open-cluster-management.io/addon-name"
 )
+
+// agent namespace manifestwork
+const (
+	// agentNamespaceManifestWorkName is the name of the ManifestWork (in the ManagedCluster namespace)
+	// that creates the fleetconfig-controller agent's install namespace on a spoke cluster.
+	agentNamespaceManifestWorkName = "fleetconfig-controller-agent-namespace"
+)

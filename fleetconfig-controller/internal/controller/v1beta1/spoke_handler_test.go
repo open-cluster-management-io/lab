@@ -8,6 +8,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
+	workv1 "open-cluster-management.io/api/work/v1"
 
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1alpha1"
 	"github.com/open-cluster-management-io/lab/fleetconfig-controller/api/v1beta1"
@@ -405,5 +406,51 @@ func TestAppendJoinSpokeTransportAndAuthArgs_CleanupLifecycle(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestAgentNamespaceDeletionPolicy(t *testing.T) {
+	tests := []struct {
+		name  string
+		purge bool
+		want  workv1.DeletePropagationPolicyType
+	}{
+		{
+			name:  "purgeAgentNamespace orphans the namespace",
+			purge: false,
+			want:  workv1.DeletePropagationPolicyTypeOrphan,
+		},
+		{
+			name:  "purgeAgentNamespace deletes the namespace",
+			purge: true,
+			want:  workv1.DeletePropagationPolicyTypeForeground,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spoke := &v1beta1.Spoke{
+				Spec: v1beta1.SpokeSpec{
+					SpokeSpecBase: v1beta1.SpokeSpecBase{
+						CleanupConfig: v1beta1.CleanupConfig{PurgeAgentNamespace: tt.purge},
+					},
+				},
+			}
+			if got := agentNamespaceDeletionPolicy(spoke); got != tt.want {
+				t.Errorf("agentNamespaceDeletionPolicy() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsAgentNamespaceManifestWork(t *testing.T) {
+	if !isAgentNamespaceManifestWork(workv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{Name: agentNamespaceManifestWorkName, Namespace: "cluster1"},
+	}) {
+		t.Error("expected the agent namespace manifestWork to be recognized")
+	}
+	if isAgentNamespaceManifestWork(workv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{Name: "addon-fleetconfig-controller-agent-deploy", Namespace: "cluster1"},
+	}) {
+		t.Error("expected an addon manifestWork not to be recognized as the agent namespace manifestWork")
 	}
 }

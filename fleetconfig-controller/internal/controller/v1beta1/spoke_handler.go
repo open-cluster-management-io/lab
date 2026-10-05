@@ -18,6 +18,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
@@ -26,6 +27,7 @@ import (
 	workapi "open-cluster-management.io/api/client/work/clientset/versioned"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	operatorv1 "open-cluster-management.io/api/operator/v1"
+	workv1 "open-cluster-management.io/api/work/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/yaml"
@@ -309,6 +311,10 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 	if err != nil {
 		return fmt.Errorf("failed to create addon client: %w", err)
 	}
+	workC, err := common.WorkClient(hubKubeconfig)
+	if err != nil {
+		return fmt.Errorf("failed to create work client: %w", err)
+	}
 
 	// check if the spoke has already been joined to the hub
 	ownerLabels := map[string]string{
@@ -370,15 +376,18 @@ func (r *SpokeReconciler) doHubWork(ctx context.Context, spoke *v1beta1.Spoke, h
 		}
 	}
 
-	// precreate the namespace that the agent will be installed into
-	// this prevents it from being automatically garbage collected when the spoke is deregistered
-	err = r.createAgentNamespace(ctx, spoke)
-	if err != nil {
-		logger.Error(err, "failed to create agent namespace", "spoke", spoke.Name)
-		spoke.SetConditions(true, v1beta1.NewCondition(
-			err.Error(), v1beta1.SpokeJoined, metav1.ConditionFalse, metav1.ConditionTrue,
-		))
-		return err
+	// precreate the namespace that the agent will be installed into, via a ManifestWork on the hub.
+	// this keeps the namespace from being garbage collected with the addon's ManifestWork when the
+	// spoke is deregistered, and avoids the hub needing direct API access to the spoke.
+	if managedCluster != nil {
+		err = r.ensureAgentNamespaceManifestWork(ctx, workC, spoke, managedCluster.Name)
+		if err != nil {
+			logger.Error(err, "failed to ensure agent namespace manifestWork", "spoke", spoke.Name)
+			spoke.SetConditions(true, v1beta1.NewCondition(
+				err.Error(), v1beta1.SpokeJoined, metav1.ConditionFalse, metav1.ConditionTrue,
+			))
+			return err
+		}
 	}
 
 	// check managed clusters joined condition
@@ -534,38 +543,131 @@ func (r *SpokeReconciler) configureFCCAddOn(spoke *v1beta1.Spoke) {
 	spoke.Spec.AddOns[fccIdx].DeploymentConfig.CustomizedVariables = mergedVars
 }
 
-func (r *SpokeReconciler) createAgentNamespace(ctx context.Context, spoke *v1beta1.Spoke) error {
+// ensureAgentNamespaceManifestWork creates or updates the ManifestWork that declares the
+// fleetconfig-controller agent's install namespace on the spoke cluster. The namespace is applied
+// by the work agent rather than by a direct API call from the hub.
+//
+// The ManifestWork's deleteOption.propagationPolicy is derived from the Spoke's cleanupConfig:
+//   - purgeAgentNamespace=true  -> Foreground, so the namespace is deleted when the ManifestWork is
+//     removed (honored wherever a work agent is still running, e.g. a spoke that never pivoted)
+//   - purgeAgentNamespace=false -> Orphan, so the namespace survives teardown of the addon's
+//     ManifestWork and the agent can keep running to finish cleanup
+//
+// In the pivoted case the work agent is uninstalled by `clusteradm unjoin` before the hub removes
+// this ManifestWork, so the namespace is deleted by the agent itself (see agentSelfDestruct), which
+// reads the same purgeAgentNamespace value.
+func (r *SpokeReconciler) ensureAgentNamespaceManifestWork(
+	ctx context.Context,
+	workC *workapi.Clientset,
+	spoke *v1beta1.Spoke,
+	mcName string,
+) error {
 	logger := log.FromContext(ctx)
 
 	if r.InstanceType == v1beta1.InstanceTypeUnified || spoke.IsHubAsSpoke() || spoke.PivotComplete() {
 		return nil
 	}
 
-	spokeKubeconfig, err := kube.KubeconfigFromSecretOrCluster(ctx, r.Client, spoke.Spec.Kubeconfig, spoke.Namespace)
-	if err != nil {
-		return err
-	}
-
-	spokeRestCfg, err := kube.RestConfigFromKubeconfig(spokeKubeconfig)
-	if err != nil {
-		return err
-	}
-	spokeCli, err := client.New(spokeRestCfg, client.Options{})
-	if err != nil {
-		return err
-	}
 	agentNamespace := os.Getenv(v1beta1.ControllerNamespaceEnvVar) // manager.go enforces that this is not ""
 	ns := &corev1.Namespace{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: corev1.SchemeGroupVersion.String(),
+			Kind:       "Namespace",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   agentNamespace,
 			Labels: maps.Clone(v1beta1.ManagedByLabels),
 		},
 	}
-	err = spokeCli.Create(ctx, ns)
-	if err != nil && !kerrs.IsAlreadyExists(err) {
+	raw, err := json.Marshal(ns)
+	if err != nil {
+		return fmt.Errorf("failed to marshal agent namespace manifest: %w", err)
+	}
+
+	propagationPolicy := agentNamespaceDeletionPolicy(spoke)
+
+	mw := &workv1.ManifestWork{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      agentNamespaceManifestWorkName,
+			Namespace: mcName,
+			Labels:    maps.Clone(v1beta1.ManagedByLabels),
+		},
+		Spec: workv1.ManifestWorkSpec{
+			DeleteOption: &workv1.DeleteOption{PropagationPolicy: propagationPolicy},
+			Workload: workv1.ManifestsTemplate{
+				Manifests: []workv1.Manifest{{RawExtension: runtime.RawExtension{Raw: raw}}},
+			},
+		},
+	}
+
+	existing, err := workC.WorkV1().ManifestWorks(mcName).Get(ctx, mw.Name, metav1.GetOptions{})
+	if kerrs.IsNotFound(err) {
+		if _, err = workC.WorkV1().ManifestWorks(mcName).Create(ctx, mw, metav1.CreateOptions{}); err != nil {
+			return fmt.Errorf("failed to create agent namespace manifestWork: %w", err)
+		}
+		logger.V(1).Info("agent namespace manifestWork created", "spoke", spoke.Name, "namespace", agentNamespace)
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get agent namespace manifestWork: %w", err)
+	}
+	mw.ResourceVersion = existing.ResourceVersion
+	if _, err = workC.WorkV1().ManifestWorks(mcName).Update(ctx, mw, metav1.UpdateOptions{}); err != nil {
+		return fmt.Errorf("failed to update agent namespace manifestWork: %w", err)
+	}
+	logger.V(1).Info("agent namespace manifestWork updated", "spoke", spoke.Name, "namespace", agentNamespace)
+	return nil
+}
+
+// agentNamespaceDeletionPolicy maps a Spoke's cleanupConfig onto the deletion policy for the agent
+// install namespace ManifestWork: Foreground if purgeAgentNamespace is set, otherwise Orphan so the
+// namespace survives teardown of the addon's ManifestWork.
+func agentNamespaceDeletionPolicy(spoke *v1beta1.Spoke) workv1.DeletePropagationPolicyType {
+	if spoke.Spec.CleanupConfig.PurgeAgentNamespace {
+		return workv1.DeletePropagationPolicyTypeForeground
+	}
+	return workv1.DeletePropagationPolicyTypeOrphan
+}
+
+// isAgentNamespaceManifestWork reports whether mw is the FCC-owned ManifestWork that creates the
+// agent's install namespace on the spoke cluster. It is the only ManifestWork FCC owns directly -
+// addon workloads are owned by their ManagedClusterAddOn - so cleanup accounting has to skip it.
+func isAgentNamespaceManifestWork(mw workv1.ManifestWork) bool {
+	return mw.Name == agentNamespaceManifestWorkName
+}
+
+// deleteAgentNamespaceManifestWork removes the agent namespace ManifestWork. Whether the namespace
+// itself is deleted or orphaned is decided by the ManifestWork's deleteOption.propagationPolicy.
+func deleteAgentNamespaceManifestWork(ctx context.Context, workC *workapi.Clientset, mcName string) error {
+	err := workC.WorkV1().ManifestWorks(mcName).Delete(ctx, agentNamespaceManifestWorkName, metav1.DeleteOptions{})
+	if err != nil && !kerrs.IsNotFound(err) {
+		return fmt.Errorf("failed to delete agent namespace manifestWork in %q: %w", mcName, err)
+	}
+	return nil
+}
+
+// clearManifestWorkFinalizers drops the finalizers from the named ManifestWork. It is used once the
+// klusterlet-work-agent has been uninstalled and can no longer remove them itself, where the
+// ManifestWork would otherwise terminate forever and block deletion of the cluster namespace.
+func clearManifestWorkFinalizers(ctx context.Context, workC *workapi.Clientset, mcName, mwName string) error {
+	patchBytes, err := json.Marshal(map[string]any{
+		"metadata": map[string]any{
+			"finalizers": nil,
+		},
+	})
+	if err != nil {
 		return err
 	}
-	logger.V(1).Info("agent namespace configured", "spoke", spoke.Name, "namespace", agentNamespace)
+	_, err = workC.WorkV1().ManifestWorks(mcName).Patch(
+		ctx,
+		mwName,
+		types.MergePatchType,
+		patchBytes,
+		metav1.PatchOptions{},
+	)
+	if err != nil && !kerrs.IsNotFound(err) {
+		return fmt.Errorf("failed to clear finalizers on ManifestWork %s/%s: %w", mcName, mwName, err)
+	}
 	return nil
 }
 
@@ -836,6 +938,9 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 	if err != nil {
 		return "", fmt.Errorf("failed to list manifestWorks for managedCluster %s: %w", mcName, err)
 	}
+	// the agent namespace ManifestWork is FCC-owned rather than addon-owned, and is cleaned up as
+	// part of the FCC addon teardown, so exclude it from the non-addon workload check
+	manifestWorks.Items = slices.DeleteFunc(manifestWorks.Items, isAgentNamespaceManifestWork)
 
 	// check that the number of manifestWorks is the same as the number of addons enabled for that spoke
 	if len(manifestWorks.Items) > 0 && !allOwnersAddOns(manifestWorks.Items) {
@@ -854,6 +959,15 @@ func (r *SpokeReconciler) hubCleanupPreflight(ctx context.Context, spoke *v1beta
 	// for hub-as-spoke, or if the addon agent never came up, disable all addons
 	// otherwise, leave fleetconfig-controller-agent addon running so that it can do deregistration
 	shouldCleanAll := spoke.IsHubAsSpoke() || !pivotComplete || r.InstanceType == v1beta1.InstanceTypeUnified
+
+	// if the agent never came up, no work agent is left to unjoin the spoke with, so the namespace
+	// ManifestWork can be removed here and its propagationPolicy honored. otherwise the agent is
+	// still running and still needs its namespace, so it is removed after the spoke unjoins.
+	if shouldCleanAll {
+		if err := deleteAgentNamespaceManifestWork(ctx, workC, mcName); err != nil {
+			return "", err
+		}
+	}
 
 	if !shouldCleanAll {
 		spokeCopy.Spec.AddOns = append(spokeCopy.Spec.AddOns, v1beta1.AddOn{ConfigName: v1beta1.FCCAddOnName})
@@ -919,29 +1033,32 @@ func (r *SpokeReconciler) waitForAgentAddonDeleted(ctx context.Context, spoke *v
 		v1beta1.AddonsConfigured, v1beta1.AddonsConfigured, metav1.ConditionTrue, metav1.ConditionTrue,
 	))
 
-	// at this point, klusterlet-work-agent is uninstalled, so nothing can remove this finalizer. all resources are cleaned up by the spoke's controller, so to prevent a dangling mw/namespace, we remove the finalizer manually
+	// the agent is gone (or was never deployed), so its install namespace can be orphaned or purged
+	// per the Spoke's cleanupConfig. In the pivoted case the work agent has already been uninstalled
+	// by unjoin, so this only removes the ManifestWork from the hub; the agent deletes the namespace
+	// itself during self-destruct.
+	if err := deleteAgentNamespaceManifestWork(ctx, workC, mcName); err != nil {
+		spoke.SetConditions(true, v1beta1.NewCondition(
+			err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
+		))
+		return err
+	}
+	// nothing is left on the spoke to remove this finalizer, so a dangling ManifestWork would block
+	// deletion of the cluster namespace
+	if err := clearManifestWorkFinalizers(ctx, workC, mcName, agentNamespaceManifestWorkName); err != nil {
+		spoke.SetConditions(true, v1beta1.NewCondition(
+			err.Error(), v1beta1.CleanupFailed, metav1.ConditionTrue, metav1.ConditionFalse,
+		))
+		return err
+	}
+
+	// at this point, klusterlet-work-agent is uninstalled, so nothing can remove these finalizers. all resources are cleaned up by the spoke's controller, so to prevent a dangling mw/namespace, we remove the finalizers manually
 	mwList, err := workC.WorkV1().ManifestWorks(mcName).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", manifestWorkAddOnLabelKey, v1beta1.FCCAddOnName)})
 	if err != nil {
 		return err
 	}
 	for _, mw := range mwList.Items {
-		patchBytes, err := json.Marshal(map[string]any{
-			"metadata": map[string]any{
-				"finalizers": nil,
-			},
-		})
-		if err != nil {
-			return err
-		}
-
-		_, err = workC.WorkV1().ManifestWorks(mcName).Patch(
-			ctx,
-			mw.Name,
-			types.MergePatchType,
-			patchBytes,
-			metav1.PatchOptions{},
-		)
-		if err != nil && !kerrs.IsNotFound(err) {
+		if err := clearManifestWorkFinalizers(ctx, workC, mcName, mw.Name); err != nil {
 			return err
 		}
 	}
