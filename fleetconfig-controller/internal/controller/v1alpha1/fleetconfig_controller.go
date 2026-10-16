@@ -93,14 +93,14 @@ func (r *FleetConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Add a finalizer and requeue if not already present
 	if !slices.Contains(fc.Finalizers, v1alpha1.FleetConfigFinalizer) {
 		fc.Finalizers = append(fc.Finalizers, v1alpha1.FleetConfigFinalizer)
-		return ret(ctx, ctrl.Result{Requeue: true}, nil)
+		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 	}
 
 	// Handle deletion logic with finalizer
 	if !fc.DeletionTimestamp.IsZero() {
 		if fc.Status.Phase != v1alpha1.FleetConfigDeleting {
 			fc.Status.Phase = v1alpha1.FleetConfigDeleting
-			return ret(ctx, ctrl.Result{Requeue: true}, nil)
+			return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 		}
 
 		if slices.Contains(fc.Finalizers, v1alpha1.FleetConfigFinalizer) {
@@ -134,7 +134,7 @@ func (r *FleetConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	if previousPhase == "" {
 		// set initial phase/conditions and requeue
-		return ret(ctx, ctrl.Result{Requeue: true}, nil)
+		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 	}
 
 	// Handle Hub cluster: initialization and/or upgrade
@@ -144,7 +144,7 @@ func (r *FleetConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 	hubInitializedCond := fc.GetCondition(v1alpha1.FleetConfigHubInitialized)
 	if hubInitializedCond == nil || hubInitializedCond.Status == metav1.ConditionFalse {
-		return ret(ctx, ctrl.Result{Requeue: true}, nil)
+		return ret(ctx, ctrl.Result{RequeueAfter: requeue}, nil)
 	}
 
 	// Handle Spoke clusters: join and/or upgrade

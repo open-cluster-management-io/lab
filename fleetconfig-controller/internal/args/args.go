@@ -15,6 +15,13 @@ import (
 // Redacted is used to mask sensitive values
 const Redacted = "REDACTED"
 
+// clusteradm CLI flags shared by the hub and spoke reconcilers.
+const (
+	FlagWait          = "--wait=true"
+	FlagBundleVersion = "--bundle-version"
+	FlagImageRegistry = "--image-registry"
+)
+
 var sensitiveKeys = []string{
 	"join-token",
 	"jointoken",
@@ -49,7 +56,7 @@ func PrepareResources(resources ResourceSpec) []string {
 	flags := []string{"--resource-qos-class", qos}
 	if req := resources.GetRequests(); req != nil {
 		rv := reflect.ValueOf(req)
-		if rv.Kind() != reflect.Ptr || !rv.IsNil() {
+		if rv.Kind() != reflect.Pointer || !rv.IsNil() {
 			if s := req.String(); s != "" {
 				flags = append(flags, "--resource-requests", s)
 			}
@@ -57,7 +64,7 @@ func PrepareResources(resources ResourceSpec) []string {
 	}
 	if lim := resources.GetLimits(); lim != nil {
 		rv := reflect.ValueOf(lim)
-		if rv.Kind() != reflect.Ptr || !rv.IsNil() {
+		if rv.Kind() != reflect.Pointer || !rv.IsNil() {
 			if s := lim.String(); s != "" {
 				flags = append(flags, "--resource-limits", s)
 			}
