@@ -131,7 +131,7 @@ func initializeHub(ctx context.Context, fc *v1alpha1.FleetConfig, hubKubeconfig 
 		"init",
 		fmt.Sprintf("--create-namespace=%t", fc.Spec.Hub.CreateNamespace),
 		fmt.Sprintf("--force=%t", fc.Spec.Hub.Force),
-		"--wait=true",
+		arg_utils.FlagWait,
 	}, fc.BaseArgs()...)
 
 	if fc.Spec.RegistrationAuth.Driver == v1alpha1.AWSIRSARegistrationDriver {
@@ -179,8 +179,8 @@ func initializeHub(ctx context.Context, fc *v1alpha1.FleetConfig, hubKubeconfig 
 		initArgs = append(initArgs, "--feature-gates", fc.Spec.Hub.ClusterManager.FeatureGates)
 		initArgs = append(initArgs, fmt.Sprintf("--use-bootstrap-token=%t", fc.Spec.Hub.ClusterManager.UseBootstrapToken))
 		// source args
-		initArgs = append(initArgs, "--bundle-version", fc.Spec.Hub.ClusterManager.Source.BundleVersion)
-		initArgs = append(initArgs, "--image-registry", fc.Spec.Hub.ClusterManager.Source.Registry)
+		initArgs = append(initArgs, arg_utils.FlagBundleVersion, fc.Spec.Hub.ClusterManager.Source.BundleVersion)
+		initArgs = append(initArgs, arg_utils.FlagImageRegistry, fc.Spec.Hub.ClusterManager.Source.Registry)
 		// resources args
 		initArgs = append(initArgs, arg_utils.PrepareResources(fc.Spec.Hub.ClusterManager.Resources)...)
 	} else {
@@ -277,9 +277,9 @@ func upgradeHub(ctx context.Context, fc *v1alpha1.FleetConfig) error {
 
 	upgradeArgs := append([]string{
 		"upgrade", "clustermanager",
-		"--bundle-version", fc.Spec.Hub.ClusterManager.Source.BundleVersion,
-		"--image-registry", fc.Spec.Hub.ClusterManager.Source.Registry,
-		"--wait=true",
+		arg_utils.FlagBundleVersion, fc.Spec.Hub.ClusterManager.Source.BundleVersion,
+		arg_utils.FlagImageRegistry, fc.Spec.Hub.ClusterManager.Source.Registry,
+		arg_utils.FlagWait,
 	}, fc.BaseArgs()...)
 
 	logger.V(1).Info("clusteradm upgrade clustermanager", "args", arg_utils.SanitizeArgs(upgradeArgs))

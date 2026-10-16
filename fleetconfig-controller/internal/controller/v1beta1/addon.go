@@ -160,6 +160,8 @@ func applyCMA(ctx context.Context, addonC *addonapi.Clientset, a v1beta1.AddOnCo
 			},
 		},
 		Spec: addonv1alpha1.ClusterManagementAddOnSpec{
+			//nolint:staticcheck // v1alpha1 has no non-deprecated spelling of this field; migrating to
+			// v1beta1's defaultConfigs changes the API version FCC writes and needs e2e verification.
 			SupportedConfigs: []addonv1alpha1.ConfigMeta{
 				{
 					ConfigGroupResource: addonv1alpha1.ConfigGroupResource{

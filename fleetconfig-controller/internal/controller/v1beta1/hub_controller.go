@@ -486,7 +486,7 @@ func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub, hub
 		"init",
 		fmt.Sprintf("--create-namespace=%t", hub.Spec.CreateNamespace),
 		fmt.Sprintf("--force=%t", hub.Spec.Force),
-		"--wait=true",
+		arg_utils.FlagWait,
 	}, hub.BaseArgs()...)
 
 	if hub.Spec.RegistrationAuth.Driver == v1beta1.AWSIRSARegistrationDriver {
@@ -553,8 +553,8 @@ func (r *HubReconciler) initializeHub(ctx context.Context, hub *v1beta1.Hub, hub
 		}
 		initArgs = append(initArgs, fmt.Sprintf("--use-bootstrap-token=%t", hub.Spec.ClusterManager.UseBootstrapToken))
 		// source args
-		initArgs = append(initArgs, "--bundle-version", hub.Spec.ClusterManager.Source.BundleVersion)
-		initArgs = append(initArgs, "--image-registry", hub.Spec.ClusterManager.Source.Registry)
+		initArgs = append(initArgs, arg_utils.FlagBundleVersion, hub.Spec.ClusterManager.Source.BundleVersion)
+		initArgs = append(initArgs, arg_utils.FlagImageRegistry, hub.Spec.ClusterManager.Source.Registry)
 		// resources args
 		initArgs = append(initArgs, arg_utils.PrepareResources(hub.Spec.ClusterManager.Resources)...)
 		valuesArgs, valuesCleanup, err := prepareClusterManagerChartValuesArgs(clusterManagerValues)
@@ -660,9 +660,9 @@ func (r *HubReconciler) upgradeHub(ctx context.Context, hub *v1beta1.Hub, hubKub
 
 	upgradeArgs := append([]string{
 		"upgrade", "clustermanager",
-		"--bundle-version", hub.Spec.ClusterManager.Source.BundleVersion,
-		"--image-registry", hub.Spec.ClusterManager.Source.Registry,
-		"--wait=true",
+		arg_utils.FlagBundleVersion, hub.Spec.ClusterManager.Source.BundleVersion,
+		arg_utils.FlagImageRegistry, hub.Spec.ClusterManager.Source.Registry,
+		arg_utils.FlagWait,
 	}, hub.BaseArgs()...)
 
 	valuesArgs, valuesCleanup, err := prepareClusterManagerChartValuesArgs(clusterManagerValues)

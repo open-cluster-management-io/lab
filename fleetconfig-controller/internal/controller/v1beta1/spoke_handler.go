@@ -1365,7 +1365,7 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, m
 		fmt.Sprintf("--create-namespace=%t", spoke.Spec.CreateNamespace),
 		fmt.Sprintf("--enable-sync-labels=%t", spoke.Spec.SyncLabels),
 		"--hub-token", tokenMeta.Token,
-		"--wait=true",
+		arg_utils.FlagWait,
 		// klusterlet args
 		"--mode", spoke.Spec.Klusterlet.Mode,
 		fmt.Sprintf("--force-internal-endpoint-lookup=%t", spoke.Spec.Klusterlet.ForceInternalEndpointLookup),
@@ -1380,8 +1380,8 @@ func (r *SpokeReconciler) joinSpoke(ctx context.Context, spoke *v1beta1.Spoke, m
 	if hub.Spec.ClusterManager != nil {
 		// source args
 		joinArgs = append(joinArgs,
-			"--bundle-version", hub.Spec.ClusterManager.Source.BundleVersion,
-			"--image-registry", hub.Spec.ClusterManager.Source.Registry)
+			arg_utils.FlagBundleVersion, hub.Spec.ClusterManager.Source.BundleVersion,
+			arg_utils.FlagImageRegistry, hub.Spec.ClusterManager.Source.Registry)
 	}
 	for k, v := range spoke.Spec.Klusterlet.Annotations {
 		joinArgs = append(joinArgs, fmt.Sprintf("--klusterlet-annotation=%s=%s", k, v))
@@ -1557,9 +1557,9 @@ func (r *SpokeReconciler) upgradeSpoke(ctx context.Context, spoke *v1beta1.Spoke
 
 	upgradeArgs := append([]string{
 		"upgrade", "klusterlet",
-		"--bundle-version", source.BundleVersion,
-		"--image-registry", source.Registry,
-		"--wait=true",
+		arg_utils.FlagBundleVersion, source.BundleVersion,
+		arg_utils.FlagImageRegistry, source.Registry,
+		arg_utils.FlagWait,
 	}, spoke.BaseArgs()...)
 
 	valuesArgs, valuesCleanup, err := prepareKlusterletValuesFile(klusterletValues)

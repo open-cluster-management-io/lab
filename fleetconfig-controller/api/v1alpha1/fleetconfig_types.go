@@ -70,11 +70,11 @@ type FleetConfigStatus struct {
 
 // ToComparable returns a deep copy of the FleetConfigStatus that's suitable for semantic comparison.
 func (s *FleetConfigStatus) ToComparable(_ ...Condition) *FleetConfigStatus {
-	comparable := s.DeepCopy()
-	for i := range comparable.Conditions {
-		comparable.Conditions[i].LastTransitionTime = metav1.Time{}
+	clone := s.DeepCopy()
+	for i := range clone.Conditions {
+		clone.Conditions[i].LastTransitionTime = metav1.Time{}
 	}
-	return comparable
+	return clone
 }
 
 // GetCondition returns the condition with the supplied type, if it exists.
