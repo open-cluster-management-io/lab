@@ -17,6 +17,7 @@ The `ai-assistance` subproject provides **vendor-neutral AI assistance** content
 
 - **Prompts** (`prompts/`) - Reusable AI prompts for common OCM development tasks
 - **Guides** (`guides/`) - Contributor guides for building OCM components
+  - [Contributing to OCM with an AI Assistant](guides/best-practices/ai-assisted-contributions.md) - setting up your assistant to follow OCM's AI contribution policy
 
 ## Vendor Neutrality
 
