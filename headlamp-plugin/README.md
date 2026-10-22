@@ -1,5 +1,26 @@
 # headlamp-plugin
 
+> [!IMPORTANT]
+> ## 🚀 Browse every managed cluster in Headlamp
+>
+> Want to look **inside** your managed clusters, not just list them? The OCM
+> [**Headlamp solution**](https://github.com/open-cluster-management-io/ocm/tree/main/solutions/headlamp)
+> turns Headlamp into a UI for your whole fleet:
+>
+> - Every managed cluster appears in Headlamp's cluster chooser.
+> - Open any cluster to see its pods, nodes and workloads, through `cluster-proxy`.
+> - No kubeconfigs to manage: `managed-serviceaccount` creates and rotates the tokens.
+> - Read-only on managed clusters by default. The Headlamp service account is a
+>   cluster admin on the hub, so treat its token as an admin credential.
+>
+> It needs no plugin code, and a single `deploy.sh` sets it up.
+> **[Get started →](https://github.com/open-cluster-management-io/ocm/tree/main/solutions/headlamp)**
+>
+> ![Headlamp cluster chooser listing managed clusters from OCM](https://raw.githubusercontent.com/open-cluster-management-io/ocm/main/solutions/headlamp/assets/cluster-chooser.png)
+>
+> This plugin and that solution do different jobs: the plugin shows OCM objects on the hub,
+> such as `ManagedCluster` status, and the solution lets you browse each managed cluster.
+
 A [Headlamp](https://headlamp.dev/) plugin that provides a dashboard for [Open Cluster Management (OCM)](https://open-cluster-management.io/) resources. View and manage your multicluster fleet directly from the Headlamp UI.
 
 ## Features
