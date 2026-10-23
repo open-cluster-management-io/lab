@@ -50,6 +50,8 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 ## Examples
 
 - **Add-on Development**: Prompts for scaffolding new OCM add-ons
+  - [Build an OCM Add-on with AddOnTemplate](guides/getting-started/build-an-addon-with-addontemplate.md) - guide to turning a single-cluster workload into a fleet-wide add-on
+  - [Scaffold a Template-based OCM Add-on](prompts/addon-development/scaffold-template-addon.md) - prompt that generates the add-on YAML from your workload
 - **Policy Patterns**: Guidance for writing OCM policies
 - **Placement Logic**: Assistance with cluster placement and selection
 - **Multicluster Workflows**: Patterns for cross-cluster operations
