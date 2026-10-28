@@ -48,7 +48,7 @@ fleetConfig:
   ## Registration authentication configuration for FleetConfig setup. Uses certificate signing requests (CSR) by default.
   ## Available fields:
   ## - **driver**: The authentication driver to use (default: "csr"). Options are "csr", "awsirsa" and "grpc".
-  ## - **grpc**: gRPC registration settings. Used when driver is "grpc"; must be unset when driver is "awsirsa".
+  ## - **grpc**: gRPC registration settings. Used when driver is "grpc"; with driver "csr", server, autoApprovedIdentities, or endpointType "loadBalancer" also enables gRPC initialization. Must be unset when driver is "awsirsa".
   ## - **hubClusterARN**: The ARN of the hub cluster (required for EKS FleetConfigs).
   ## - **autoApprovedARNPatterns**: Optional list of spoke cluster ARN patterns that the hub will auto-approve.
   ## @descriptionEnd

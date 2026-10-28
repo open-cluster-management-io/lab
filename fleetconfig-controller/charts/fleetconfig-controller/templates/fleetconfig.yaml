@@ -15,6 +15,7 @@ spec:
   registrationAuth:
     driver: {{ .driver | quote }}
     {{- with .grpc }}
+    {{- if or .endpointType .server .autoApprovedIdentities }}
     {{- if eq (default "csr" $.Values.fleetConfig.registrationAuth.driver) "awsirsa" }}
     {{- fail "fleetConfig.registrationAuth.grpc must be unset when driver is awsirsa" }}
     {{- end }}
@@ -31,6 +32,7 @@ spec:
         - {{ . | quote }}
         {{- end }}
       {{- end }}
+    {{- end }}
     {{- end }}
     {{- if .hubClusterARN }}
     hubClusterARN: {{ .hubClusterARN | quote }}
