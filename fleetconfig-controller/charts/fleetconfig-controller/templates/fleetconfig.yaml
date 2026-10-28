@@ -14,6 +14,24 @@ spec:
   {{- with .Values.fleetConfig.registrationAuth }}
   registrationAuth:
     driver: {{ .driver | quote }}
+    {{- with .grpc }}
+    {{- if eq (default "csr" $.Values.fleetConfig.registrationAuth.driver) "awsirsa" }}
+    {{- fail "fleetConfig.registrationAuth.grpc must be unset when driver is awsirsa" }}
+    {{- end }}
+    grpc:
+      {{- if .endpointType }}
+      endpointType: {{ .endpointType | quote }}
+      {{- end }}
+      {{- if .server }}
+      server: {{ .server | quote }}
+      {{- end }}
+      {{- if .autoApprovedIdentities }}
+      autoApprovedIdentities:
+        {{- range .autoApprovedIdentities }}
+        - {{ . | quote }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
     {{- if .hubClusterARN }}
     hubClusterARN: {{ .hubClusterARN | quote }}
     {{- end }}
@@ -118,6 +136,12 @@ spec:
     forceInternalEndpointLookup: {{ .klusterlet.forceInternalEndpointLookup }}
     forceInternalEndpointLookupManaged: {{ .klusterlet.forceInternalEndpointLookupManaged }}
     singleton: {{ .klusterlet.singleton }}
+    {{- with .klusterlet.addonKubeClientRegistrationAuth }}
+    addonKubeClientRegistrationAuth: {{ . | quote }}
+    {{- end }}
+    {{- if .klusterlet.addonTokenExpirationSeconds }}
+    addonTokenExpirationSeconds: {{ .klusterlet.addonTokenExpirationSeconds }}
+    {{- end }}
     {{- $mck := .klusterlet.managedClusterKubeconfig -}}
     {{- if and $mck.inCluster (and $mck.secretReference (not (empty $mck.secretReference.name))) }}
     {{- fail "spoke.klusterlet.managedClusterKubeconfig.inCluster and spoke.klusterlet.managedClusterKubeconfig.secretReference are mutually exclusive" }}
