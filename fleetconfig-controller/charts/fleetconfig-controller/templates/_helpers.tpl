@@ -181,10 +181,5 @@ Works with arbitrary depth and handles maps, slices, and scalar values.
 Check whether to run fleetconfig-controller in addon mode
 */}}
 {{- define "addonMode" -}}
-{{- $provider := include "kubernetesProvider" . -}}
-{{- if eq $provider "eks" -}}
-{{- false -}}
-{{- else -}}
 {{- .Values.addonMode -}}
-{{- end -}}
 {{- end -}}

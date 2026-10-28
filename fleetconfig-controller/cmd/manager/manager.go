@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -318,9 +319,40 @@ func getHubRestConfig() (*rest.Config, error) {
 	hubKubeconfig = bytes.ReplaceAll(hubKubeconfig, []byte("tls.crt"), []byte(certPath))
 	hubKubeconfig = bytes.ReplaceAll(hubKubeconfig, []byte("tls.key"), []byte(keyPath))
 
+	hubKubeconfig, err = resolveTokenFile(hubKubeconfig, basePath)
+	if err != nil {
+		return nil, err
+	}
+
 	cfg, err := kube.RestConfigFromKubeconfig(hubKubeconfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create REST config for hub: %v", err)
 	}
 	return cfg, nil
+}
+
+// resolveTokenFile makes relative tokenFile paths absolute. The kubeconfig is
+// parsed from memory, so clientcmd has no base directory to resolve them against.
+func resolveTokenFile(kubeconfig []byte, basePath string) ([]byte, error) {
+	config, err := clientcmd.Load(kubeconfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load kubeconfig: %v", err)
+	}
+
+	changed := false
+	for _, authInfo := range config.AuthInfos {
+		if authInfo.TokenFile != "" && !filepath.IsAbs(authInfo.TokenFile) {
+			authInfo.TokenFile = filepath.Join(basePath, authInfo.TokenFile)
+			changed = true
+		}
+	}
+	if !changed {
+		return kubeconfig, nil
+	}
+
+	data, err := clientcmd.Write(*config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write kubeconfig: %v", err)
+	}
+	return data, nil
 }
