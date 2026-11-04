@@ -108,13 +108,13 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 		}
 	}
 
-	// do deletes first, then creates.
-	err = handleAddonDelete(ctx, addonC, addonsToDelete)
+	// do creates first, then deletes to avoid dropping the ClusterManagementAddOn.
+	err = handleAddonCreate(ctx, kClient, addonC, hub, append(addonsToCreate, addonsToUpdate...))
 	if err != nil {
 		return true, err
 	}
 
-	err = handleAddonCreate(ctx, kClient, addonC, hub, append(addonsToCreate, addonsToUpdate...))
+	err = handleAddonDelete(ctx, addonC, addonsToDelete)
 	if err != nil {
 		return true, err
 	}
