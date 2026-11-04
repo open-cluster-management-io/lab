@@ -92,6 +92,14 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 		}
 	}
 
+	// Find addons that need to be updated (present in both requested and created)
+	addonsToUpdate := make([]v1beta1.AddOnConfig, 0)
+	for i, requestedName := range requestedVersionedNames {
+		if slices.Contains(createdVersionedNames, requestedName) {
+			addonsToUpdate = append(addonsToUpdate, requestedAddOns[i])
+		}
+	}
+
 	// Find addons that need to be deleted (present in created, missing from requested)
 	addonsToDelete := make([]string, 0)
 	for _, createdName := range createdVersionedNames {
@@ -106,7 +114,7 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 		return true, err
 	}
 
-	err = handleAddonCreate(ctx, kClient, addonC, hub, addonsToCreate)
+	err = handleAddonCreate(ctx, kClient, addonC, hub, append(addonsToCreate, addonsToUpdate...))
 	if err != nil {
 		return true, err
 	}

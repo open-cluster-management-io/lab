@@ -317,13 +317,13 @@ func validateAddonRemovalConstraints(ctx context.Context, oldObject, newObject *
 func getRemovedAddOnConfigs(oldObject, newObject *v1beta1.Hub) []string {
 	oldAddOnConfigs := make(map[string]struct{})
 	for _, a := range oldObject.Spec.AddOnConfigs {
-		key := fmt.Sprintf("%s-%s", a.Name, a.Version)
+		key := a.Name
 		oldAddOnConfigs[key] = struct{}{}
 	}
 
 	newAddOnConfigs := make(map[string]struct{})
 	for _, a := range newObject.Spec.AddOnConfigs {
-		key := fmt.Sprintf("%s-%s", a.Name, a.Version)
+		key := a.Name
 		newAddOnConfigs[key] = struct{}{}
 	}
 
