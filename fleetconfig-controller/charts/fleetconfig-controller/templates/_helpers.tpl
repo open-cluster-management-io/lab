@@ -59,6 +59,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
+Pod labels: shared podLabels merged with the caller's specific labels (specific wins).
+Usage: include "chart.podLabels" (dict "root" $ "labels" .Values.managerPodLabels "indent" 8)
+*/}}
+{{- define "chart.podLabels" -}}
+{{- $labels := mergeOverwrite (deepCopy (.root.Values.podLabels | default dict)) (.labels | default dict) -}}
+{{- with $labels }}
+{{- toYaml . | nindent (int $.indent) }}
+{{- end }}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "chart.serviceAccountName" -}}

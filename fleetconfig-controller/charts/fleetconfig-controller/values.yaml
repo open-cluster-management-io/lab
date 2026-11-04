@@ -302,12 +302,21 @@ imageRegistry: ""
 ## @param image.pullPolicy Image pull policy
 image:
   repository: quay.io/open-cluster-management/fleetconfig-controller
-  tag: v0.4.1
+  tag: v0.4.2
   pullPolicy: IfNotPresent
 
 
 ## @param imagePullSecrets Image pull secrets
 imagePullSecrets: []
+
+## @param podLabels Labels to add to both the fleetconfig-controller manager and agent pods.
+podLabels: {}
+
+## @param managerPodLabels Additional labels for the manager pods. Merged with podLabels; these take precedence.
+managerPodLabels: {}
+
+## @param agentPodLabels Additional labels for the add-on agent pods. Merged with podLabels; these take precedence.
+agentPodLabels: {}
 
 ## @param serviceAccount.annotations Annotations to add to the service account
 serviceAccount:

@@ -29,7 +29,7 @@ spec:
             metadata:
               labels:
                 control-plane: controller-manager
-                {{- include "chart.selectorLabels" . | nindent 16 }}
+                {{- include "chart.podLabels" (dict "root" $ "labels" .Values.agentPodLabels "indent" 16) }}
               annotations:
                 kubectl.kubernetes.io/default-container: manager
             spec:
