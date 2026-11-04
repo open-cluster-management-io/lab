@@ -96,7 +96,9 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 	addonsToUpdate := make([]v1beta1.AddOnConfig, 0)
 	for i, requestedName := range requestedVersionedNames {
 		if slices.Contains(createdVersionedNames, requestedName) {
-			addonsToUpdate = append(addonsToUpdate, requestedAddOns[i])
+			if requestedAddOns[i].Overwrite {
+				addonsToUpdate = append(addonsToUpdate, requestedAddOns[i])
+			}
 		}
 	}
 

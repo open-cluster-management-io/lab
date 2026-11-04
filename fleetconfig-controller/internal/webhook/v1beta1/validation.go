@@ -317,20 +317,21 @@ func validateAddonRemovalConstraints(ctx context.Context, oldObject, newObject *
 func getRemovedAddOnConfigs(oldObject, newObject *v1beta1.Hub) []string {
 	oldAddOnConfigs := make(map[string]struct{})
 	for _, a := range oldObject.Spec.AddOnConfigs {
-		key := a.Name
+		key := fmt.Sprintf("%s-%s", a.Name, a.Version)
 		oldAddOnConfigs[key] = struct{}{}
 	}
 
-	newAddOnConfigs := make(map[string]struct{})
+	newAddOnNames := make(map[string]struct{})
 	for _, a := range newObject.Spec.AddOnConfigs {
-		key := a.Name
-		newAddOnConfigs[key] = struct{}{}
+		newAddOnNames[a.Name] = struct{}{}
 	}
 
 	var removedAddOnConfigs []string
-	for key := range oldAddOnConfigs {
-		if _, found := newAddOnConfigs[key]; !found {
-			removedAddOnConfigs = append(removedAddOnConfigs, key)
+	for _, a := range oldObject.Spec.AddOnConfigs {
+		// If the add-on name is completely missing from the new config, it was removed.
+		// If the name is present (even if the version changed), it is an in-place update.
+		if _, found := newAddOnNames[a.Name]; !found {
+			removedAddOnConfigs = append(removedAddOnConfigs, fmt.Sprintf("%s-%s", a.Name, a.Version))
 		}
 	}
 
