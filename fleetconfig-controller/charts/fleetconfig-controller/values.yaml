@@ -309,7 +309,7 @@ image:
 ## @param imagePullSecrets Image pull secrets
 imagePullSecrets: []
 
-## @param podLabels Labels to add to both the fleetconfig-controller manager and agent pods.
+## @param podLabels Labels to add to both the fleetconfig-controller manager and agent pods. Reserved keys set by the chart (control-plane and app.kubernetes.io/*) are ignored.
 podLabels: {}
 
 ## @param managerPodLabels Additional labels for the manager pods. Merged with podLabels; these take precedence.

@@ -59,12 +59,21 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Pod labels: shared podLabels merged with the caller's specific labels (specific wins).
+Extra pod labels: shared podLabels merged with the caller's specific labels (specific wins).
+Keys already set by the pod template (control-plane and chart.selectorLabels) are dropped so
+user labels can never break the Deployment selector. Values are stringified for label validity.
 Usage: include "chart.podLabels" (dict "root" $ "labels" .Values.managerPodLabels "indent" 8)
 */}}
 {{- define "chart.podLabels" -}}
+{{- $reserved := merge (dict "control-plane" "controller-manager") (include "chart.selectorLabels" .root | fromYaml) -}}
 {{- $labels := mergeOverwrite (deepCopy (.root.Values.podLabels | default dict)) (.labels | default dict) -}}
-{{- with $labels }}
+{{- $extra := dict -}}
+{{- range $k, $v := $labels }}
+{{- if not (hasKey $reserved $k) }}
+{{- $_ := set $extra $k (toString $v) }}
+{{- end }}
+{{- end }}
+{{- with $extra }}
 {{- toYaml . | nindent (int $.indent) }}
 {{- end }}
 {{- end }}
