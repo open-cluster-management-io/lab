@@ -13,6 +13,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -640,4 +641,12 @@ func featureGateHasMode(gates []operatorv1.FeatureGate, feature string, mode ope
 		}
 	}
 	return false
+}
+
+// networkingAPIGroup is the API group of the NetworkPolicy rule added to the klusterlet ClusterRole in OCM v1.4.0.
+const networkingAPIGroup = "networking.k8s.io"
+
+// isNetworkPolicyRule reports whether rule grants access to NetworkPolicies.
+func isNetworkPolicyRule(rule rbacv1.PolicyRule) bool {
+	return slices.Contains(rule.APIGroups, networkingAPIGroup) && slices.Contains(rule.Resources, "networkpolicies")
 }
