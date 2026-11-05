@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -280,6 +282,24 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 				return err
 			}, 1*time.Minute, 1*time.Second).Should(Succeed())
 
+			// Re-applying unchanged manifests results in empty patches, which would not exercise the agent's RBAC.
+			// Drop a rule from the klusterlet ClusterRole to mimic manifests applied by an older clusteradm, so that
+			// the upgrade must patch the ClusterRole.
+			By("simulating klusterlet operator RBAC applied by an older OCM version")
+			EventuallyWithOffset(1, func() error {
+				cr := &rbacv1.ClusterRole{}
+				if err := tc.kClientSpoke.Get(tc.ctx, klusterletNN, cr); err != nil {
+					utils.WarnError(err, "failed to get klusterlet ClusterRole")
+					return err
+				}
+				rules := slices.DeleteFunc(slices.Clone(cr.Rules), isNetworkPolicyRule)
+				if len(rules) == len(cr.Rules) {
+					return fmt.Errorf("klusterlet ClusterRole has no %s rule", networkingAPIGroup)
+				}
+				cr.Rules = rules
+				return tc.kClientSpoke.Update(tc.ctx, cr)
+			}, 1*time.Minute, 1*time.Second).Should(Succeed())
+
 			By("updating the klusterlet values and annotations, and verifying that the upgrade is successful")
 			EventuallyWithOffset(1, func() error {
 				err := tc.kClient.Get(tc.ctx, v1beta1spokeNN, spokeClone)
@@ -324,6 +344,32 @@ var _ = Describe("hub and spoke", Label("v1beta1"), Serial, Ordered, func() {
 					err = fmt.Errorf("wrong status sync interval found on Klusterlet. want: %s, got: %s", newDuration, klusterlet.Spec.WorkConfiguration.StatusSyncInterval.Duration)
 					utils.WarnError(err, "failed to upgrade klusterlet")
 					return err
+				}
+				return nil
+			}, 3*time.Minute, 5*time.Second).Should(Succeed())
+
+			By("verifying that the agent restored the klusterlet ClusterRole and completed the upgrade")
+			EventuallyWithOffset(1, func() error {
+				cr := &rbacv1.ClusterRole{}
+				if err := tc.kClientSpoke.Get(tc.ctx, klusterletNN, cr); err != nil {
+					utils.WarnError(err, "failed to get klusterlet ClusterRole")
+					return err
+				}
+				if !slices.ContainsFunc(cr.Rules, isNetworkPolicyRule) {
+					err := fmt.Errorf("klusterlet ClusterRole has no %s rule", networkingAPIGroup)
+					utils.WarnError(err, "klusterlet ClusterRole not restored")
+					return err
+				}
+				if err := tc.kClient.Get(tc.ctx, v1beta1spokeNN, spokeClone); err != nil {
+					utils.WarnError(err, "failed to get spoke")
+					return err
+				}
+				for _, c := range spokeClone.Status.Conditions {
+					if c.Type == v1beta1.KlusterletSynced && c.Status != metav1.ConditionTrue {
+						err := fmt.Errorf("%s condition is %s: %s", c.Type, c.Status, c.Message)
+						utils.WarnError(err, "klusterlet upgrade not completed")
+						return err
+					}
 				}
 				return nil
 			}, 3*time.Minute, 5*time.Second).Should(Succeed())
