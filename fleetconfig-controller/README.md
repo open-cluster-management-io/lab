@@ -8,7 +8,9 @@ The controller is a lightweight wrapper around [clusteradm](https://github.com/o
 
 `fleetconfig-controller` supports 2 modes of operation:
 - `addonMode: true` (recommended): After the initial join, a `fleetconfig-controller-agent` will be installed on the spoke cluster as an OCM addon. Once installed, the agent will manage all day 2 operations for the spoke cluster asynchronously. For more information about addon mode, see [2-phase-spoke-reconcile.md](./docs/2-phase-spoke-reconcile.md).
-- `addonMode: false`: All management of all spokes is done from the hub cluster. No agent is installed on the spoke cluster. Currently, this is the only mode supported for EKS.
+- `addonMode: false`: All management of all spokes is done from the hub cluster. No agent is installed on the spoke cluster.
+
+On EKS, add-on mode requires Spokes to use token add-on authentication (`klusterlet.addonKubeClientRegistrationAuth: token`).
 
 For the deprecated `v1alpha1` `FleetConfig` API, addon mode is not supported.
 
@@ -49,7 +51,7 @@ Support for orchestration of OCM multi-clusters varies based on the Kubernetes d
 | Kubernetes Distribution | Support Level                         |
 |-------------------------|---------------------------------------|
 | Vanilla Kubernetes      | ✅ Fully Supported                    |
-| Amazon EKS              | ✅ Fully Supported (addonMode: false) |
+| Amazon EKS              | ✅ Fully Supported                    |
 | Google GKE              | ✅ Fully Supported                    |
 | Azure AKS               | 🚧 On Roadmap                         |
 

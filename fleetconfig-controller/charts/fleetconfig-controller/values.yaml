@@ -47,15 +47,23 @@ fleetConfig:
   ## ### Registration Authentication Configuration
   ## Registration authentication configuration for FleetConfig setup. Uses certificate signing requests (CSR) by default.
   ## Available fields:
-  ## - **driver**: The authentication driver to use (default: "csr"). Set to "awsirsa" to use AWS IAM Roles for Service Accounts (IRSA) for EKS FleetConfigs.
+  ## - **driver**: The authentication driver to use (default: "csr"). Options are "csr", "awsirsa" and "grpc".
+  ## - **grpc**: gRPC registration settings. Used when driver is "grpc"; with driver "csr", server, autoApprovedIdentities, or endpointType "loadBalancer" also enables gRPC initialization. Must be unset when driver is "awsirsa".
   ## - **hubClusterARN**: The ARN of the hub cluster (required for EKS FleetConfigs).
   ## - **autoApprovedARNPatterns**: Optional list of spoke cluster ARN patterns that the hub will auto-approve.
   ## @descriptionEnd
-  ## @param fleetConfig.registrationAuth.driver The authentication driver to use (default: "csr"). Set to "awsirsa" to use AWS IAM Roles for Service Accounts (IRSA) for EKS FleetConfigs.
+  ## @param fleetConfig.registrationAuth.driver The authentication driver to use (default: "csr"). Set to "awsirsa" for EKS FleetConfigs, or "grpc" for non-EKS spokes.
   registrationAuth:
     # The driver used for authentication. Default is "csr".
     # If configuring an EKS FleetConfig, ensure this is set to "awsirsa".
     driver: "csr"
+    ## @param fleetConfig.registrationAuth.grpc.endpointType gRPC endpoint type for clusteradm init when driver is "grpc". Valid values are "hostname" and "loadBalancer".
+    ## @param fleetConfig.registrationAuth.grpc.server gRPC server address for clusteradm init when driver is "grpc" and endpointType is "hostname". Required for non-EKS spokes that cannot reach the in-cluster service.
+    ## @param fleetConfig.registrationAuth.grpc.autoApprovedIdentities Identities that the hub will auto-approve for gRPC registration.
+    grpc:
+      endpointType: ""
+      server: ""
+      autoApprovedIdentities: []
     ## @param fleetConfig.registrationAuth.hubClusterARN The ARN of the hub cluster. This is only required if configuring an EKS FleetConfig. Example: "arn:aws:eks:us-west-2:<HUB_AWS_ACCOUNT_ID>:cluster/<HUB_CLUSTER_NAME>".
     hubClusterARN: ""
     ## @param fleetConfig.registrationAuth.autoApprovedARNPatterns Optional list of spoke cluster name ARN patterns that the hub will auto-approve.
@@ -263,6 +271,10 @@ fleetConfig:
           memory: ""
         qosClass: "Default"
       singleton: false
+      ## @param fleetConfig.spokes[0].klusterlet.addonKubeClientRegistrationAuth Authentication driver for add-on kubeClient registration. Valid values are "csr" and "token".
+      addonKubeClientRegistrationAuth: ""
+      ## @param fleetConfig.spokes[0].klusterlet.addonTokenExpirationSeconds Token lifetime in seconds when addonKubeClientRegistrationAuth is "token". Use 0 for the system default.
+      addonTokenExpirationSeconds: 0
       ## @param fleetConfig.spokes[0].klusterlet.values Values to pass to the klusterlet Helm chart.
       values: {}
     ## @param fleetConfig.spokes[0].addOns Add-on configuration for the spoke clusters.
@@ -282,7 +294,7 @@ topologyResources:
 ## @param spokeConcurrentReconciles Maximum number of Spoke resources that will be reconciled at the same time.
 spokeConcurrentReconciles: 5
 
-## @param addonMode Whether to run fleetconfig-controller in addon mode. Addon mode allows for decentralized day 2 management of spoke clusters. Not supported when kubernetesProvider is EKS.
+## @param addonMode Whether to run fleetconfig-controller in addon mode. Addon mode allows for decentralized day 2 management of spoke clusters. On EKS, Spokes must use token add-on authentication.
 addonMode: true
 
 ## @param enableLegacyControllers Whether to enable the legacy FleetConfig resource controller.
