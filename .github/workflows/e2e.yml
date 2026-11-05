@@ -33,6 +33,8 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: 1.27
+          # go.mod lives in the submodule repo, not the workspace root
+          cache-dependency-path: "**/go.sum"
 
       - name: Test E2E
         run: |
