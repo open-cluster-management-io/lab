@@ -872,12 +872,15 @@ func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spo
 		Name:     roleName,
 	}
 
-	err := r.createBinding(ctx, roleRef, spoke.Namespace, mcName)
+	// token-auth addon agents authenticate as a service account instead of the addon group
+	tokenAuth := strings.EqualFold(spoke.Spec.Klusterlet.AddonKubeClientRegistrationAuth, v1beta1.AddonKubeClientRegistrationAuthToken)
+
+	err := r.createBinding(ctx, roleRef, spoke.Namespace, mcName, tokenAuth)
 	if err != nil {
 		return err
 	}
 	if spoke.Spec.HubRef.Namespace != spoke.Namespace {
-		err = r.createBinding(ctx, roleRef, spoke.Spec.HubRef.Namespace, mcName)
+		err = r.createBinding(ctx, roleRef, spoke.Spec.HubRef.Namespace, mcName, tokenAuth)
 		if err != nil {
 			return err
 		}
@@ -887,8 +890,10 @@ func (r *SpokeReconciler) bindAddonAgent(ctx context.Context, spoke *v1beta1.Spo
 
 // createBinding creates a RoleBinding for a given role.
 // The RoleBinding follows a different naming format than OCM uses for addon agents.
-// The ManagedCluster name is appended to the RoleBinding name and used to build the addon agent's subject group
-func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.RoleRef, namespace, mcName string) error {
+// The ManagedCluster name is appended to the RoleBinding name and used to build the addon agent's subject group.
+// With token auth the agent authenticates as the <addon-name>-agent service account in the ManagedCluster namespace,
+// so that service account is granted the role in addition to the addon group.
+func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.RoleRef, namespace, mcName string, tokenAuth bool) error {
 	logger := log.FromContext(ctx)
 
 	bindingLabels := maps.Clone(v1beta1.ManagedByLabels)
@@ -908,6 +913,13 @@ func (r *SpokeReconciler) createBinding(ctx context.Context, roleRef rbacv1.Role
 				Name:     clusterAddonGroup(mcName, v1beta1.FCCAddOnName),
 			},
 		},
+	}
+	if tokenAuth {
+		binding.Subjects = append(binding.Subjects, rbacv1.Subject{
+			Kind:      rbacv1.ServiceAccountKind,
+			Name:      v1beta1.FCCAddOnName + "-agent",
+			Namespace: mcName,
+		})
 	}
 
 	err := r.Create(ctx, binding, &client.CreateOptions{})

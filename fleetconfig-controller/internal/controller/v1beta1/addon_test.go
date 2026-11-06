@@ -2,11 +2,18 @@ package v1beta1
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	kerrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
 	addonapi "open-cluster-management.io/api/client/addon/clientset/versioned"
 
@@ -389,3 +396,38 @@ func TestHandleSpokeAddons(t *testing.T) {
 		}
 	})
 }
+
+var _ = Describe("createBinding", func() {
+	ctx := context.Background()
+	roleRef := rbacv1.RoleRef{Kind: "ClusterRole", APIGroup: rbacv1.GroupName, Name: "test-role"}
+
+	expectSubjects := func(mcName string, tokenAuth bool, want []rbacv1.Subject) {
+		if err := k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: mcName}}); err != nil && !kerrs.IsAlreadyExists(err) {
+			Expect(err).NotTo(HaveOccurred())
+		}
+		r := &SpokeReconciler{Client: k8sClient}
+		Expect(r.createBinding(ctx, roleRef, mcName, mcName, tokenAuth)).To(Succeed())
+
+		rb := &rbacv1.RoleBinding{}
+		key := types.NamespacedName{
+			Namespace: mcName,
+			Name: fmt.Sprintf("open-cluster-management:%s:%s:agent-%s",
+				v1beta1.FCCAddOnName, strings.ToLower(roleRef.Kind), mcName),
+		}
+		Expect(k8sClient.Get(ctx, key, rb)).To(Succeed())
+		Expect(rb.Subjects).To(Equal(want))
+	}
+
+	It("binds only the addon group with CSR auth", func() {
+		expectSubjects("binding-csr", false, []rbacv1.Subject{
+			{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: clusterAddonGroup("binding-csr", v1beta1.FCCAddOnName)},
+		})
+	})
+
+	It("also binds the agent service account with token auth", func() {
+		expectSubjects("binding-token", true, []rbacv1.Subject{
+			{Kind: rbacv1.GroupKind, APIGroup: rbacv1.GroupName, Name: clusterAddonGroup("binding-token", v1beta1.FCCAddOnName)},
+			{Kind: rbacv1.ServiceAccountKind, Name: v1beta1.FCCAddOnName + "-agent", Namespace: "binding-token"},
+		})
+	})
+})
