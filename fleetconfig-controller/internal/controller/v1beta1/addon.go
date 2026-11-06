@@ -92,6 +92,16 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 		}
 	}
 
+	// Find addons that need to be updated (present in both requested and created)
+	addonsToUpdate := make([]v1beta1.AddOnConfig, 0)
+	for i, requestedName := range requestedVersionedNames {
+		if slices.Contains(createdVersionedNames, requestedName) {
+			if requestedAddOns[i].Overwrite {
+				addonsToUpdate = append(addonsToUpdate, requestedAddOns[i])
+			}
+		}
+	}
+
 	// Find addons that need to be deleted (present in created, missing from requested)
 	addonsToDelete := make([]string, 0)
 	for _, createdName := range createdVersionedNames {
@@ -100,13 +110,13 @@ func handleAddonConfig(ctx context.Context, kClient client.Client, addonC *addon
 		}
 	}
 
-	// do deletes first, then creates.
-	err = handleAddonDelete(ctx, addonC, addonsToDelete)
+	// do creates first, then deletes to avoid dropping the ClusterManagementAddOn.
+	err = handleAddonCreate(ctx, kClient, addonC, hub, append(addonsToCreate, addonsToUpdate...))
 	if err != nil {
 		return true, err
 	}
 
-	err = handleAddonCreate(ctx, kClient, addonC, hub, addonsToCreate)
+	err = handleAddonDelete(ctx, addonC, addonsToDelete)
 	if err != nil {
 		return true, err
 	}
@@ -122,6 +132,9 @@ func handleAddonCreate(ctx context.Context, kClient client.Client, addonC *addon
 	logger := log.FromContext(ctx)
 	logger.V(0).Info("createAddOns")
 
+	// Track defaults that have been set to avoid flip-flopping when reapplying multiple versions
+	defaultsSet := make(map[string]bool)
+
 	for _, a := range addons {
 		templateName := fmt.Sprintf("%s-%s", a.Name, a.Version)
 
@@ -136,7 +149,12 @@ func handleAddonCreate(ctx context.Context, kClient client.Client, addonC *addon
 			return err
 		}
 
-		if err := applyCMA(ctx, addonC, a, templateName); err != nil {
+		isDefault := !defaultsSet[a.Name]
+		if isDefault {
+			defaultsSet[a.Name] = true
+		}
+
+		if err := applyCMA(ctx, addonC, a, templateName, isDefault); err != nil {
 			return err
 		}
 		if err := applyTemplate(ctx, addonC, a, templateName, manifests); err != nil {
@@ -148,7 +166,7 @@ func handleAddonCreate(ctx context.Context, kClient client.Client, addonC *addon
 }
 
 // applyCMA creates or updates the ClusterManagementAddOn for a custom addon template.
-func applyCMA(ctx context.Context, addonC *addonapi.Clientset, a v1beta1.AddOnConfig, templateName string) error {
+func applyCMA(ctx context.Context, addonC *addonapi.Clientset, a v1beta1.AddOnConfig, templateName string, setAsDefault bool) error {
 	logger := log.FromContext(ctx)
 
 	cma := &addonv1alpha1.ClusterManagementAddOn{
@@ -168,15 +186,18 @@ func applyCMA(ctx context.Context, addonC *addonapi.Clientset, a v1beta1.AddOnCo
 						Group:    addonv1alpha1.GroupVersion.Group,
 						Resource: "addontemplates",
 					},
-					DefaultConfig: &addonv1alpha1.ConfigReferent{
-						Name: templateName,
-					},
 				},
 			},
 			InstallStrategy: addonv1alpha1.InstallStrategy{
 				Type: addonv1alpha1.AddonInstallStrategyManual,
 			},
 		},
+	}
+
+	if setAsDefault {
+		cma.Spec.SupportedConfigs[0].DefaultConfig = &addonv1alpha1.ConfigReferent{
+			Name: templateName,
+		}
 	}
 
 	existing, err := addonC.AddonV1alpha1().ClusterManagementAddOns().Get(ctx, a.Name, metav1.GetOptions{})
@@ -187,6 +208,12 @@ func applyCMA(ctx context.Context, addonC *addonapi.Clientset, a v1beta1.AddOnCo
 	if err != nil {
 		return err
 	}
+	
+	// Preserve existing DefaultConfig if we are not the one setting it
+	if !setAsDefault && len(existing.Spec.SupportedConfigs) > 0 {
+		cma.Spec.SupportedConfigs[0].DefaultConfig = existing.Spec.SupportedConfigs[0].DefaultConfig
+	}
+
 	if !a.Overwrite {
 		logger.V(1).Info("overwrite is false - skipping updating ClusterManagementAddOn to use new AddOnTemplate")
 		return nil
