@@ -4,7 +4,7 @@ ARG OS
 ARG ARCH
 
 ARG GO_BASE_IMAGE=golang:1.27.3-alpine3.23
-ARG PYTHON_BASE_IMAGE=python:3.14-alpine
+ARG PYTHON_BASE_IMAGE=python:3.15-alpine
 
 ## Stage 1: Build the manager binary
 FROM ${GO_BASE_IMAGE} AS builder
