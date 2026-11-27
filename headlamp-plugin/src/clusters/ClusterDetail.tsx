@@ -1,13 +1,13 @@
-import { useParams } from 'react-router-dom';
 import {
+  ConditionsTable,
   MainInfoSection,
   SectionBox,
   SimpleTable,
-  ConditionsTable,
 } from '@kinvolk/headlamp-plugin/lib/components/common';
-import { ManagedCluster } from '../resources';
+import { useParams } from 'react-router-dom';
 import StatusLabel, { conditionToStatus } from '../common/StatusLabel';
 import { getConditionStatus, useOCMContext } from '../helpers';
+import { ManagedCluster } from '../resources';
 
 export default function ClusterDetail() {
   const { name } = useParams<{ name: string }>();
@@ -58,10 +58,7 @@ export default function ClusterDetail() {
     cluster.jsonData.status?.conditions,
     'ManagedClusterConditionAvailable'
   );
-  const joined = getConditionStatus(
-    cluster.jsonData.status?.conditions,
-    'ManagedClusterJoined'
-  );
+  const joined = getConditionStatus(cluster.jsonData.status?.conditions, 'ManagedClusterJoined');
 
   return (
     <>
@@ -76,8 +73,8 @@ export default function ClusterDetail() {
                 {available?.status === 'True'
                   ? 'Available'
                   : available?.status === 'False'
-                    ? 'Unavailable'
-                    : 'Unknown'}
+                  ? 'Unavailable'
+                  : 'Unknown'}
               </StatusLabel>
             ),
           },
@@ -88,8 +85,8 @@ export default function ClusterDetail() {
                 {joined?.status === 'True'
                   ? 'Joined'
                   : joined?.status === 'False'
-                    ? 'Not Joined'
-                    : 'Unknown'}
+                  ? 'Not Joined'
+                  : 'Unknown'}
               </StatusLabel>
             ),
           },
@@ -99,9 +96,10 @@ export default function ClusterDetail() {
           },
           {
             name: 'Hub Accepts Client',
-            value: cluster.jsonData.spec?.hubAcceptsClient === true
-              ? 'Yes'
-              : cluster.jsonData.spec?.hubAcceptsClient === false
+            value:
+              cluster.jsonData.spec?.hubAcceptsClient === true
+                ? 'Yes'
+                : cluster.jsonData.spec?.hubAcceptsClient === false
                 ? 'No'
                 : '-',
           },

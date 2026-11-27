@@ -1,7 +1,6 @@
 import { Link, SectionBox, SimpleTable } from '@kinvolk/headlamp-plugin/lib/components/common';
-import { ClusterManagementAddOn, ManagedClusterAddOn } from '../resources';
-import StatusLabel, { conditionToStatus } from '../common/StatusLabel';
 import { getConditionStatus, useOCMContext } from '../helpers';
+import { ClusterManagementAddOn, ManagedClusterAddOn } from '../resources';
 
 export default function AddOnList() {
   const ctx = useOCMContext();

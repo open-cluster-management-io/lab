@@ -1,7 +1,7 @@
 import { Link, SectionBox, SimpleTable } from '@kinvolk/headlamp-plugin/lib/components/common';
-import { ManifestWork } from '../resources';
 import StatusLabel, { conditionToStatus } from '../common/StatusLabel';
 import { getConditionStatus, useOCMContext } from '../helpers';
+import { ManifestWork } from '../resources';
 
 export default function ManifestWorkList() {
   const ctx = useOCMContext();
@@ -59,10 +59,7 @@ export default function ManifestWorkList() {
           {
             label: 'Target Cluster',
             getter: (w: InstanceType<typeof ManifestWork>) => (
-              <Link
-                routeName="ocm-cluster-detail"
-                params={{ name: w.metadata.namespace }}
-              >
+              <Link routeName="ocm-cluster-detail" params={{ name: w.metadata.namespace }}>
                 {w.metadata.namespace}
               </Link>
             ),
@@ -70,31 +67,32 @@ export default function ManifestWorkList() {
           {
             label: 'Source',
             getter: (w: InstanceType<typeof ManifestWork>) => {
-              const replicaSet = w.jsonData.metadata?.labels?.['work.open-cluster-management.io/manifestworkreplicaset'];
-              return replicaSet
-                ? <StatusLabel status="success">ReplicaSet</StatusLabel>
-                : <StatusLabel status="unknown">Manual</StatusLabel>;
+              const replicaSet =
+                w.jsonData.metadata?.labels?.[
+                  'work.open-cluster-management.io/manifestworkreplicaset'
+                ];
+              return replicaSet ? (
+                <StatusLabel status="success">ReplicaSet</StatusLabel>
+              ) : (
+                <StatusLabel status="unknown">Manual</StatusLabel>
+              );
             },
           },
           {
             label: 'Manifests',
-            getter: (w: InstanceType<typeof ManifestWork>) =>
-              w.manifestCount.toString(),
+            getter: (w: InstanceType<typeof ManifestWork>) => w.manifestCount.toString(),
           },
           {
             label: 'Applied',
             getter: (w: InstanceType<typeof ManifestWork>) => {
-              const applied = getConditionStatus(
-                w.jsonData.status?.conditions,
-                'Applied'
-              );
+              const applied = getConditionStatus(w.jsonData.status?.conditions, 'Applied');
               return (
                 <StatusLabel status={conditionToStatus(applied?.status)}>
                   {applied?.status === 'True'
                     ? 'Applied'
                     : applied?.status === 'False'
-                      ? 'Not Applied'
-                      : 'Unknown'}
+                    ? 'Not Applied'
+                    : 'Unknown'}
                 </StatusLabel>
               );
             },
@@ -102,25 +100,21 @@ export default function ManifestWorkList() {
           {
             label: 'Available',
             getter: (w: InstanceType<typeof ManifestWork>) => {
-              const available = getConditionStatus(
-                w.jsonData.status?.conditions,
-                'Available'
-              );
+              const available = getConditionStatus(w.jsonData.status?.conditions, 'Available');
               return (
                 <StatusLabel status={conditionToStatus(available?.status)}>
                   {available?.status === 'True'
                     ? 'Available'
                     : available?.status === 'False'
-                      ? 'Unavailable'
-                      : 'Unknown'}
+                    ? 'Unavailable'
+                    : 'Unknown'}
                 </StatusLabel>
               );
             },
           },
           {
             label: 'Age',
-            getter: (w: InstanceType<typeof ManifestWork>) =>
-              w.metadata.creationTimestamp ?? '-',
+            getter: (w: InstanceType<typeof ManifestWork>) => w.metadata.creationTimestamp ?? '-',
             sort: true,
           },
         ]}

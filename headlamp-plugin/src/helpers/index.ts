@@ -29,7 +29,9 @@ export function useOCMInstalled(): boolean | null {
 }
 
 export function getConditionStatus(
-  conditions: Array<{ type: string; status: string; message?: string; reason?: string }> | undefined,
+  conditions:
+    | Array<{ type: string; status: string; message?: string; reason?: string }>
+    | undefined,
   conditionType: string
 ): { status: string; message: string; reason: string } | null {
   if (!conditions) return null;

@@ -160,7 +160,11 @@ export class ManifestWork extends KubeObject {
     return this.jsonData.spec?.workload?.manifests?.length ?? 0;
   }
 
-  get manifests(): Array<{ apiVersion: string; kind: string; metadata: { name: string; namespace?: string } }> {
+  get manifests(): Array<{
+    apiVersion: string;
+    kind: string;
+    metadata: { name: string; namespace?: string };
+  }> {
     return this.jsonData.spec?.workload?.manifests ?? [];
   }
 }
@@ -207,7 +211,13 @@ export class AppliedManifestWork extends KubeObject {
     return this.jsonData.spec?.hubHash ?? '';
   }
 
-  get appliedResources(): Array<{ group: string; version: string; resource: string; name: string; namespace: string }> {
+  get appliedResources(): Array<{
+    group: string;
+    version: string;
+    resource: string;
+    name: string;
+    namespace: string;
+  }> {
     return this.jsonData.status?.appliedResources ?? [];
   }
 }

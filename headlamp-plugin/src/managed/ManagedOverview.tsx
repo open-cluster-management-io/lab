@@ -1,12 +1,12 @@
 import { K8s } from '@kinvolk/headlamp-plugin/lib';
 import {
+  ConditionsTable,
   SectionBox,
   SimpleTable,
-  ConditionsTable,
 } from '@kinvolk/headlamp-plugin/lib/components/common';
-import { Klusterlet, ClusterClaim, AppliedManifestWork } from '../resources';
 import StatusLabel, { conditionToStatus } from '../common/StatusLabel';
-import { useOCMContext, getConditionStatus } from '../helpers';
+import { getConditionStatus, useOCMContext } from '../helpers';
+import { AppliedManifestWork, ClusterClaim, Klusterlet } from '../resources';
 
 export default function ManagedOverview() {
   const ctx = useOCMContext();
@@ -61,8 +61,8 @@ export default function ManagedOverview() {
                       {available?.status === 'True'
                         ? 'Available'
                         : available?.status === 'False'
-                          ? 'Unavailable'
-                          : 'Unknown'}
+                        ? 'Unavailable'
+                        : 'Unknown'}
                     </StatusLabel>
                   ),
                 },
@@ -138,7 +138,8 @@ export default function ManagedOverview() {
                 label: 'Status',
                 getter: (pod: any) => {
                   const phase = pod.jsonData.status?.phase ?? 'Unknown';
-                  const statusType = phase === 'Running' ? 'success' : phase === 'Pending' ? 'warning' : 'error';
+                  const statusType =
+                    phase === 'Running' ? 'success' : phase === 'Pending' ? 'warning' : 'error';
                   return <StatusLabel status={statusType}>{phase}</StatusLabel>;
                 },
               },
@@ -146,7 +147,9 @@ export default function ManagedOverview() {
                 label: 'Restarts',
                 getter: (pod: any) => {
                   const containers = pod.jsonData.status?.containerStatuses ?? [];
-                  return containers.reduce((sum: number, c: any) => sum + (c.restartCount ?? 0), 0).toString();
+                  return containers
+                    .reduce((sum: number, c: any) => sum + (c.restartCount ?? 0), 0)
+                    .toString();
                 },
               },
               {

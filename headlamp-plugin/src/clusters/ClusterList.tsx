@@ -1,7 +1,7 @@
 import { Link, SectionBox, SimpleTable } from '@kinvolk/headlamp-plugin/lib/components/common';
-import { ManagedCluster } from '../resources';
 import StatusLabel, { conditionToStatus } from '../common/StatusLabel';
 import { getConditionStatus, useOCMContext } from '../helpers';
+import { ManagedCluster } from '../resources';
 
 export default function ClusterList() {
   const ctx = useOCMContext();
@@ -65,8 +65,8 @@ export default function ClusterList() {
                 available?.status === 'True'
                   ? 'Available'
                   : available?.status === 'False'
-                    ? 'Unavailable'
-                    : 'Unknown';
+                  ? 'Unavailable'
+                  : 'Unknown';
               return <StatusLabel status={statusType}>{label}</StatusLabel>;
             },
           },
@@ -82,8 +82,8 @@ export default function ClusterList() {
                 joined?.status === 'True'
                   ? 'Joined'
                   : joined?.status === 'False'
-                    ? 'Not Joined'
-                    : 'Unknown';
+                  ? 'Not Joined'
+                  : 'Unknown';
               return <StatusLabel status={statusType}>{label}</StatusLabel>;
             },
           },
@@ -94,13 +94,11 @@ export default function ClusterList() {
           },
           {
             label: 'CPU',
-            getter: (cluster: InstanceType<typeof ManagedCluster>) =>
-              cluster.cpuCapacity || '-',
+            getter: (cluster: InstanceType<typeof ManagedCluster>) => cluster.cpuCapacity || '-',
           },
           {
             label: 'Memory',
-            getter: (cluster: InstanceType<typeof ManagedCluster>) =>
-              cluster.memoryCapacity || '-',
+            getter: (cluster: InstanceType<typeof ManagedCluster>) => cluster.memoryCapacity || '-',
           },
           {
             label: 'Age',

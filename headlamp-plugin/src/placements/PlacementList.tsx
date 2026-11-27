@@ -1,7 +1,7 @@
 import { Link, SectionBox, SimpleTable } from '@kinvolk/headlamp-plugin/lib/components/common';
-import { Placement } from '../resources';
 import StatusLabel, { conditionToStatus } from '../common/StatusLabel';
 import { getConditionStatus, useOCMContext } from '../helpers';
+import { Placement } from '../resources';
 
 export default function PlacementList() {
   const ctx = useOCMContext();
@@ -69,9 +69,7 @@ export default function PlacementList() {
             label: 'Selected',
             getter: (p: InstanceType<typeof Placement>) =>
               `${p.numberOfSelectedClusters}` +
-              (p.jsonData.spec?.numberOfClusters
-                ? ` / ${p.jsonData.spec.numberOfClusters}`
-                : ''),
+              (p.jsonData.spec?.numberOfClusters ? ` / ${p.jsonData.spec.numberOfClusters}` : ''),
           },
           {
             label: 'Status',
@@ -85,16 +83,15 @@ export default function PlacementList() {
                   {satisfied?.status === 'True'
                     ? 'Satisfied'
                     : satisfied?.status === 'False'
-                      ? 'Not Satisfied'
-                      : 'Unknown'}
+                    ? 'Not Satisfied'
+                    : 'Unknown'}
                 </StatusLabel>
               );
             },
           },
           {
             label: 'Age',
-            getter: (p: InstanceType<typeof Placement>) =>
-              p.metadata.creationTimestamp ?? '-',
+            getter: (p: InstanceType<typeof Placement>) => p.metadata.creationTimestamp ?? '-',
             sort: true,
           },
         ]}

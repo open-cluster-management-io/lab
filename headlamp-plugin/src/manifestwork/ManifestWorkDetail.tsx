@@ -1,14 +1,14 @@
-import { useParams } from 'react-router-dom';
 import {
+  ConditionsTable,
+  Link,
   MainInfoSection,
   SectionBox,
   SimpleTable,
-  ConditionsTable,
-  Link,
 } from '@kinvolk/headlamp-plugin/lib/components/common';
-import { ManifestWork } from '../resources';
+import { useParams } from 'react-router-dom';
 import StatusLabel, { conditionToStatus } from '../common/StatusLabel';
 import { getConditionStatus, useOCMContext } from '../helpers';
+import { ManifestWork } from '../resources';
 
 export default function ManifestWorkDetail() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>();
@@ -85,10 +85,15 @@ export default function ManifestWorkDetail() {
           {
             name: 'Source',
             value: (() => {
-              const replicaSet = work.jsonData.metadata?.labels?.['work.open-cluster-management.io/manifestworkreplicaset'];
-              return replicaSet
-                ? <StatusLabel status="success">ReplicaSet ({replicaSet})</StatusLabel>
-                : <StatusLabel status="unknown">Manual</StatusLabel>;
+              const replicaSet =
+                work.jsonData.metadata?.labels?.[
+                  'work.open-cluster-management.io/manifestworkreplicaset'
+                ];
+              return replicaSet ? (
+                <StatusLabel status="success">ReplicaSet ({replicaSet})</StatusLabel>
+              ) : (
+                <StatusLabel status="unknown">Manual</StatusLabel>
+              );
             })(),
           },
           {
@@ -110,8 +115,8 @@ export default function ManifestWorkDetail() {
                 {applied?.status === 'True'
                   ? 'Applied'
                   : applied?.status === 'False'
-                    ? 'Not Applied'
-                    : 'Unknown'}
+                  ? 'Not Applied'
+                  : 'Unknown'}
               </StatusLabel>
             ),
           },
@@ -122,8 +127,8 @@ export default function ManifestWorkDetail() {
                 {available?.status === 'True'
                   ? 'Available'
                   : available?.status === 'False'
-                    ? 'Unavailable'
-                    : 'Unknown'}
+                  ? 'Unavailable'
+                  : 'Unknown'}
               </StatusLabel>
             ),
           },
@@ -144,8 +149,7 @@ export default function ManifestWorkDetail() {
             },
             {
               label: 'Namespace',
-              getter: (m: { metadata: { namespace?: string } }) =>
-                m.metadata.namespace || '-',
+              getter: (m: { metadata: { namespace?: string } }) => m.metadata.namespace || '-',
             },
             {
               label: 'API Version',

@@ -1,5 +1,5 @@
-import { type ReactNode } from 'react';
 import { Box, Typography } from '@mui/material';
+import { type ReactNode } from 'react';
 
 type StatusType = 'success' | 'error' | 'warning' | 'unknown';
 
