@@ -12,6 +12,7 @@ FROM busybox:stable
 
 RUN adduser -D -u 1001 plugin
 COPY --from=build /app/dist /plugins/headlamp-ocm
+COPY --from=build /app/package.json /plugins/headlamp-ocm/package.json
 USER 1001
 
 CMD ["sh", "-c", "cp -r /plugins/headlamp-ocm /headlamp-plugins/"]

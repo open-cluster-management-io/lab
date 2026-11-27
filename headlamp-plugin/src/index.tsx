@@ -1,18 +1,14 @@
-import {
-  registerSidebarEntry,
-  registerRoute,
-  registerSidebarEntryFilter,
-} from '@kinvolk/headlamp-plugin/lib';
-import Overview from './overview/Overview';
-import ClusterList from './clusters/ClusterList';
-import ClusterDetail from './clusters/ClusterDetail';
-import ManagedOverview from './managed/ManagedOverview';
-import PlacementList from './placements/PlacementList';
-import PlacementDetail from './placements/PlacementDetail';
-import ManifestWorkList from './manifestwork/ManifestWorkList';
-import ManifestWorkDetail from './manifestwork/ManifestWorkDetail';
-import AddOnList from './addons/AddOnList';
+import { registerRoute, registerSidebarEntry } from '@kinvolk/headlamp-plugin/lib';
 import AddOnDetail from './addons/AddOnDetail';
+import AddOnList from './addons/AddOnList';
+import ClusterDetail from './clusters/ClusterDetail';
+import ClusterList from './clusters/ClusterList';
+import ManagedOverview from './managed/ManagedOverview';
+import ManifestWorkDetail from './manifestwork/ManifestWorkDetail';
+import ManifestWorkList from './manifestwork/ManifestWorkList';
+import Overview from './overview/Overview';
+import PlacementDetail from './placements/PlacementDetail';
+import PlacementList from './placements/PlacementList';
 
 // Top-level OCM sidebar group
 registerSidebarEntry({
@@ -149,4 +145,3 @@ registerRoute({
   exact: true,
   component: () => <ManagedOverview />,
 });
-

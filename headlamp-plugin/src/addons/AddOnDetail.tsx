@@ -1,14 +1,14 @@
-import { useParams } from 'react-router-dom';
 import {
+  ConditionsTable,
+  Link,
   MainInfoSection,
   SectionBox,
   SimpleTable,
-  ConditionsTable,
-  Link,
 } from '@kinvolk/headlamp-plugin/lib/components/common';
-import { ClusterManagementAddOn, ManagedClusterAddOn } from '../resources';
+import { useParams } from 'react-router-dom';
 import StatusLabel, { conditionToStatus } from '../common/StatusLabel';
 import { getConditionStatus, useOCMContext } from '../helpers';
+import { ClusterManagementAddOn, ManagedClusterAddOn } from '../resources';
 
 export default function AddOnDetail() {
   const { name } = useParams<{ name: string }>();
@@ -56,9 +56,10 @@ export default function AddOnDetail() {
     );
   }
 
-  const perCluster = clusterAddons?.filter(
-    (ca: InstanceType<typeof ManagedClusterAddOn>) => ca.metadata.name === name
-  ) ?? [];
+  const perCluster =
+    clusterAddons?.filter(
+      (ca: InstanceType<typeof ManagedClusterAddOn>) => ca.metadata.name === name
+    ) ?? [];
 
   return (
     <>
@@ -93,10 +94,7 @@ export default function AddOnDetail() {
               {
                 label: 'Cluster',
                 getter: (ca: InstanceType<typeof ManagedClusterAddOn>) => (
-                  <Link
-                    routeName="ocm-cluster-detail"
-                    params={{ name: ca.metadata.namespace }}
-                  >
+                  <Link routeName="ocm-cluster-detail" params={{ name: ca.metadata.namespace }}>
                     {ca.metadata.namespace}
                   </Link>
                 ),
@@ -105,17 +103,14 @@ export default function AddOnDetail() {
               {
                 label: 'Available',
                 getter: (ca: InstanceType<typeof ManagedClusterAddOn>) => {
-                  const available = getConditionStatus(
-                    ca.jsonData.status?.conditions,
-                    'Available'
-                  );
+                  const available = getConditionStatus(ca.jsonData.status?.conditions, 'Available');
                   return (
                     <StatusLabel status={conditionToStatus(available?.status)}>
                       {available?.status === 'True'
                         ? 'Available'
                         : available?.status === 'False'
-                          ? 'Unavailable'
-                          : 'Unknown'}
+                        ? 'Unavailable'
+                        : 'Unknown'}
                     </StatusLabel>
                   );
                 },
@@ -132,8 +127,8 @@ export default function AddOnDetail() {
                       {configured?.status === 'True'
                         ? 'Yes'
                         : configured?.status === 'False'
-                          ? 'No'
-                          : 'Unknown'}
+                        ? 'No'
+                        : 'Unknown'}
                     </StatusLabel>
                   );
                 },

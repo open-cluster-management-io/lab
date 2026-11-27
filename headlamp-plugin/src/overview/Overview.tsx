@@ -1,14 +1,20 @@
-import { Box, Chip, Typography } from '@mui/material';
 import {
   Link,
+  PercentageCircle,
   SectionBox,
   SimpleTable,
-  PercentageCircle,
 } from '@kinvolk/headlamp-plugin/lib/components/common';
-import { ManagedCluster, Placement, ManifestWork, ClusterManagementAddOn, ManagedClusterAddOn, ClusterManager } from '../resources';
+import { Box, Chip, Typography } from '@mui/material';
 import StatusLabel, { conditionToStatus } from '../common/StatusLabel';
-import { useOCMContext, getConditionStatus } from '../helpers';
-
+import { getConditionStatus, useOCMContext } from '../helpers';
+import {
+  ClusterManagementAddOn,
+  ClusterManager,
+  ManagedCluster,
+  ManagedClusterAddOn,
+  ManifestWork,
+  Placement,
+} from '../resources';
 
 export default function Overview() {
   const ctx = useOCMContext();
@@ -55,10 +61,7 @@ export default function Overview() {
       cluster.jsonData.status?.conditions,
       'ManagedClusterConditionAvailable'
     );
-    const joined = getConditionStatus(
-      cluster.jsonData.status?.conditions,
-      'ManagedClusterJoined'
-    );
+    const joined = getConditionStatus(cluster.jsonData.status?.conditions, 'ManagedClusterJoined');
 
     if (available?.status === 'True') availableCount++;
     else unavailableCount++;
@@ -114,9 +117,15 @@ export default function Overview() {
             {
               label: 'Role',
               getter: (cluster: InstanceType<typeof ManagedCluster>) =>
-                cluster.jsonData.metadata?.labels?.['local-cluster'] === 'true'
-                  ? <Chip label="Hub" size="small" sx={{ backgroundColor: '#7b1fa2', color: '#fff' }} />
-                  : <Chip label="Managed" size="small" />,
+                cluster.jsonData.metadata?.labels?.['local-cluster'] === 'true' ? (
+                  <Chip
+                    label="Hub"
+                    size="small"
+                    sx={{ backgroundColor: '#7b1fa2', color: '#fff' }}
+                  />
+                ) : (
+                  <Chip label="Managed" size="small" />
+                ),
             },
             {
               label: 'Status',
@@ -130,8 +139,8 @@ export default function Overview() {
                     {available?.status === 'True'
                       ? 'Available'
                       : available?.status === 'False'
-                        ? 'Unavailable'
-                        : 'Unknown'}
+                      ? 'Unavailable'
+                      : 'Unknown'}
                   </StatusLabel>
                 );
               },
@@ -148,8 +157,8 @@ export default function Overview() {
                     {joined?.status === 'True'
                       ? 'Joined'
                       : joined?.status === 'False'
-                        ? 'Not Joined'
-                        : 'Unknown'}
+                      ? 'Not Joined'
+                      : 'Unknown'}
                   </StatusLabel>
                 );
               },
@@ -209,8 +218,8 @@ export default function Overview() {
                       {satisfied?.status === 'True'
                         ? 'Satisfied'
                         : satisfied?.status === 'False'
-                          ? 'Not Satisfied'
-                          : 'Unknown'}
+                        ? 'Not Satisfied'
+                        : 'Unknown'}
                     </StatusLabel>
                   );
                 },
@@ -249,10 +258,15 @@ export default function Overview() {
               {
                 label: 'Source',
                 getter: (w: InstanceType<typeof ManifestWork>) => {
-                  const replicaSet = w.jsonData.metadata?.labels?.['work.open-cluster-management.io/manifestworkreplicaset'];
-                  return replicaSet
-                    ? <StatusLabel status="success">ReplicaSet</StatusLabel>
-                    : <StatusLabel status="unknown">Manual</StatusLabel>;
+                  const replicaSet =
+                    w.jsonData.metadata?.labels?.[
+                      'work.open-cluster-management.io/manifestworkreplicaset'
+                    ];
+                  return replicaSet ? (
+                    <StatusLabel status="success">ReplicaSet</StatusLabel>
+                  ) : (
+                    <StatusLabel status="unknown">Manual</StatusLabel>
+                  );
                 },
               },
               {
@@ -264,8 +278,8 @@ export default function Overview() {
                       {applied?.status === 'True'
                         ? 'Applied'
                         : applied?.status === 'False'
-                          ? 'Not Applied'
-                          : 'Unknown'}
+                        ? 'Not Applied'
+                        : 'Unknown'}
                     </StatusLabel>
                   );
                 },
@@ -279,8 +293,8 @@ export default function Overview() {
                       {available?.status === 'True'
                         ? 'Available'
                         : available?.status === 'False'
-                          ? 'Unavailable'
-                          : 'Unknown'}
+                        ? 'Unavailable'
+                        : 'Unknown'}
                     </StatusLabel>
                   );
                 },
@@ -312,16 +326,15 @@ export default function Overview() {
               {
                 label: 'Clusters',
                 getter: (a: InstanceType<typeof ClusterManagementAddOn>) => {
-                  const cas = clusterAddons?.filter(
-                    (ca: InstanceType<typeof ManagedClusterAddOn>) =>
-                      ca.metadata.name === a.metadata.name
-                  ) ?? [];
-                  const available = cas.filter(
-                    (ca: InstanceType<typeof ManagedClusterAddOn>) => {
-                      const cond = getConditionStatus(ca.jsonData.status?.conditions, 'Available');
-                      return cond?.status === 'True';
-                    }
-                  ).length;
+                  const cas =
+                    clusterAddons?.filter(
+                      (ca: InstanceType<typeof ManagedClusterAddOn>) =>
+                        ca.metadata.name === a.metadata.name
+                    ) ?? [];
+                  const available = cas.filter((ca: InstanceType<typeof ManagedClusterAddOn>) => {
+                    const cond = getConditionStatus(ca.jsonData.status?.conditions, 'Available');
+                    return cond?.status === 'True';
+                  }).length;
                   return `${available} / ${cas.length} available`;
                 },
               },

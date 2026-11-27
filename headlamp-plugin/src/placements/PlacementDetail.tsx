@@ -1,14 +1,14 @@
-import { useParams } from 'react-router-dom';
 import {
+  ConditionsTable,
+  Link,
   MainInfoSection,
   SectionBox,
   SimpleTable,
-  ConditionsTable,
-  Link,
 } from '@kinvolk/headlamp-plugin/lib/components/common';
-import { Placement, PlacementDecision } from '../resources';
+import { useParams } from 'react-router-dom';
 import StatusLabel, { conditionToStatus } from '../common/StatusLabel';
 import { getConditionStatus, useOCMContext } from '../helpers';
+import { Placement, PlacementDecision } from '../resources';
 
 export default function PlacementDetail() {
   const { namespace, name } = useParams<{ namespace: string; name: string }>();
@@ -56,19 +56,15 @@ export default function PlacementDetail() {
     );
   }
 
-  const satisfied = getConditionStatus(
-    placement.jsonData.status?.conditions,
-    'PlacementSatisfied'
-  );
+  const satisfied = getConditionStatus(placement.jsonData.status?.conditions, 'PlacementSatisfied');
 
   const placementDecisions = decisions?.filter(
     (d: InstanceType<typeof PlacementDecision>) =>
       d.jsonData.metadata?.labels?.['cluster.open-cluster-management.io/placement'] === name
   );
 
-  const selectedClusters = placementDecisions?.flatMap(
-    (d: InstanceType<typeof PlacementDecision>) => d.decisions
-  ) ?? [];
+  const selectedClusters =
+    placementDecisions?.flatMap((d: InstanceType<typeof PlacementDecision>) => d.decisions) ?? [];
 
   return (
     <>
@@ -99,8 +95,8 @@ export default function PlacementDetail() {
                 {satisfied?.status === 'True'
                   ? 'Satisfied'
                   : satisfied?.status === 'False'
-                    ? 'Not Satisfied'
-                    : 'Unknown'}
+                  ? 'Not Satisfied'
+                  : 'Unknown'}
               </StatusLabel>
             ),
           },
@@ -115,10 +111,7 @@ export default function PlacementDetail() {
               {
                 label: 'Cluster',
                 getter: (row: { clusterName: string }) => (
-                  <Link
-                    routeName="ocm-cluster-detail"
-                    params={{ name: row.clusterName }}
-                  >
+                  <Link routeName="ocm-cluster-detail" params={{ name: row.clusterName }}>
                     {row.clusterName}
                   </Link>
                 ),
